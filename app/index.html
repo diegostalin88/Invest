@@ -600,6 +600,12 @@
                         <label class="block"><span>Custo por Perna (%, entrada e saída):</span> <input type="number" id="param-costs" value="0.1" step="0.05" class="w-full mt-1 border-orange-500"></label>
                         <hr class="border-gray-600 my-2">
                         <label class="checkbox-label text-sm"><input type="checkbox" id="param-regime-filter" checked> Abortar compras se Amplitude de Mercado (Termômetro) < 50% na data</label>
+                        <hr class="border-gray-600 my-2">
+                        <p class="text-sm font-bold">Opções dos livros <span class="font-normal text-gray-400">(0 = desligado)</span></p>
+                        <label class="block"><span>Alvo de Lucro (múltiplo do ATR):</span> <input type="number" id="param-alvo-atr" value="0" step="0.5" min="0" class="w-full mt-1"><span class="text-xs text-gray-400">Malheiros/Fitschen: vende quando o preço sobe N × ATR acima da entrada.</span></label>
+                        <label class="block"><span>Saída por Tempo (pregões):</span> <input type="number" id="param-saida-dias" value="0" step="1" min="0" class="w-full mt-1"><span class="text-xs text-gray-400">Fitschen: vende no fechamento após N pregões, se nada antes.</span></label>
+                        <label class="block"><span>Preço Mínimo p/ Entrar:</span> <input type="number" id="param-preco-min" value="0" step="1" min="0" class="w-full mt-1"><span class="text-xs text-gray-400">Kaufman: evitar ações de preço muito baixo.</span></label>
+                        <label class="block"><span>Volatilidade Máxima p/ Entrar (ATR em % do preço):</span> <input type="number" id="param-vol-max" value="0" step="0.5" min="0" class="w-full mt-1"><span class="text-xs text-gray-400">Kaufman: não entrar com volatilidade extrema.</span></label>
                     </div>
                     <button id="run-backtest-btn" class="btn btn-primary w-full p-3 mt-6" disabled>Executar Teste Isolado</button>
                 </div></div>
@@ -1451,6 +1457,10 @@
             costPct: parseFloat(document.getElementById('param-costs').value) || 0,
             targetProfitFactor: parseFloat(document.getElementById('param-rr').value) || 0,
             regimeFilter: document.getElementById('param-regime-filter').checked,
+            alvoAtr: Math.max(0, parseFloat(document.getElementById('param-alvo-atr').value) || 0),
+            saidaDias: Math.max(0, parseInt(document.getElementById('param-saida-dias').value, 10) || 0),
+            precoMin: Math.max(0, parseFloat(document.getElementById('param-preco-min').value) || 0),
+            volMax: Math.max(0, parseFloat(document.getElementById('param-vol-max').value) || 0),
             weights: getCurrentWeights()
         };
     }
@@ -1466,7 +1476,8 @@
         const indicators = precomputeAllIndicators(dataSubset, getIndicatorParameters());
         const costFraction = (riskParams.costPct || 0) / 100; // aplicado uma vez na entrada e uma vez na saída
         let position = 'out', entryPrice = 0, capital = riskParams.capital, peak = riskParams.capital, maxDD = 0, stopPrice = 0, positionSize = 0;
-        let pendingEntry = false, pendingATR = 0, entryIdx = -1;
+        let pendingEntry = false, pendingATR = 0, entryIdx = -1, targetPrice = null;
+        const saidas = { stop: 0, alvo: 0, tempo: 0 }; // por que cada trade terminou
         const trades = []; const eq = [{x: dataSubset.dates[0], y: capital}];
 
         for (let i = 200; i < dataSubset.close.length; i++) {
@@ -1484,6 +1495,8 @@
                 positionSize = stopDist > 0 ? maxRiskCash / stopDist : 0;
                 position = positionSize > 0 ? 'long' : 'out';
                 pendingEntry = false; entryIdx = i;
+                // Opção dos livros (0 = desligado): alvo de lucro em múltiplos do ATR do dia do sinal
+                targetPrice = riskParams.alvoAtr > 0 ? entryPrice + pendingATR * riskParams.alvoAtr : null;
             }
 
             if (position !== 'out') {
@@ -1494,8 +1507,13 @@
                 // ATR Trailing Stop
                 if (indicators.ATR[i]) stopPrice = Math.max(stopPrice, dataSubset.close[i] - (indicators.ATR[i] * riskParams.atrMult));
 
-                if (dataSubset.low[i] <= stopPrice) {
-                    const exitPrice = stopPrice * (1 - costFraction);
+                // Ordem conservadora: se no mesmo candle tocou stop e alvo, assume o stop.
+                let exitPrice = null;
+                if (dataSubset.low[i] <= stopPrice) { exitPrice = stopPrice; saidas.stop++; }
+                else if (targetPrice !== null && dataSubset.high[i] >= targetPrice) { exitPrice = Math.max(targetPrice, dataSubset.open[i]); saidas.alvo++; }
+                else if (riskParams.saidaDias > 0 && i - entryIdx + 1 >= riskParams.saidaDias) { exitPrice = dataSubset.close[i]; saidas.tempo++; }
+                if (exitPrice !== null) {
+                    exitPrice *= (1 - costFraction);
                     const pnl = (exitPrice - entryPrice) * positionSize; trades.push({ pnl, pct: pnl/capital });
                     capital += pnl; position = 'out'; curEq = capital;
                 }
@@ -1507,6 +1525,9 @@
                     const pct = regimeByDateMap[dataSubset.dates[i]];
                     if (pct !== undefined && pct < 50) regimeOk = false; // sem dado de regime naquela data -> não bloqueia (fail-open)
                 }
+                // Opções dos livros (0 = desligado): preço mínimo e volatilidade máxima para entrar
+                if (regimeOk && riskParams.precoMin > 0 && dataSubset.close[i] < riskParams.precoMin) regimeOk = false;
+                if (regimeOk && riskParams.volMax > 0 && indicators.ATR[i] && indicators.ATR[i] / dataSubset.close[i] * 100 > riskParams.volMax) regimeOk = false;
                 if (regimeOk) {
                     const signals = analyzeAllSignals(dataSubset, indicators, i);
                     const { totalScore } = computeStrategyScore(signals, riskParams.weights);
@@ -1528,8 +1549,81 @@
         const grossWin = wins.reduce((s,t)=>s+t.pnl,0); const grossLoss = Math.abs(losses.reduce((s,t)=>s+t.pnl,0));
         const profitFactor = grossLoss > 0 ? grossWin/grossLoss : (grossWin > 0 ? Infinity : 0);
         // Estado no último candle (só leitura, para o "Plano de operação"; não muda o resultado)
-        const aberta = position === 'long' ? { entrada: entryPrice, data: dataSubset.dates[entryIdx], stop: stopPrice } : null;
-        return { final: capital, returnPct, maxDD, winRate, expectancy, trades: trades.length, eq, profitFactor, aberta, sinalHoje: pendingEntry, atrHoje: pendingATR };
+        const aberta = position === 'long' ? { entrada: entryPrice, data: dataSubset.dates[entryIdx], stop: stopPrice, alvo: targetPrice, dias: dataSubset.close.length - entryIdx } : null;
+        return { final: capital, returnPct, maxDD, winRate, expectancy, trades: trades.length, eq, profitFactor, aberta, sinalHoje: pendingEntry, atrHoje: pendingATR, saidas, retornosTrades: trades.map(t => t.pct) };
+    }
+
+    // ===== Ferramentas de validação tiradas dos livros (só leitura: não mudam o resultado do Backtest) =====
+    // Monte Carlo (Chan, Fitschen): sorteia os trades com reposição e recompõe o capital várias vezes,
+    // para ver a faixa de resultados que a MESMA regra poderia ter dado só por sorte da ordem/amostra.
+    function monteCarloTrades(retornos, n = 1000) {
+        if (!retornos || retornos.length < 5) return null;
+        let semente = 12345; const aleat = () => { semente = (semente * 1103515245 + 12345) % 2147483648; return semente / 2147483648; };
+        const finais = [], quedas = [];
+        for (let k = 0; k < n; k++) {
+            let cap = 1, pico = 1, dd = 0;
+            for (let j = 0; j < retornos.length; j++) {
+                cap *= 1 + retornos[Math.floor(aleat() * retornos.length)];
+                if (cap > pico) pico = cap; dd = Math.max(dd, (pico - cap) / pico);
+            }
+            finais.push(cap - 1); quedas.push(dd);
+        }
+        finais.sort((a, b) => a - b); quedas.sort((a, b) => a - b);
+        const q = (v, p) => v[Math.min(v.length - 1, Math.floor(p * v.length))];
+        return { p5: q(finais, 0.05), p50: q(finais, 0.5), p95: q(finais, 0.95), probPerda: finais.filter(x => x < 0).length / n, dd95: q(quedas, 0.95) };
+    }
+    // Robustez (Kaufman): a regra precisa continuar boa com parâmetros VIZINHOS, não só no valor escolhido.
+    function robustezParametros(dados, rp) {
+        const linhas = [];
+        for (const dS of [-0.5, 0, 0.5]) for (const dA of [-0.5, 0, 0.5]) {
+            const r2 = { ...rp, minScore: Math.max(0, rp.minScore + dS), atrMult: Math.max(0.5, rp.atrMult + dA) };
+            const res = runCoreBacktest(dados, r2);
+            if (res) linhas.push({ minScore: r2.minScore, atrMult: r2.atrMult, pf: res.profitFactor, ret: res.returnPct, trades: res.trades, centro: dS === 0 && dA === 0 });
+        }
+        const bons = linhas.filter(l => l.trades > 0 && l.pf >= 1).length;
+        return { linhas, bons, total: linhas.length };
+    }
+    // Perfil do papel (Malheiros/Fitschen; teste da Razão de Variância de Chan): compara a variação de 10 dias
+    // com 10× a variação de 1 dia. Acima de 1 = movimentos se prolongam (tendência); abaixo de 1 = voltam (reversão).
+    function perfilDoAtivo(d, janela = 10) {
+        const c = d && d.close; if (!c || c.length < janela * 30) return null;
+        const r1 = []; for (let i = 1; i < c.length; i++) if (c[i] > 0 && c[i - 1] > 0) r1.push(Math.log(c[i] / c[i - 1]));
+        const rk = []; for (let i = janela; i < c.length; i++) if (c[i] > 0 && c[i - janela] > 0) rk.push(Math.log(c[i] / c[i - janela]));
+        const variancia = v => { const m = v.reduce((a, b) => a + b, 0) / v.length; return v.reduce((a, b) => a + (b - m) ** 2, 0) / (v.length - 1); };
+        const v1 = variancia(r1); if (!(v1 > 0)) return null;
+        const vr = variancia(rk) / (janela * v1);
+        const tipo = vr > 1.1 ? 'tendencia' : vr < 0.9 ? 'reversao' : 'neutro';
+        const nome = { tendencia: 'Tendência', reversao: 'Reversão', neutro: 'Sem viés claro' }[tipo];
+        const texto = { tendencia: 'os movimentos costumam se prolongar: estratégias de rompimento e médias móveis combinam mais.', reversao: 'os movimentos costumam voltar: comprar quedas e suportes combina mais; rompimentos falham com frequência.', neutro: 'nem tendência nem reversão se destacam no histórico.' }[tipo];
+        return { vr, tipo, nome, texto };
+    }
+    function avisoSobrevivencia() {
+        return MERCADO.pasta === 'br'
+            ? 'O Brasil usa a carteira <b>atual</b> do IBOVESPA. Empresas que saíram do índice (ou quebraram) não entram no teste, então o resultado tende a ser otimista (viés de sobrevivência, Chan).'
+            : 'A lista de ações é a de <b>hoje</b>. Empresas que deixaram a bolsa não entram no teste, então o resultado tende a ser otimista (viés de sobrevivência, Chan).';
+    }
+    function relatorioLivros(ticker, res, rp) {
+        const pct = v => (v * 100).toFixed(1) + '%';
+        const mc = monteCarloTrades(res.retornosTrades);
+        const perf = perfilDoAtivo(allData[ticker]);
+        const extras = rp.alvoAtr > 0 || rp.saidaDias > 0;
+        let h = '<div class="mt-4 space-y-3 text-sm" id="bt-livros">';
+        if (extras || res.saidas.stop) h += `<div class="result-metric"><span class="text-xs text-gray-400">Como os trades terminaram</span><div class="text-base mt-1">Stop: <b>${res.saidas.stop}</b>${rp.alvoAtr > 0 ? ` · Alvo: <b>${res.saidas.alvo}</b>` : ''}${rp.saidaDias > 0 ? ` · Tempo: <b>${res.saidas.tempo}</b>` : ''}</div></div>`;
+        if (perf) h += `<div class="result-metric"><span class="text-xs text-gray-400">Perfil do papel (Razão de Variância ${perf.vr.toFixed(2)})</span><div class="text-base mt-1"><b>${perf.nome}</b>: ${perf.texto}</div></div>`;
+        h += mc ? `<div class="result-metric"><span class="text-xs text-gray-400">Monte Carlo (1.000 sorteios dos ${res.trades} trades)</span><div class="text-base mt-1">Retorno provável entre <b>${pct(mc.p5)}</b> e <b>${pct(mc.p95)}</b> (mediana ${pct(mc.p50)}). Chance de terminar no prejuízo: <b>${pct(mc.probPerda)}</b>. Queda máxima no pior caso (95%): <b>${pct(mc.dd95)}</b>.</div></div>`
+                : '<div class="result-metric"><span class="text-xs text-gray-400">Monte Carlo</span><div class="text-base mt-1">Poucos trades (menos de 5) para sortear.</div></div>';
+        h += `<div class="result-metric" id="bt-robustez"><span class="text-xs text-gray-400">Robustez (Score Mínimo e ATR vizinhos)</span><div class="text-base mt-1">Calculando…</div></div>`;
+        h += `<p class="text-xs text-yellow-400">⚠️ ${avisoSobrevivencia()}</p></div>`;
+        return h;
+    }
+    function preencherRobustez(ticker, rp) {
+        const box = document.getElementById('bt-robustez'); if (!box) return;
+        const r = robustezParametros(allData[ticker], rp);
+        const cel = l => `<td class="p-1 text-center ${l.centro ? 'font-bold underline' : ''} ${l.trades && l.pf >= 1 ? 'text-green-400' : 'text-red-400'}">${l.trades ? (l.pf === Infinity ? '∞' : l.pf.toFixed(2)) : '—'}</td>`;
+        const atrs = [...new Set(r.linhas.map(l => l.atrMult))]; const scores = [...new Set(r.linhas.map(l => l.minScore))];
+        const tabela = `<table class="mt-2 text-sm"><tr><td class="p-1 text-gray-400">Score \\ ATR</td>${atrs.map(a => `<td class="p-1 text-center text-gray-400">${a.toFixed(1)}</td>`).join('')}</tr>${scores.map(sc => `<tr><td class="p-1 text-gray-400">${sc.toFixed(1)}</td>${atrs.map(a => cel(r.linhas.find(l => l.minScore === sc && l.atrMult === a))).join('')}</tr>`).join('')}</table>`;
+        const veredito = r.bons >= 7 ? '✅ Robusta: o fator de lucro fica acima de 1 na maioria das combinações vizinhas.' : r.bons >= 5 ? '⚠️ Mais ou menos: parte das combinações vizinhas perde dinheiro.' : '❌ Frágil: o bom resultado depende do valor exato dos parâmetros.';
+        box.innerHTML = `<span class="text-xs text-gray-400">Robustez (fator de lucro com Score Mínimo e ATR vizinhos; sublinhado = o seu)</span><div class="text-base mt-1">${veredito} (${r.bons} de ${r.total})</div>${tabela}`;
     }
 
     runBacktestBtn.addEventListener('click', () => {
@@ -1541,7 +1635,8 @@
         const pfLabel = res.profitFactor === Infinity ? '∞' : res.profitFactor.toFixed(2);
         const pfPass = res.profitFactor >= pfTarget;
         const lowSample = res.trades < 20 ? `<p class="text-xs text-yellow-400 mt-3">⚠️ Amostra pequena (${res.trades} trades): resultado pouco confiável estatisticamente. Prefira ativos/períodos com mais operações antes de confiar nestes números.</p>` : '';
-        document.getElementById('backtest-results-container').innerHTML = `<div class="backtest-results-grid"><div class="result-metric"><span class="text-xs text-gray-400">Capital Final</span><div class="value">${res.final.toLocaleString(MERCADO.locale,{style:'currency',currency:MERCADO.moeda})}</div></div><div class="result-metric"><span class="text-xs text-gray-400">Retorno Ttl</span><div class="value ${res.returnPct>0?'positive':'negative'}">${(res.returnPct*100).toFixed(2)}%</div></div><div class="result-metric"><span class="text-xs text-gray-400">Max Drawdown</span><div class="value negative">${(res.maxDD*100).toFixed(2)}%</div></div><div class="result-metric"><span class="text-xs text-gray-400">Win Rate</span><div class="value">${(res.winRate*100).toFixed(1)}%</div></div><div class="result-metric"><span class="text-xs text-gray-400">Nº de Trades</span><div class="value">${res.trades}</div></div><div class="result-metric ${pfPass?'border-green-500':'border-red-500'} border-2"><span class="text-xs ${pfPass?'text-green-400':'text-red-400'}">Profit Factor (meta ${pfTarget.toFixed(2)})</span><div class="value ${pfPass?'positive':'negative'}">${pfLabel} ${pfPass?'✅':'❌'}</div></div><div class="result-metric border-indigo-500 border-2"><span class="text-xs text-indigo-400">Expectância (${MERCADO.simbolo})</span><div class="value ${res.expectancy>0?'positive':'negative'}">${res.expectancy.toFixed(2)}</div></div></div>${lowSample}`;
+        document.getElementById('backtest-results-container').innerHTML = `<div class="backtest-results-grid"><div class="result-metric"><span class="text-xs text-gray-400">Capital Final</span><div class="value">${res.final.toLocaleString(MERCADO.locale,{style:'currency',currency:MERCADO.moeda})}</div></div><div class="result-metric"><span class="text-xs text-gray-400">Retorno Ttl</span><div class="value ${res.returnPct>0?'positive':'negative'}">${(res.returnPct*100).toFixed(2)}%</div></div><div class="result-metric"><span class="text-xs text-gray-400">Max Drawdown</span><div class="value negative">${(res.maxDD*100).toFixed(2)}%</div></div><div class="result-metric"><span class="text-xs text-gray-400">Win Rate</span><div class="value">${(res.winRate*100).toFixed(1)}%</div></div><div class="result-metric"><span class="text-xs text-gray-400">Nº de Trades</span><div class="value">${res.trades}</div></div><div class="result-metric ${pfPass?'border-green-500':'border-red-500'} border-2"><span class="text-xs ${pfPass?'text-green-400':'text-red-400'}">Profit Factor (meta ${pfTarget.toFixed(2)})</span><div class="value ${pfPass?'positive':'negative'}">${pfLabel} ${pfPass?'✅':'❌'}</div></div><div class="result-metric border-indigo-500 border-2"><span class="text-xs text-indigo-400">Expectância (${MERCADO.simbolo})</span><div class="value ${res.expectancy>0?'positive':'negative'}">${res.expectancy.toFixed(2)}</div></div></div>${lowSample}${relatorioLivros(ticker, res, rp)}`;
+        setTimeout(() => preencherRobustez(ticker, rp), 30);
         Plotly.newPlot('backtest-capital-curve', [{x: res.eq.map(e=>e.x), y: res.eq.map(e=>e.y), type:'scatter'}], {title:'In-Sample Equity', paper_bgcolor:'#1f2937', plot_bgcolor:'#1f2937', font:{color:'#fff'}});
     });
 
@@ -2262,6 +2357,8 @@
                 <p class="mt-2">Pelas regras do Backtest, a compra aconteceu em ${res.aberta.data.split("-").reverse().join("/")} e ainda não bateu no stop.</p>`;
             grade = dado('Preço de entrada', fmtPrecoM(res.aberta.entrada)) + dado('Resultado até hoje', fmtPctM(lucro), lucro >= 0 ? '#22c55e' : '#ef4444')
                 + dado('Stop móvel (sair se tocar)', fmtPrecoM(res.aberta.stop), '#ef4444') + dado('Distância do stop', dist(res.aberta.stop));
+            if (res.aberta.alvo) grade += dado('Alvo de lucro (vender se tocar)', `${fmtPrecoM(res.aberta.alvo)} <span class="text-sm" style="color:var(--mudo)">${dist(res.aberta.alvo)}</span>`, '#22c55e');
+            if (rp.saidaDias > 0) grade += dado('Saída por tempo', `em ${Math.max(1, rp.saidaDias - res.aberta.dias)} pregão(ões)`);
         } else if (res.sinalHoje) {
             const atr = res.atrHoje;
             const stopIni = Math.max(fech - atr * rp.atrMult, fech * (1 - rp.stopLossPct / 100));
@@ -2270,6 +2367,8 @@
                 <p class="mt-2">O score passou do mínimo (${fmtNumM(rp.minScore, 1)}) no fechamento de hoje. Pela regra, a compra é na <b>abertura do próximo pregão</b>. Os valores abaixo usam o fechamento de hoje como estimativa.</p>`;
             grade = dado('Entrada estimada', fmtPrecoM(fech)) + dado('Stop inicial', fmtPrecoM(stopIni), '#ef4444')
                 + dado('Risco por ação', `${fmtPrecoM(risco)} (${fmtPctM(-risco / fech * 100).replace('+', '')})`) + dado(`Qtd. p/ arriscar ${fmtNumM(rp.riskTrade, 1)}%`, `${qtd} ações`);
+            if (rp.alvoAtr > 0) grade += dado('Alvo de lucro estimado', `${fmtPrecoM(fech + atr * rp.alvoAtr)} <span class="text-sm" style="color:var(--mudo)">${dist(fech + atr * rp.alvoAtr)}</span>`, '#22c55e');
+            if (rp.saidaDias > 0) grade += dado('Saída por tempo', `após ${rp.saidaDias} pregões`);
         } else {
             const ind = precomputeAllIndicators(d, getIndicatorParameters());
             const { totalScore } = computeStrategyScore(analyzeAllSignals(d, ind, n - 1), rp.weights);
@@ -2295,8 +2394,13 @@
             </div>
             <p class="text-sm mt-2" style="color:var(--mudo)">${res.trades < 20 ? '⚠️ Poucas operações: o histórico ainda é pouco confiável. ' : ''}${passa ? 'A regra passou na meta de fator de lucro neste papel.' : 'A regra <b>não</b> passou na meta de fator de lucro neste papel: o histórico pede cautela.'}</p>`;
         const fund = `<div class="am-card mt-4 text-sm">Fundamentos: <b>${ex.f ? ex.notaFund + '/5' : 'sem dados'}</b>. O preço diz <i>quando</i>; os fundamentos dizem <i>se vale a pena</i> ter o papel.</div>`;
-        return `${cab}<div class="am-grade mt-3">${grade}</div>${hist}${fund}
-            <p class="text-xs mt-4" style="color:var(--mudo)">A saída é só por stop: o stop móvel sobe junto com o preço (fechamento − ${fmtNumM(rp.atrMult, 1)} × ATR) e nunca desce. Não há alvo de venda. Parâmetros do Módulo 3; não é recomendação de investimento.</p>`;
+        const perf = perfilDoAtivo(d);
+        const perfil = perf ? `<div class="am-card mt-4 text-sm">Perfil do papel: <b>${perf.nome}</b>. No histórico, ${perf.texto}</div>` : '';
+        const regrasSaida = ['o stop móvel sobe junto com o preço (fechamento − ' + fmtNumM(rp.atrMult, 1) + ' × ATR) e nunca desce'];
+        if (rp.alvoAtr > 0) regrasSaida.push(`o alvo vende quando o preço sobe ${fmtNumM(rp.alvoAtr, 1)} × ATR acima da entrada`);
+        if (rp.saidaDias > 0) regrasSaida.push(`a saída por tempo vende após ${rp.saidaDias} pregões`);
+        return `${cab}<div class="am-grade mt-3">${grade}</div>${hist}${perfil}${fund}
+            <p class="text-xs mt-4" style="color:var(--mudo)">Saída: ${regrasSaida.join('; ')}.${rp.alvoAtr > 0 || rp.saidaDias > 0 ? '' : ' Não há alvo de venda (dá para ligar em Testes → Backtest → Opções dos livros).'} ${avisoSobrevivencia().replace(/<\/?b>/g, '')} Não é recomendação de investimento.</p>`;
     }
     let ativoAberto = null;
     function abrirAtivo(t, aba = 'resumo') {
@@ -2504,7 +2608,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { get graficos() { return graficos; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14 };
+    window.investDebug = { get graficos() { return graficos; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).

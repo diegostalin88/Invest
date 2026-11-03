@@ -155,6 +155,18 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     await page.click('#run-backtest-btn');
     await page.waitForSelector('#backtest-results-container .result-metric', { timeout: 30000 });
     ok(true, 'Backtest roda');
+    await page.waitForFunction(() => /Robusta|Mais ou menos|Frágil/.test((document.getElementById('bt-robustez') || {}).textContent || ''), null, { timeout: 30000 });
+    const livros = await page.textContent('#bt-livros');
+    ok(/Monte Carlo/.test(livros) && /Perfil do papel/.test(livros) && /sobrevivência/.test(livros), 'Backtest: Monte Carlo, perfil do papel, robustez e aviso de sobrevivência');
+    const opcoes = await page.evaluate(() => {
+        const I = window.investDebug; const d = I.allData['BOA1']; const base = I.getBacktestRiskParams();
+        const r0 = I.runCoreBacktest(d, base);
+        const r1 = I.runCoreBacktest(d, { ...base, alvoAtr: 2, saidaDias: 10 });
+        const r2 = I.runCoreBacktest(d, { ...base, precoMin: 1e9 });
+        const fechados = r1.saidas.stop + r1.saidas.alvo + r1.saidas.tempo;
+        return { padraoSoStop: r0.saidas.alvo === 0 && r0.saidas.tempo === 0, somaBate: fechados === r1.trades, usouAlvoOuTempo: r1.saidas.alvo + r1.saidas.tempo > 0, filtroPreco: r2.trades === 0 };
+    });
+    ok(opcoes.padraoSoStop && opcoes.somaBate && opcoes.usouAlvoOuTempo && opcoes.filtroPreco, `Backtest: opções dos livros (alvo, tempo, preço mínimo) funcionam e ficam desligadas por padrão ${JSON.stringify(opcoes)}`);
     await page.click('button[data-tab="walkforward"]');
     await page.click('#run-walkforward-btn');
     await page.waitForSelector('#walkforward-summary .result-metric', { timeout: 30000 });
