@@ -52,16 +52,33 @@
         .corr-high { background-color: #7f1d1d; } /* Alta correlação positiva (Perigo) */
         .corr-mid { background-color: #92400e; }
         .corr-low { background-color: #064e3b; } /* Correlação baixa/negativa (Bom para diversificar) */
+        /* ---- Celular ---- */
+        @media (max-width: 640px) {
+            body { padding: 0.75rem !important; }
+            .card { padding: 1rem; border-radius: 0.6rem; }
+            .tab-btn { padding: 0.6rem 0.9rem; font-size: 0.85rem; }
+            .btn { padding: 0.6rem 1rem; }
+            select, input[type="text"], input[type="number"], textarea { font-size: 16px; } /* evita zoom automático do iOS */
+            .results-table th, .results-table td { padding: 0.5rem 0.45rem; font-size: 0.8rem; }
+            .results-table td.text-xs, .results-table td:last-child.text-xs { min-width: 13rem; }
+            .result-metric { padding: 0.6rem; }
+            .result-metric .value { font-size: 1.2rem; }
+            .backtest-results-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+            #melhores-opcoes-resumo p.text-xs { font-size: 0.7rem; }
+            .correlation-matrix th, .correlation-matrix td { padding: 0.3rem; font-size: 0.7rem; }
+        }
+        /* Tabelas largas rolam de lado dentro do cartão, sem estourar a página */
+        .overflow-x-auto { -webkit-overflow-scrolling: touch; }
     </style>
 </head>
 <body class="p-4 md:p-8">
     <div class="max-w-screen-2xl mx-auto">
-        <div class="flex justify-between items-center mb-6">
+        <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
             <div>
-                <h1 class="text-4xl font-bold">Dashboard Quantitativo</h1>
+                <h1 class="text-2xl sm:text-4xl font-bold">Dashboard Quantitativo</h1>
                 <p class="text-gray-400">Arquitetura Fitschen/Kaufman: Walk-Forward & Paridade de Risco</p>
             </div>
-            <div id="market-sentiment-module" class="card w-96 hidden">
+            <div id="market-sentiment-module" class="card w-full md:w-96 hidden">
                 <h3 class="text-base font-bold mb-2">Filtro de Regime (Ativos > MME 200)</h3>
                 <div class="w-full bg-gray-700 rounded-full h-6">
                     <div id="market-thermometer-bar" class="h-6 rounded-full text-center text-white text-sm font-bold" style="width: 0%;"></div>
@@ -106,7 +123,7 @@
         <div id="tab-contents">
             <!-- Módulo 1 -->
             <div id="screener-content" class="tab-content active"><div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-1 space-y-6">
+                <div class="lg:col-span-1 space-y-6 order-2 lg:order-1">
                     <div class="card border-l-4 border-indigo-500">
                         <h3 class="text-lg font-bold mb-4">A. Restrição de Liquidez</h3>
                         <div class="space-y-4 text-sm">
@@ -164,7 +181,7 @@
                     </div>
                 </div>
 
-                <div class="lg:col-span-2 card">
+                <div class="lg:col-span-2 card order-1 lg:order-2">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-lg font-bold">Vetor de Ativos Aprovados</h3>
                         <button id="download-btn" class="btn btn-secondary text-sm" disabled>Exportar CSV</button>
@@ -201,7 +218,7 @@
                         <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="DMI"> DMI</label>
                     </div>
                 </div>
-                <div id="analysis-chart" style="min-height: 650px;"></div>
+                <div id="analysis-chart" class="min-h-[420px] md:min-h-[650px]"></div>
             </div>
             
             <!-- Hidden inputs to keep calculations working -->
@@ -286,7 +303,7 @@
 
             <!-- Módulo 6: Fundamentos (NOVO) -->
             <div id="fundamentals-content" class="tab-content"><div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-1 space-y-6">
+                <div class="lg:col-span-1 space-y-6 order-2 lg:order-1">
                     <div class="card border-l-4 border-purple-500">
                         <h3 class="text-lg font-bold mb-2 text-purple-400">A. Fundamentos</h3>
                         <p class="text-xs text-gray-400 mb-4">Carregados automaticamente junto com os preços. A coleta diária busca fundamentos (Yahoo, com reserva na SEC EDGAR), radar de 8-K e sinais de mercado para todo ativo com volume financeiro médio ≥ US$ 10 mi/dia; os índices são renovados a cada 7 dias e o radar de 8-K todo dia. Para usar um arquivo próprio, abra o "Modo manual (avançado)" no topo.</p>
@@ -305,7 +322,7 @@
                         <p class="text-xs text-gray-500 mt-3">Critérios não preenchidos nos dados (ex: fonte só parcial) não reprovam o ativo — aparecem como "s/dado".</p>
                     </div>
                 </div>
-                <div class="lg:col-span-2 card">
+                <div class="lg:col-span-2 card order-1 lg:order-2">
                     <h3 class="text-lg font-bold mb-4">Shortlist Técnico × Qualidade Fundamentalista</h3>
                     <p class="text-xs text-gray-400 mb-4">Score Combinado = Score técnico (Módulo 1) + 1 ponto para cada critério fundamentalista aprovado (máx. 5). Isto é uma ferramenta de apoio à análise — não é recomendação de investimento; os números vêm de fontes públicas gratuitas e podem estar incompletos ou defasados.</p>
                     <div id="fundamentals-results-container" class="overflow-x-auto"></div>
@@ -1306,7 +1323,7 @@
             topHtml = `<div class="card border-2 border-green-500 mb-6">
                 <h4 class="text-base font-bold text-green-400 mb-1">🏆 Melhores Opções (dados fundamentalistas suficientes)</h4>
                 <p class="text-xs text-gray-400 mb-4">Ranking por Score Combinado, só entre ativos com pelo menos ${MIN_DATA_COVERAGE_FOR_RANKING}/5 critérios fundamentalistas com dado real e SEM evento corporativo crítico recente (ETFs/fundos e ativos sob risco de falência/deslistagem/restatement/fusão ficam de fora daqui, mesmo que apareçam na tabela completa abaixo).</p>
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
                 ${topPicks.map((r, i) => `
                     <div class="result-metric text-left">
                         <div class="text-xs text-gray-400">${medals[i]} · Fund. ${r.fundScore}/5</div>
