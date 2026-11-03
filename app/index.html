@@ -116,16 +116,6 @@
                         </div>
                     </div>
 
-                    <div class="card border-l-4 border-red-500">
-                        <h3 class="text-lg font-bold mb-2 text-red-400">B. Guilhotina Macro (Blacklist)</h3>
-                        <div class="flex flex-wrap gap-2 mb-4">
-                            <button id="btn-crisis-china" class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white border border-gray-500">Guerra China/Chips</button>
-                            <button id="btn-crisis-juros" class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white border border-gray-500">Juros/Biotech</button>
-                            <button id="btn-crisis-petroleo" class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white border border-gray-500">Choque Petróleo</button>
-                            <button id="btn-crisis-clear" class="px-2 py-1 bg-gray-800 hover:bg-red-900 rounded text-xs text-red-400 border border-red-800">Limpar</button>
-                        </div>
-                        <label class="block"><textarea id="param-blacklist" rows="3" class="w-full mt-1 bg-gray-900 text-xs font-mono" placeholder="Tickers bloqueados..."></textarea></label>
-                    </div>
 
                     <div class="card">
                         <details open>
@@ -311,22 +301,6 @@
         }
     });
 
-    // BLACKLIST MACRO
-    const toxicLists = {
-        china: "AAPL, NVDA, NVDL, NVDU, SOXL, AMD, INTC, MU, SBUX, TSLA, QCOM, TSM, ASML, AMAT, LRCX, KLAC, TXN, SWKS, NXPI, WMT, TGT",
-        juros: "SEDG, ENPH, REGN, VKTX, PTGX, PTCT, FSLR, RUN, SPWR, NOVA, IBB, XBI, LABU",
-        petroleo: "SAIA, DAL, UAL, AAL, LUV, FDX, UPS, ODFL, XPO, CHRW"
-    };
-    function addListToBlacklist(listStr) {
-        const current = document.getElementById('param-blacklist').value;
-        const currentArr = current.split(',').map(s => s.trim()).filter(s => s !== "");
-        const newArr = listStr.split(',').map(s => s.trim());
-        document.getElementById('param-blacklist').value = [...new Set([...currentArr, ...newArr])].join(', ');
-    }
-    document.getElementById('btn-crisis-china').addEventListener('click', () => addListToBlacklist(toxicLists.china));
-    document.getElementById('btn-crisis-juros').addEventListener('click', () => addListToBlacklist(toxicLists.juros));
-    document.getElementById('btn-crisis-petroleo').addEventListener('click', () => addListToBlacklist(toxicLists.petroleo));
-    document.getElementById('btn-crisis-clear').addEventListener('click', () => document.getElementById('param-blacklist').value = "");
 
     // GLOBAIS
     let allData = {}; let filteredScreenerResults = []; let currentScreenerIndex = -1; let historicalRegimeData = [];
@@ -668,7 +642,6 @@
           try {
             const currentWeights = getCurrentWeights();
             const minAdtv = parseFloat(document.getElementById('filter-adtv').value) || 0;
-            const blacklist = document.getElementById('param-blacklist').value.toUpperCase().split(',').map(t => t.trim()).filter(t => t !== "");
             let scoredAssets = {}; const params = getIndicatorParameters();
             const todosTickers = Object.keys(allData);
             let ultimaPausa = performance.now();
@@ -680,7 +653,6 @@
                     ultimaPausa = performance.now();
                 }
                 const ticker = todosTickers[k];
-                if (blacklist.includes(ticker)) continue;
                 const data = allData[ticker]; if (!data || data.close.length < 201) continue;
                 const i = data.close.length - 1;
                 
