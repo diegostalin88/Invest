@@ -83,6 +83,26 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     await page.waitForFunction(() => /B\. Força do Volume/.test(document.getElementById('estrategias-results').textContent), null, { timeout: 60000 });
     const volB = await page.$$eval('#estrategias-results tbody tr td:first-child', t => t.map(x => x.textContent.trim()));
     ok(volB.includes('CRIT') && volB.includes('BOA1'), `B. "Força do Volume" pega os ativos com spike de volume: ${volB.join(', ')}`);
+    // "Otimista": o sinal IFR_Cross_SMA_Up agora existe, então a estratégia consegue disparar
+    const otim = await page.evaluate(() => {
+        const { allData, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14 } = window.investDebug;
+        const params = getIndicatorParameters(); let diasIfr = 0, diasOtimista = 0;
+        for (const t of Object.keys(allData)) {
+            const d = allData[t]; if (d.close.length < 201) continue;
+            const ind = v14_precomputarIndicadores(d, params);
+            for (let i = 201; i < d.close.length; i++) {
+                const b = v14_analisarSinais(d, ind, i).buy;
+                if (b.IFR_Cross_SMA_Up) diasIfr++;
+                if (estrategiasV14.optimistic_buy.buy.every(k => b[k])) diasOtimista++;
+            }
+        }
+        return { diasIfr, diasOtimista };
+    });
+    ok(otim.diasIfr > 0 && otim.diasOtimista > 0, `"Otimista" dispara no histórico (IFR cruzou a média em ${otim.diasIfr} dias; os 3 sinais juntos em ${otim.diasOtimista})`);
+    await page.selectOption('#confluence-select', 'optimistic_buy');
+    await page.click('#run-filter-btn');
+    await page.waitForFunction(() => /B\. Otimista \(ADL\+Mom\+IFR\): \d+ ativo/.test(document.getElementById('estrategias-results').textContent), null, { timeout: 60000 });
+    ok(true, `B. "Otimista" roda: ${(await page.textContent('#estrategias-results h4')).trim()}`);
     ok((await page.$$eval('#screener-results-container tbody tr', t => t.length)) === antes, 'B não altera o shortlist do motor de pontuação');
     ok(await page.$('#param-blacklist') === null, 'Guilhotina Macro (Blacklist) removida');
     await page.screenshot({ path: path.join(SHOTS, 'app_screener_estrategias.png'), fullPage: false });

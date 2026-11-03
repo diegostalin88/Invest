@@ -819,6 +819,8 @@
     // =============================================================================================
     function v14_calculateMACD(data, fast, slow, signal) { const fastEMA = calculateEMA(data, fast); const slowEMA = calculateEMA(data, slow); const macdLine = fastEMA.map((e, i) => (e !== null && slowEMA[i] !== null) ? e - slowEMA[i] : null); const signalData = { close: macdLine.filter(v => v !== null) }; const signalEMA = signalData.close.length > signal ? calculateEMA(signalData, signal) : []; let signalLine = new Array(macdLine.length).fill(null); for (let i = 0, j = 0; i < macdLine.length; i++) { if (macdLine[i] !== null) { if (j < signalEMA.length) { signalLine[i] = signalEMA[j]; j++; } } } const histogram = macdLine.map((m, i) => (m !== null && signalLine[i] !== null) ? m - signalLine[i] : null); return { macdLine, signalLine, histogram }; }
     function v14_calculateIFR(data, length) { if (!data || !data.close) return []; const close = data.close; let gains = [], losses = []; for (let i = 1; i < close.length; i++) { const change = close[i] - close[i - 1]; gains.push(change > 0 ? change : 0); losses.push(change < 0 ? -change : 0); } if (gains.length < length) return new Array(close.length).fill(null); let avgGain = gains.slice(0, length).reduce((a,b)=>a+b,0)/length; let avgLoss = losses.slice(0, length).reduce((a,b)=>a+b,0)/length; let ifr = [100 - (100 / (1 + (avgLoss === 0 ? Infinity : avgGain / avgLoss)))]; for (let i = length; i < gains.length; i++) { avgGain = (avgGain * (length - 1) + gains[i]) / length; avgLoss = (avgLoss * (length - 1) + losses[i]) / length; ifr.push(100 - (100 / (1 + (avgLoss === 0 ? Infinity : avgGain / avgLoss)))); } return new Array(close.length - ifr.length).fill(null).concat(ifr); }
+    // Média móvel simples que só começa quando a janela inteira tem valor (o IFR começa com nulos).
+    function v14_mediaIgnorandoNulos(serie, periodo) { const out = new Array(serie.length).fill(null); let soma = 0, validos = 0; for (let i = 0; i < serie.length; i++) { const v = serie[i]; if (v === null || v === undefined || !isFinite(v)) { soma = 0; validos = 0; continue; } soma += v; validos++; if (validos > periodo) soma -= serie[i - periodo]; if (validos >= periodo) out[i] = soma / periodo; } return out; }
     function v14_calculateStoch(data, kLength, dLength) { if (!data || !data.close) return {k:[],d:[]}; const { close, high, low } = data; let k = []; for (let i = kLength - 1; i < close.length; i++) { const highSlice = high.slice(i - kLength + 1, i + 1); const lowSlice = low.slice(i - kLength + 1, i + 1); const minLow = Math.min(...lowSlice); const maxHigh = Math.max(...highSlice); k.push(maxHigh - minLow === 0 ? 0 : ((close[i] - minLow) / (maxHigh - minLow)) * 100); } const dData = { close: k }; const d = dData.close.length >= dLength ? calculateSMA(dData, dLength) : []; return { k: new Array(kLength - 1).fill(null).concat(k), d: new Array(kLength - 1 + dLength - 1).fill(null).concat(d) }; }
     function v14_calculateMomentum(data, period) { if (!data || !data.close) return []; return data.close.map((c, i) => i < period ? null : c - data.close[i - period]); }
     function v14_calculateParabolicSAR(data, start, inc, max) { if (!data || !data.close) return []; const { high, low } = data; let sar = [low[0]]; let ep = high[0]; let af = start; let isLong = true; for (let i = 1; i < high.length; i++) { let nextSar = sar[i-1] + af * (ep - sar[i-1]); if (isLong) { if (high[i] > ep) { ep = high[i]; af = Math.min(max, af + inc); } if (low[i] < nextSar) { isLong = false; nextSar = ep; ep = low[i]; af = start; } } else { if (low[i] < ep) { ep = low[i]; af = Math.min(max, af + inc); } if (high[i] > nextSar) { isLong = true; nextSar = ep; ep = high[i]; af = start; } } sar.push(nextSar); } return sar; }
@@ -892,6 +894,9 @@
         if (indicators.Stoch.k[i] > indicators.Stoch.d[i] && indicators.Stoch.k[prev] <= indicators.Stoch.d[prev] && indicators.Stoch.k[i] < 30) signals.buy.STOCH_Cross_Up_Oversold = 'Cruz. Estocástico (Sobrevenda)';
         if (indicators.Momentum[i] > 0 && indicators.Momentum[prev] <=0) signals.buy.Momentum_Cross_Up = 'Momentum Cruzou p/ Cima';
         if (indicators.Momentum[i] > indicators.Momentum[prev]) signals.buy.Momentum_Rising = 'Momentum Apontando para Cima';
+        // Sinal usado pela estratégia "Otimista": o IFR cruza para cima a sua própria média de 9 dias.
+        // (Estava listado na v14, mas nunca tinha sido programado, então a "Otimista" nunca disparava.)
+        if (indicators.IFR_SMA && indicators.IFR_SMA[i] !== null && indicators.IFR_SMA[prev] !== null && indicators.IFR[i] > indicators.IFR_SMA[i] && indicators.IFR[prev] <= indicators.IFR_SMA[prev]) signals.buy.IFR_Cross_SMA_Up = 'IFR Cruzou a Média (9) p/ Cima';
         if (indicators.SAR[i] && close[i] > indicators.SAR[i] && close[prev] <= indicators.SAR[prev]) signals.buy.SAR_Flip_Up = 'Reversão SAR Positiva';
         if (indicators.patterns.Double_Bottom.some(p => p.p3.index + PIVOT_WINDOW <= i && close[i] > p.p2.price && close[prev] <= p.p2.price)) signals.buy.Double_Bottom = 'Rompimento Fundo Duplo';
         const recentLowPivots = indicators.pivots.low.filter(p => p.index + PIVOT_WINDOW <= i);
@@ -949,7 +954,7 @@
             Keltner: calculateKeltnerChannels(data, params.keltner.ema, params.keltner.atr, 2),
             VWAP: calculateVWAP(data, 20),
             SAR: v14_calculateParabolicSAR(data, 0.02, 0.02, 0.2),
-            IFR: ifrData,
+            IFR: ifrData, IFR_SMA: v14_mediaIgnorandoNulos(ifrData, 9),
             MACD: v14_calculateMACD(data, params.macd.fast, params.macd.slow, params.macd.signal),
             Stoch: v14_calculateStoch(data, 14, 3),
             Momentum: v14_calculateMomentum(data, params.momentum.period),
@@ -1424,6 +1429,8 @@
     }
 
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
+    // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
+    window.investDebug = { get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14 };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).
