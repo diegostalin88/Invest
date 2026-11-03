@@ -73,6 +73,7 @@
                 <div class="flex-1"><label for="ticker-select" class="block text-sm font-medium text-gray-400 mb-1">Foco Analítico</label><select id="ticker-select" class="w-full"></select></div>
             </div>
             <div id="data-freshness-banner" class="mt-3 text-sm hidden"></div>
+            <div id="app-message" class="hidden" role="status"></div>
         </div>
 
         <div class="border-b border-gray-700 mb-6"><nav class="flex overflow-x-auto -mb-px" id="tabs">
@@ -478,19 +479,41 @@
         }
     }
 
+    // Mensagem na própria página (substitui os alert() de carregamento, que podem passar despercebidos ou ser bloqueados)
+    function mostrarMensagem(texto, tipo = 'info') {
+        const box = document.getElementById('app-message');
+        if (!box) return;
+        const cores = { info: 'border-indigo-500 text-indigo-200', sucesso: 'border-green-500 text-green-300', aviso: 'border-yellow-500 text-yellow-300', erro: 'border-red-500 text-red-300' };
+        box.className = `mt-3 text-sm border-l-4 pl-3 py-1 flex items-start justify-between gap-3 ${cores[tipo] || cores.info}`;
+        box.innerHTML = `<span>${texto}</span><button type="button" class="text-gray-500 hover:text-gray-300" aria-label="Fechar mensagem">✕</button>`;
+        box.querySelector('button').addEventListener('click', () => box.classList.add('hidden'));
+    }
+
+    // Ponto único de inicialização: usado tanto pelo carregamento automático (data/manifest.json) quanto pelo
+    // modo manual (upload do JSON). `fundamentos` é opcional; `meta` traz informações do manifesto para o cabeçalho.
+    function inicializarComDados(precos, fundamentos = null, meta = {}) {
+        allData = precos; const tickers = Object.keys(allData);
+        tickerSelect.innerHTML = tickers.map(t => `<option value="${t}">${t}</option>`).join('');
+        allButtons.forEach(btn => btn.disabled = false);
+        document.getElementById('strategy-weights-container').innerHTML = Object.entries(strategyWeights).map(([key, value]) => `<div class="flex items-center justify-between p-1"><label class="text-gray-300">${value.name}</label><input type="number" data-key="${key}" value="${value.weight}" step="0.1" class="w-20 strategy-weight-input"></div>`).join('');
+        document.getElementById('market-sentiment-module').classList.remove('hidden');
+        computeHistoricalRegime();
+        updateMarketThermometerUI();
+        if (fundamentos) carregarFundamentos(fundamentos);
+        updateDataFreshnessBanner(allData, meta);
+        mostrarMensagem(`${tickers.length.toLocaleString('pt-BR')} ativos prontos para Screener, Backtest e Walk-Forward.`, 'sucesso');
+    }
+
     fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0]; if (!file) return;
         const reader = new FileReader();
         reader.onload = (event) => {
-            allData = JSON.parse(event.target.result); const tickers = Object.keys(allData);
-            tickerSelect.innerHTML = tickers.map(t => `<option value="${t}">${t}</option>`).join('');
-            allButtons.forEach(btn => btn.disabled = false);
-            document.getElementById('strategy-weights-container').innerHTML = Object.entries(strategyWeights).map(([key, value]) => `<div class="flex items-center justify-between p-1"><label class="text-gray-300">${value.name}</label><input type="number" data-key="${key}" value="${value.weight}" step="0.1" class="w-20 strategy-weight-input"></div>`).join('');
-            document.getElementById('market-sentiment-module').classList.remove('hidden');
-            computeHistoricalRegime();
-            updateMarketThermometerUI();
-            updateDataFreshnessBanner(allData);
-            alert(`JSON Carregado. ${tickers.length} ativos prontos para Walk-Forward e Screener.`);
+            try {
+                inicializarComDados(JSON.parse(event.target.result));
+            } catch (err) {
+                console.error('Erro ao ler JSON de preços:', err);
+                mostrarMensagem('Não consegui ler esse JSON de preços. Confira se é o arquivo gerado pela coleta.', 'erro');
+            }
         }; reader.readAsText(file);
     });
 
@@ -724,17 +747,22 @@
 
     // MÓDULO 6: FUNDAMENTOS (cruza o shortlist técnico do Screener com dados fundamentalistas gerados
     // offline pelo fetch_fundamentals.py — ver docstring daquele script para as fontes usadas)
+    function carregarFundamentos(dados) {
+        fundamentalsData = dados || {};
+        const n = Object.keys(fundamentalsData).length;
+        document.getElementById('fundamentals-status').textContent = `${n.toLocaleString('pt-BR')} ativo(s) carregado(s).`;
+        runFundamentalsBtn.disabled = false;
+    }
+
     fundamentalsFileInput.addEventListener('change', (e) => {
         const file = e.target.files[0]; if (!file) return;
         const reader = new FileReader();
         reader.onload = (event) => {
             try {
-                fundamentalsData = JSON.parse(event.target.result);
-                const n = Object.keys(fundamentalsData).length;
-                document.getElementById('fundamentals-status').textContent = `${n} ativo(s) carregado(s).`;
-                runFundamentalsBtn.disabled = false;
+                carregarFundamentos(JSON.parse(event.target.result));
+                mostrarMensagem(`Fundamentos de ${Object.keys(fundamentalsData).length.toLocaleString('pt-BR')} ativo(s) carregados.`, 'sucesso');
             } catch (err) {
-                alert('Não consegui ler esse JSON. Confirme se é o arquivo gerado pelo fetch_fundamentals.py.');
+                mostrarMensagem('Não consegui ler esse JSON de fundamentos. Confirme se é o fundamentos.json gerado pela coleta.', 'erro');
             }
         };
         reader.readAsText(file);
