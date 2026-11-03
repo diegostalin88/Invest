@@ -285,6 +285,7 @@
         <symbol id="i-busca" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.2-4.2"/></symbol>
         <symbol id="i-filtro" viewBox="0 0 24 24"><path d="M4 6h9"/><path d="M17 6h3"/><circle cx="15" cy="6" r="2"/><path d="M4 12h3"/><path d="M11 12h9"/><circle cx="9" cy="12" r="2"/><path d="M4 18h11"/><path d="M19 18h1"/><circle cx="17" cy="18" r="2"/></symbol>
         <symbol id="i-alvo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+        <symbol id="i-carteira" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M16 13h2"/><path d="M6 6V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/></symbol>
         <symbol id="i-relatorio" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8.5 10h7M8.5 14h7M8.5 18h4"/></symbol>
         <symbol id="i-tabela" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M9 10v10"/></symbol>
         <symbol id="i-rede" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8 7.5 10.8 16"/><path d="M16 7.5 13.2 16"/><path d="M8.5 6h7"/></symbol>
@@ -323,9 +324,10 @@
             <button type="button" class="am-botao sec mt-3 hidden" id="am-ranking-mais">Mostrar mais</button>
         </section>
 
-        <section class="am-pagina" data-pagina="relatorio">
-            <div id="am-relatorio" class="relatorio-alvo"></div>
-            <p class="am-aviso">Ferramenta de apoio à análise. Não é recomendação de investimento.</p>
+        <section class="am-pagina" data-pagina="carteira">
+            <div id="am-carteira"></div>
+            <button type="button" class="am-botao mt-4" id="am-carteira-add">+ Adicionar papel</button>
+            <p class="am-aviso">A carteira fica salva só neste aparelho. Ferramenta de apoio à análise; não é recomendação de investimento.</p>
         </section>
 
         <section class="am-pagina" data-pagina="testes">
@@ -343,7 +345,7 @@
                 <button type="button" class="am-linha" data-sub="estrategias"><span class="am-avatar" style="background:#4338ca"><svg class="am-ico"><use href="#i-alvo"/></svg></span><span class="am-meio"><span class="am-tk block">Screener de Estratégias</span><span class="am-nome block">Ativos que dispararam uma estratégia hoje</span></span><svg class="am-ico" style="color:var(--mudo)"><use href="#i-dir"/></svg></button>
                 <button type="button" class="am-linha" data-sub="fundamentos"><span class="am-avatar" style="background:#7e22ce"><svg class="am-ico"><use href="#i-tabela"/></svg></span><span class="am-meio"><span class="am-tk block">Técnica × Fundamentos</span><span class="am-nome block">Tabela completa e limites de qualidade</span></span><svg class="am-ico" style="color:var(--mudo)"><use href="#i-dir"/></svg></button>
                 <button type="button" class="am-linha" data-sub="correlacao"><span class="am-avatar" style="background:#047857"><svg class="am-ico"><use href="#i-rede"/></svg></span><span class="am-meio"><span class="am-tk block">Correlação (Pearson)</span><span class="am-nome block">Evite comprar ativos que andam juntos</span></span><svg class="am-ico" style="color:var(--mudo)"><use href="#i-dir"/></svg></button>
-                <button type="button" class="am-linha" data-sub="dados"><span class="am-avatar" style="background:#374151"><svg class="am-ico"><use href="#i-dados"/></svg></span><span class="am-meio"><span class="am-tk block">Dados e atualização</span><span class="am-nome block">Data da coleta, avisos e modo manual</span></span><svg class="am-ico" style="color:var(--mudo)"><use href="#i-dir"/></svg></button>
+                <button type="button" class="am-linha" data-sub="relatorio"><span class="am-avatar" style="background:#b45309"><svg class="am-ico"><use href="#i-relatorio"/></svg></span><span class="am-meio"><span class="am-tk block">Relatório</span><span class="am-nome block">Melhor regra por papel, entradas e short squeeze</span></span><svg class="am-ico" style="color:var(--mudo)"><use href="#i-dir"/></svg></button>
             </div>
             <p class="am-aviso">Ferramenta de apoio à análise. Não é recomendação de investimento.<br>Gráficos: <a href="https://www.tradingview.com/" target="_blank" rel="noopener" class="underline">TradingView Lightweight Charts</a>.</p>
         </section>
@@ -351,7 +353,7 @@
         <nav class="am-nav" aria-label="Navegação">
             <button type="button" data-ir-pagina="inicio" class="ativa"><svg class="am-ico"><use href="#i-inicio"/></svg>Início</button>
             <button type="button" data-ir-pagina="ranking"><svg class="am-ico"><use href="#i-ranking"/></svg>Ranking</button>
-            <button type="button" data-ir-pagina="relatorio"><svg class="am-ico"><use href="#i-relatorio"/></svg>Relatório</button>
+            <button type="button" data-ir-pagina="carteira"><svg class="am-ico"><use href="#i-carteira"/></svg>Carteira</button>
             <button type="button" data-ir-pagina="testes"><svg class="am-ico"><use href="#i-testes"/></svg>Testes</button>
             <button type="button" data-ir-pagina="mais"><svg class="am-ico"><use href="#i-mais"/></svg>Mais</button>
         </nav>
@@ -384,11 +386,26 @@
                 <div data-sub-slot="estrategias" class="hidden space-y-4"></div>
                 <div data-sub-slot="fundamentos" class="hidden"></div>
                 <div data-sub-slot="correlacao" class="hidden"></div>
-                <div data-sub-slot="dados" class="hidden space-y-4"></div>
+                <div data-sub-slot="relatorio" class="hidden"><div id="am-relatorio" class="relatorio-alvo"></div></div>
             </div>
         </div>
 
         <!-- Painel de filtros que sobe de baixo -->
+        <div class="am-folha-fundo" id="am-cart-fundo"></div>
+        <div class="am-folha" id="am-cart-folha" role="dialog" aria-modal="true" aria-label="Papel da carteira">
+            <div class="am-alca"></div>
+            <div class="flex items-center justify-between mb-3"><div class="text-lg font-bold" id="am-cart-titulo">Adicionar papel</div><button type="button" class="text-sm font-semibold" style="color:var(--acento)" id="am-cart-fechar">Fechar</button></div>
+            <label class="block mb-3"><span class="text-sm" style="color:var(--mudo)">Papel (ex.: PETR4, IONQ)</span><input id="am-cart-ticker" list="am-cart-lista" autocomplete="off" autocapitalize="characters" class="w-full mt-1"></label>
+            <datalist id="am-cart-lista"></datalist>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+                <label class="block"><span class="text-sm" style="color:var(--mudo)">Quantidade</span><input id="am-cart-qtd" type="number" inputmode="decimal" min="0" step="any" class="w-full mt-1"></label>
+                <label class="block"><span class="text-sm" style="color:var(--mudo)">Preço médio</span><input id="am-cart-pm" type="number" inputmode="decimal" min="0" step="any" class="w-full mt-1"></label>
+            </div>
+            <label class="block mb-3"><span class="text-sm" style="color:var(--mudo)">Data da compra (opcional)</span><input id="am-cart-data" type="date" class="w-full mt-1"></label>
+            <p class="text-sm mb-3" style="color:#fca5a5" id="am-cart-erro"></p>
+            <button type="button" class="am-botao" id="am-cart-salvar">Salvar</button>
+            <button type="button" class="am-botao sec mt-2 hidden" id="am-cart-remover">Remover da carteira</button>
+        </div>
         <div class="am-folha-fundo" id="am-folha-fundo"></div>
         <div class="am-folha" id="am-folha" role="dialog" aria-modal="true" aria-label="Filtros do ranking">
             <div class="am-alca"></div>
@@ -1073,6 +1090,10 @@
 
     function mostrarModoManual(motivo) {
         esconderProgresso();
+        if (document.body.classList.contains('com-app-movel')) {   // no celular não há modo manual
+            mostrarMensagem(`Não consegui carregar os dados (${motivo}). Tente de novo em alguns minutos.`, 'erro');
+            return;
+        }
         const det = document.getElementById('manual-mode');
         det.open = true;
         document.getElementById('manual-mode-reason').innerHTML = `<span class="text-yellow-300 font-semibold">Não consegui carregar os dados automáticos (${motivo}).</span> Isso acontece quando a página é aberta direto do computador (<code>file://</code>), quando a primeira coleta ainda não rodou ou quando o GitHub Pages está fora do ar. Carregue os arquivos manualmente abaixo.`;
@@ -2565,7 +2586,7 @@
     function agendarAtualizacaoMovel() { if (APP_MOVEL) setTimeout(atualizarAppMovel, 0); }
 
     // Navegação entre páginas e telas sobrepostas (com suporte ao botão "voltar" do Android)
-    const TITULOS = { inicio: 'Início', ranking: 'Ranking', relatorio: 'Relatório', testes: 'Testes', mais: 'Mais' };
+    const TITULOS = { inicio: 'Início', ranking: 'Ranking', carteira: 'Carteira', testes: 'Testes', mais: 'Mais' };
     function mostrarPagina(nome) {
         document.querySelectorAll('#app-movel .am-pagina').forEach(p => p.classList.toggle('ativa', p.dataset.pagina === nome));
         document.querySelectorAll('.am-nav button').forEach(b => b.classList.toggle('ativa', b.dataset.irPagina === nome));
@@ -2729,6 +2750,128 @@
         requestAnimationFrame(() => { if (graficoModo !== modo) b.click(); else atualizarModuloGrafico(); });
     }
 
+    // =================== CARTEIRA (salva só neste aparelho, em localStorage) ===================
+    const CHAVE_CARTEIRA = 'invest-carteira';
+    function lerCarteira() { try { const v = JSON.parse(localStorage.getItem(CHAVE_CARTEIRA) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+    function gravarCarteira(lista) { try { localStorage.setItem(CHAVE_CARTEIRA, JSON.stringify(lista)); return true; } catch (e) { return false; } }
+    const mercadoCodigo = () => mercadoAtual === 'br' ? 'br' : 'us';
+    function nomeEstrategiaV14(k) { const o = document.querySelector(`#confluence-select option[value="${k}"]`); return o ? o.textContent.trim() : k; }
+    // Viés do papel com as ferramentas do app: tendência longa (MME200), curta (MME 9×21), estratégias de compra
+    // × venda da v14 ativas nos últimos 3 pregões e o retorno de 20 pregões. Cada item soma +1/−1 (o retorno, ±0,5).
+    function viesDoPapel(t) {
+        const d = allData[t]; if (!d || d.close.length < 210) return null;
+        const n = d.close.length, fech = d.close[n - 1], params = getIndicatorParameters();
+        const ind = precomputeAllIndicators(d, params); const motivos = []; let pts = 0;
+        const e200 = ind.EMA_200[n - 1], e9 = ind.EMA_short[n - 1], e21 = ind.EMA_long[n - 1];
+        if (e200) { const a = fech > e200; pts += a ? 1 : -1; motivos.push([a, `Preço ${a ? 'acima' : 'abaixo'} da MME200 (${fmtPctM((fech / e200 - 1) * 100)}): tendência longa de ${a ? 'alta' : 'baixa'}`]); }
+        if (e9 && e21) { const a = e9 > e21; pts += a ? 1 : -1; motivos.push([a, `MME9 ${a ? 'acima' : 'abaixo'} da MME21: curto prazo ${a ? 'subindo' : 'caindo'}`]); }
+        const ind14 = v14_precomputarIndicadores(d, params); const compra = new Set(), venda = new Set();
+        for (let i = n - 3; i < n; i++) {
+            const sig = v14_analisarSinais(d, ind14, i);
+            for (const [k, e] of Object.entries(estrategiasV14)) {
+                if (k === 'all') continue; const mv = e.minVotes || 1;
+                if (e.buy && e.buy.length && Object.keys(sig.buy).filter(x => e.buy.includes(x)).length >= mv) compra.add(nomeEstrategiaV14(k));
+                if (e.sell && e.sell.length && Object.keys(sig.sell || {}).filter(x => e.sell.includes(x)).length >= mv) venda.add(nomeEstrategiaV14(k));
+            }
+        }
+        if (compra.size !== venda.size) { const a = compra.size > venda.size; pts += a ? 1 : -1; }
+        motivos.push([compra.size > venda.size ? true : compra.size < venda.size ? false : null, `Estratégias nos últimos 3 pregões: ${compra.size} de compra${compra.size ? ' (' + [...compra].join(', ') + ')' : ''} × ${venda.size} de venda${venda.size ? ' (' + [...venda].join(', ') + ')' : ''}`]);
+        if (n > 21) { const r20 = (fech / d.close[n - 21] - 1) * 100; pts += r20 > 0 ? 0.5 : -0.5; motivos.push([r20 > 0, `Últimos 20 pregões: ${fmtPctM(r20)}`]); }
+        const vies = pts >= 1.5 ? 'alta' : pts <= -1.5 ? 'baixa' : 'neutro';
+        return { vies, pts, motivos, atr: ind.ATR[n - 1], score: computeStrategyScore(analyzeAllSignals(d, ind, n - 1), getCurrentWeights()).totalScore };
+    }
+    function cartaoCarteira(item, k) {
+        const t = item.t; const d = allData[t];
+        if (!d) return `<div class="am-card"><div class="flex items-center justify-between"><span class="am-tk">${t}</span><button type="button" class="am-chip" data-cart-editar="${k}">Editar</button></div><div class="text-sm mt-1" style="color:var(--mudo)">Sem dados deste papel neste mercado (${item.m === 'br' ? 'troque para Brasil' : 'troque para EUA'} no topo, ou ele não está no universo coletado).</div></div>`;
+        const n = d.close.length, fech = d.close[n - 1]; const res = (fech / item.pm - 1) * 100; const vd = variacaoDia(t);
+        const v = viesDoPapel(t); const f = (fundamentalsData && fundamentalsData[t]) || null; const nota = notaFundamentalista(t);
+        const rel = relatorioValido() && relatorioDados.ativos.find(x => x.t === t); const vend = dadosVendido(t); const perf = perfilDoAtivo(d);
+        const rp = getBacktestRiskParams(); const stop = v && v.atr ? fech - v.atr * rp.atrMult : null;
+        const corV = { alta: 'verde', baixa: 'vermelho', neutro: 'amarelo' }[v ? v.vies : 'neutro'];
+        const rotV = { alta: '▲ Viés de alta', baixa: '▼ Viés de baixa', neutro: '● Neutro' }[v ? v.vies : 'neutro'];
+        const dado = (r, val, cor) => `<div class="am-dado"><div class="r">${r}</div><div class="v"${cor ? ` style="color:${cor}"` : ''}>${val}</div></div>`;
+        return `<div class="am-card">
+            <div class="flex items-center justify-between gap-2"><button type="button" class="flex items-center gap-2 text-left" data-ativo="${t}"><span class="am-avatar" style="background:${corAvatar(t)}">${t.slice(0, 2)}</span><span><span class="am-tk block">${t}</span><span class="am-nome block">${nomeAtivo(t) || ''}</span></span></button>
+                <span class="am-chip ${corV}">${rotV}</span></div>
+            <div class="am-grade mt-3">
+                ${dado('Preço atual', `${fmtPrecoM(fech)} <span class="text-sm ${vd >= 0 ? 'alta' : 'baixa'}" style="color:${vd >= 0 ? 'var(--alta)' : 'var(--baixa)'}">${vd === null ? '' : fmtPctM(vd)}</span>`)}
+                ${dado('Resultado', `${fmtPctM(res)}`, res >= 0 ? 'var(--alta)' : 'var(--baixa)')}
+                ${dado('Posição', `${fmtPrecoM(item.qtd * fech)}`)}${dado('Lucro/prejuízo', fmtPrecoM(item.qtd * (fech - item.pm)), res >= 0 ? 'var(--alta)' : 'var(--baixa)')}
+                ${stop ? dado(`Stop móvel (${fmtNumM(rp.atrMult, 1)}×ATR)`, `${fmtPrecoM(stop)} <span class="text-sm" style="color:var(--mudo)">${fmtPctM((stop / fech - 1) * 100)}</span>`, '#f87171') : ''}
+                ${dado('Score técnico hoje', v ? fmtNumM(v.score, 1) : '—')}
+            </div>
+            ${v ? `<div class="mt-3 text-sm space-y-1">${v.motivos.map(([bom, txt]) => `<div>${bom === true ? '🟢' : bom === false ? '🔴' : '⚪'} ${txt}</div>`).join('')}</div>` : ''}
+            <div class="mt-3 text-sm space-y-1" style="color:var(--mudo)">
+                ${f ? `<div>Fundamentos: <b style="color:var(--txt)">${nota}/5</b>${Number.isFinite(Number(f.pe)) ? ` · P/L ${fmtNumM(Number(f.pe), 1)}` : ''}${Number.isFinite(Number(f.roe)) ? ` · ROE ${fmtNumM(f.roe * 100, 1)}%` : ''}${Number.isFinite(Number(f.debtToEquity)) ? ` · Dívida/PL ${fmtNumM(Number(f.debtToEquity), 2)}` : ''}</div>` : ''}
+                ${perf ? `<div>Perfil: <b style="color:var(--txt)">${perf.nome}</b></div>` : ''}
+                ${rel ? `<div>Relatório: ${rel.regra ? `melhor regra <b style="color:var(--txt)">${nomeRegra(rel.regra)}</b>${rel.confirmada ? '' : ' (não confirmada)'}${rel.situacao === 'posicao' ? ' · a regra está <b style="color:var(--txt)">em operação</b>' : rel.situacao === 'entrada' ? ' · sinal de <b style="color:var(--txt)">entrada</b> hoje' : ''}` : 'sem regra com operações suficientes'}</div>` : ''}
+                ${vend ? `<div>Vendidos: ${vend.dias === null ? '—' : fmtNumM(vend.dias, 1)} dias para zerar${rel && rel.squeeze ? ' · ⚡ possível short squeeze' : ''}</div>` : ''}
+            </div>
+            <div class="flex gap-2 mt-3"><button type="button" class="am-botao sec" data-ativo="${t}">Abrir análise</button><button type="button" class="am-botao sec" data-cart-editar="${k}">Editar</button></div>
+        </div>`;
+    }
+    function desenharCarteira() {
+        const box = document.getElementById('am-carteira'); if (!box) return;
+        const todos = lerCarteira(); const merc = mercadoCodigo();
+        const daqui = todos.map((x, k) => ({ x, k })).filter(o => o.x.m === merc);
+        const outros = todos.length - daqui.length;
+        if (!daqui.length) {
+            box.innerHTML = `<div class="am-card text-center"><div class="text-lg font-bold">Sua carteira ${merc === 'br' ? 'no Brasil' : 'nos EUA'} está vazia</div><p class="text-sm mt-1" style="color:var(--mudo)">Adicione os papéis que você tem, com quantidade e preço médio. O app mostra o viés de alta ou de baixa, o stop, o score e os fundamentos de cada um.</p>${outros ? `<p class="text-sm mt-2" style="color:var(--mudo)">Você tem ${outros} papel(éis) no outro mercado: troque no topo.</p>` : ''}</div>`;
+            return;
+        }
+        let invest = 0, atual = 0;
+        daqui.forEach(({ x }) => { const d = allData[x.t]; if (d) { invest += x.qtd * x.pm; atual += x.qtd * d.close[d.close.length - 1]; } });
+        const res = invest ? (atual / invest - 1) * 100 : 0;
+        box.innerHTML = `<div class="am-card"><div class="text-sm" style="color:var(--mudo)">Patrimônio ${merc === 'br' ? 'no Brasil' : 'nos EUA'}</div><div class="am-preco-grande">${fmtPrecoM(atual)}</div>
+                <div class="text-sm mt-1" style="color:${res >= 0 ? 'var(--alta)' : 'var(--baixa)'}">${fmtPctM(res)} · ${fmtPrecoM(atual - invest)} sobre ${fmtPrecoM(invest)} investidos</div>
+                ${outros ? `<div class="text-xs mt-2" style="color:var(--mudo)">+ ${outros} papel(éis) no outro mercado (troque no topo para ver).</div>` : ''}</div>
+            <div class="space-y-3 mt-3">${daqui.map(({ x, k }) => cartaoCarteira(x, k)).join('')}</div>`;
+    }
+    let cartEditando = null;
+    function abrirFolhaCarteira(sim, k = null) {
+        const folha = document.getElementById('am-cart-folha'), fundo = document.getElementById('am-cart-fundo');
+        if (sim) {
+            cartEditando = k; const item = k !== null ? lerCarteira()[k] : null;
+            document.getElementById('am-cart-titulo').textContent = item ? `Editar ${item.t}` : 'Adicionar papel';
+            document.getElementById('am-cart-ticker').value = item ? item.t : '';
+            document.getElementById('am-cart-ticker').disabled = !!item;
+            document.getElementById('am-cart-qtd').value = item ? item.qtd : '';
+            document.getElementById('am-cart-pm').value = item ? item.pm : '';
+            document.getElementById('am-cart-data').value = item && item.data ? item.data : '';
+            document.getElementById('am-cart-erro').textContent = '';
+            document.getElementById('am-cart-remover').classList.toggle('hidden', !item);
+            document.getElementById('am-cart-lista').innerHTML = Object.keys(allData).sort().map(t => `<option value="${t}">`).join('');
+        }
+        folha.classList.toggle('aberta', sim); fundo.classList.toggle('aberta', sim);
+        document.body.classList.toggle('travado', sim || pilhaTelas.length > 0);
+    }
+    function salvarItemCarteira() {
+        const erro = document.getElementById('am-cart-erro');
+        const t = document.getElementById('am-cart-ticker').value.trim().toUpperCase().replace(/\.SA$/, '');
+        const qtd = parseFloat(document.getElementById('am-cart-qtd').value), pm = parseFloat(document.getElementById('am-cart-pm').value);
+        const data = document.getElementById('am-cart-data').value || null;
+        if (!t) { erro.textContent = 'Informe o papel.'; return; }
+        if (!allData[t]) { erro.textContent = `Não achei ${t} nos dados ${mercadoAtual === 'br' ? 'do Brasil (só IBOVESPA)' : 'dos EUA'}. Confira o código ou troque o mercado no topo.`; return; }
+        if (!(qtd > 0) || !(pm > 0)) { erro.textContent = 'Quantidade e preço médio precisam ser maiores que zero.'; return; }
+        const lista = lerCarteira(); const item = { t, m: mercadoCodigo(), qtd, pm, data };
+        if (cartEditando !== null) lista[cartEditando] = { ...lista[cartEditando], qtd, pm, data };
+        else { const k = lista.findIndex(x => x.t === t && x.m === item.m); if (k >= 0) lista[k] = item; else lista.push(item); }
+        if (!gravarCarteira(lista)) { erro.textContent = 'O navegador não deixou salvar (modo anônimo?).'; return; }
+        abrirFolhaCarteira(false); desenharCarteira();
+    }
+    function prepararCarteira() {
+        if (!APP_MOVEL) return;
+        document.getElementById('am-carteira-add').addEventListener('click', () => abrirFolhaCarteira(true));
+        document.getElementById('am-cart-fechar').addEventListener('click', () => abrirFolhaCarteira(false));
+        document.getElementById('am-cart-fundo').addEventListener('click', () => abrirFolhaCarteira(false));
+        document.getElementById('am-cart-salvar').addEventListener('click', salvarItemCarteira);
+        document.getElementById('am-cart-remover').addEventListener('click', () => {
+            const lista = lerCarteira(); if (cartEditando !== null) lista.splice(cartEditando, 1); gravarCarteira(lista); abrirFolhaCarteira(false); desenharCarteira();
+        });
+        document.getElementById('am-carteira').addEventListener('click', e => { const b = e.target.closest('[data-cart-editar]'); if (b) abrirFolhaCarteira(true, +b.dataset.cartEditar); });
+        document.querySelector('.am-nav [data-ir-pagina="carteira"]').addEventListener('click', () => desenharCarteira());
+    }
+
     function montarAppMovel() {
         if (!APP_MOVEL) return;
         const mover = (id, destino) => { const el = document.getElementById(id); const alvo = typeof destino === 'string' ? document.querySelector(destino) : destino; if (el && alvo) alvo.appendChild(el); };
@@ -2740,9 +2883,9 @@
         mover('sec-estrategias', '[data-sub-slot="estrategias"]'); mover('estrategias-results', '[data-sub-slot="estrategias"]');
         mover('fundamentals-content', '[data-sub-slot="fundamentos"]');
         mover('portfolio-content', '[data-sub-slot="correlacao"]');
-        mover('sec-dados', '[data-sub-slot="dados"]'); mover('market-sentiment-module', '[data-sub-slot="dados"]');
         ['sec-liquidez', 'sec-pesos', 'sec-fund-filtro'].forEach(id => mover(id, '#am-slot-filtros'));
         document.body.classList.add('com-app-movel');
+        prepararCarteira();
 
         document.querySelectorAll('[data-ir-pagina]').forEach(b => b.addEventListener('click', () => mostrarPagina(b.dataset.irPagina)));
         document.querySelectorAll('[data-fechar-tela]').forEach(b => b.addEventListener('click', () => history.back()));
@@ -2750,7 +2893,7 @@
             const linha = e.target.closest('[data-ativo]'); if (linha) { abrirAtivo(linha.dataset.ativo); return; }
             const sub = e.target.closest('[data-sub]');
             if (sub) {
-                const titulos = { estrategias: 'Screener de Estratégias', fundamentos: 'Técnica × Fundamentos', correlacao: 'Correlação (Pearson)', dados: 'Dados e atualização' };
+                const titulos = { estrategias: 'Screener de Estratégias', fundamentos: 'Técnica × Fundamentos', correlacao: 'Correlação (Pearson)', relatorio: 'Relatório' };
                 document.querySelectorAll('[data-sub-slot]').forEach(sl => sl.classList.toggle('hidden', sl.dataset.subSlot !== sub.dataset.sub));
                 document.getElementById('am-sub-titulo').textContent = titulos[sub.dataset.sub];
                 abrirTela('am-sub-tela');

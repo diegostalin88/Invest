@@ -303,7 +303,11 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     await cel.page.goBack();
     ok(await cel.page.isHidden('#am-ativo'), 'celular: voltar de novo fecha o ativo');
     // Relatório: sem o arquivo da noite, oferece "Gerar agora" no aparelho
-    await cel.page.click('.am-nav [data-ir-pagina="relatorio"]');
+    await cel.page.click('.am-nav [data-ir-pagina="mais"]');
+    ok(!(await cel.page.isVisible('[data-sub="dados"]')) && !/Dados e atualiza/.test(await cel.page.textContent('[data-pagina="mais"]')), 'celular: Mais sem "Dados e atualização"');
+    const ordemMais = await cel.page.evaluate(() => [...document.querySelectorAll('[data-pagina="mais"] [data-sub]')].map(b => b.dataset.sub));
+    ok(ordemMais.indexOf('relatorio') === ordemMais.indexOf('correlacao') + 1, `celular: Relatório logo abaixo de Correlação no Mais (${ordemMais.join(', ')})`);
+    await cel.page.click('[data-sub="relatorio"]');
     ok(await cel.page.isVisible('#am-relatorio [data-gerar-relatorio]'), 'celular: Relatório sem arquivo oferece "Gerar agora"');
     await cel.page.click('#am-relatorio [data-gerar-relatorio]');
     await cel.page.waitForFunction(() => /Último teste/.test(document.getElementById('am-relatorio').textContent), null, { timeout: 120000 });
@@ -315,6 +319,35 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     await cel.page.screenshot({ path: path.join(SHOTS, 'celular_relatorio.png'), fullPage: false });
     const cartao = await cel.page.$('#am-relatorio .rel-card[data-ativo]');
     if (cartao) { await cartao.click(); await cel.page.waitForSelector('#am-ativo.aberta', { timeout: 15000 }); ok(true, 'celular: tocar num papel do Relatório abre a tela do ativo'); await cel.page.goBack(); }
+    await cel.page.goBack();   // fecha a tela do Relatório (abre por cima, como as outras do Mais)
+    await cel.page.waitForSelector('#am-sub-tela', { state: 'hidden', timeout: 5000 });
+    // Carteira: adicionar, ver o viés, editar, persistir e remover
+    await cel.page.click('.am-nav [data-ir-pagina="carteira"]');
+    ok(/está vazia/.test(await cel.page.textContent('[data-pagina="carteira"]')), 'celular: Carteira vazia convida a adicionar');
+    const papelCart = await cel.page.evaluate(() => Object.keys(window.investDebug.allData)[0]);
+    await cel.page.click('#am-carteira-add');
+    await cel.page.fill('#am-cart-ticker', 'NAOEXISTE9');
+    await cel.page.fill('#am-cart-qtd', '100'); await cel.page.fill('#am-cart-pm', '10');
+    await cel.page.click('#am-cart-salvar');
+    ok(/Não achei/.test(await cel.page.textContent('#am-cart-erro')), 'celular: Carteira recusa papel que não existe nos dados');
+    await cel.page.fill('#am-cart-ticker', papelCart.toLowerCase());
+    await cel.page.click('#am-cart-salvar');
+    await cel.page.waitForSelector('#am-carteira [data-cart-editar]', { timeout: 10000 });
+    const cartTxt = await cel.page.textContent('#am-carteira');
+    ok(cartTxt.includes(papelCart) && /(Viés de alta|Viés de baixa|Neutro)/.test(cartTxt) && /Resultado/.test(cartTxt), `celular: Carteira mostra ${papelCart} com viés e resultado`);
+    await cel.page.waitForTimeout(300);
+    await cel.page.screenshot({ path: path.join(SHOTS, 'celular_carteira.png'), fullPage: false });
+    await cel.page.click('#am-carteira [data-cart-editar]');
+    await cel.page.fill('#am-cart-qtd', '250'); await cel.page.click('#am-cart-salvar');
+    const salvo = await cel.page.evaluate(() => JSON.parse(localStorage.getItem('invest-carteira')));
+    ok(salvo.length === 1 && salvo[0].qtd === 250 && salvo[0].t === papelCart, 'celular: editar a quantidade grava no aparelho');
+    await cel.page.reload();
+    await cel.page.waitForFunction(() => window.investDebug && Object.keys(window.investDebug.allData || {}).length > 0, null, { timeout: 60000 });
+    await cel.page.click('.am-nav [data-ir-pagina="carteira"]');
+    ok((await cel.page.textContent('#am-carteira')).includes(papelCart), 'celular: Carteira continua lá depois de recarregar');
+    await cel.page.click('#am-carteira [data-cart-editar]');
+    await cel.page.click('#am-cart-remover');
+    ok(await cel.page.evaluate(() => JSON.parse(localStorage.getItem('invest-carteira')).length === 0), 'celular: remover tira o papel da Carteira');
     // Testes e Mais
     await cel.page.click('.am-nav [data-ir-pagina="testes"]');
     await cel.page.click('#run-backtest-btn');
