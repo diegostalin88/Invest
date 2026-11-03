@@ -1,0 +1,48 @@
+name: Comparar backtest (antes x depois da correção do stop)
+
+# Só para medir: roda no push deste ramo, não publica nada.
+on:
+  push:
+    branches: [correcao-stop]
+
+permissions:
+  contents: read
+
+jobs:
+  comparar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Baixar os dados publicados
+        env:
+          BASE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data
+        run: |
+          baixar() {
+            mkdir -p "$2"
+            curl -fsSL "$1/manifest.json" -o "$2/manifest.json" || return 1
+            python3 - "$2/manifest.json" <<'PY'
+          import json, sys
+          m = json.load(open(sys.argv[1]))
+          for k in ('arquivoRelatorio', 'arquivoVendidos'):
+              m.pop(k, None)
+          json.dump(m, open(sys.argv[1], 'w'))
+          PY
+            for f in $(python3 -c "import json,sys;m=json.load(open(sys.argv[1]));print(' '.join(m['arquivosPrecos']+[m.get('arquivoFundamentos','fundamentos.json')]))" "$2/manifest.json"); do
+              curl -fsSL "$1/$f" -o "$2/$f" || return 1
+            done
+          }
+          baixar "$BASE" site/data
+          baixar "$BASE/br" site/data/br || rm -rf site/data/br
+          cp -r app/. site/
+          git show origin/main:app/index.html > site/antigo.html
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Comparar
+        run: |
+          npm install --no-save --no-package-lock playwright@1.48.2
+          npx playwright install --with-deps chromium
+          node coleta/comparar_backtest.js site
