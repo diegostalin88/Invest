@@ -348,6 +348,44 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     await cel.page.click('#am-carteira [data-cart-editar]');
     await cel.page.click('#am-cart-remover');
     ok(await cel.page.evaluate(() => JSON.parse(localStorage.getItem('invest-carteira')).length === 0), 'celular: remover tira o papel da Carteira');
+    // Análise da carteira: um papel de viés de baixa, um de alta e concentração
+    const montagem = await cel.page.evaluate(() => {
+        const D = window.investDebug; const ts = Object.keys(D.allData).filter(t => D.allData[t].close.length >= 260);
+        // monta com os primeiros 6 papéis; o 1º fica com ~60% do valor (concentrado)
+        const esc = ts.slice(0, 6); const ult = t => D.allData[t].close.at(-1);
+        const lista = esc.map((t, k) => ({ t, m: 'br', qtd: Math.round((k === 0 ? 9000 : 1200) / ult(t)) || 1, pm: ult(t), data: null }));
+        localStorage.setItem('invest-carteira', JSON.stringify(lista)); return esc;
+    });
+    // gera o Relatório de novo (o recarregamento apagou o que foi gerado no aparelho)
+    await cel.page.click('.am-nav [data-ir-pagina="mais"]'); await cel.page.click('[data-sub="relatorio"]');
+    await cel.page.click('#am-relatorio [data-gerar-relatorio]');
+    await cel.page.waitForFunction(() => /Último teste/.test(document.getElementById('am-relatorio').textContent), null, { timeout: 120000 });
+    await cel.page.goBack(); await cel.page.waitForSelector('#am-sub-tela', { state: 'hidden', timeout: 5000 });
+    await cel.page.click('.am-nav [data-ir-pagina="carteira"]');
+    await cel.page.waitForSelector('#am-cart-analise', { timeout: 15000 });
+    const A = await cel.page.evaluate(() => { const a = window.investDebug.analisarCarteira(); return { pos: a.posicoes.map(p => ({ t: p.t, acao: p.acao, vies: p.v && p.v.vies, peso: p.peso, conc: p.concentrada, val: !!(p.rel && p.rel.confirmada), op: !!(p.rel && p.rel.confirmada && p.rel.situacao === 'posicao') })), cand: a.candidatos.map(c => c.t), candOk: a.candidatos.every(c => c.entrada && c.v.vies === 'alta'), veredito: a.veredito, reforcar: a.reforcar && a.reforcar.t }; });
+    const regrasOk = A.pos.every(p => (p.vies === 'baixa' && p.val && !p.op) ? p.acao === 'trocar' : p.conc ? p.acao === 'reduzir' : p.acao === ({ alta: 'manter', neutro: 'neutro', baixa: 'neutro' }[p.vies] || 'neutro'));
+    ok(A.pos.length === montagem.length && regrasOk, `celular: análise da carteira aplica as regras (${A.pos.map(p => p.t + ':' + p.acao).join(', ')})`);
+    ok(A.pos[0].conc && A.candOk && A.cand.every(t => !montagem.includes(t)), `celular: análise aponta concentração e só sugere papéis de fora (${A.cand.join(', ') || 'nenhum'})`);
+    const anTxt = await cel.page.textContent('#am-cart-analise');
+    ok(/Análise de \d\d\/\d\d\/\d{4}/.test(anTxt) && /(Trocar ou reduzir|Reduzir peso)/.test(anTxt) && /Não é recomendação/.test(anTxt), 'celular: análise mostra data, sugestões e aviso');
+    // Caso "trocar": papel com viés de baixa e regra validada fora da operação (se existir nos dados de exemplo)
+    const troca = await cel.page.evaluate(() => {
+        const D = window.investDebug; const R = D.relatorio;
+        const alvo = R.ativos.find(a => a.confirmada && a.situacao !== 'posicao' && D.allData[a.t] && D.allData[a.t].close.length >= 260
+            && (() => { localStorage.setItem('invest-carteira', JSON.stringify([{ t: a.t, m: 'br', qtd: 10, pm: 10, data: null }])); const x = D.analisarCarteira(); return x.posicoes[0].v && x.posicoes[0].v.vies === 'baixa'; })());
+        if (!alvo) return null;
+        const x = D.analisarCarteira(); return { t: alvo.t, acao: x.posicoes[0].acao, cand: x.candidatos.length };
+    });
+    if (troca) {
+        await cel.page.click('#am-cart-reanalisar');
+        const tTxt = await cel.page.textContent('#am-cart-analise');
+        ok(troca.acao === 'trocar' && /Trocar ou reduzir/.test(tTxt) && /(trocar por|ficar em caixa)/.test(tTxt), `celular: viés de baixa + regra validada fora → sugere trocar (${troca.t}, ${troca.cand} alternativa(s))`);
+    } else console.log('ℹ️ dados de exemplo sem caso de troca; regra coberta só pela verificação geral');
+    await cel.page.evaluate(() => document.getElementById('am-cart-analise').scrollIntoView());
+    await cel.page.waitForTimeout(300);
+    await cel.page.screenshot({ path: path.join(SHOTS, 'celular_carteira_analise.png'), fullPage: false });
+    await cel.page.evaluate(() => localStorage.removeItem('invest-carteira'));
     // Testes e Mais
     await cel.page.click('.am-nav [data-ir-pagina="testes"]');
     await cel.page.click('#run-backtest-btn');

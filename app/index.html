@@ -2825,7 +2825,88 @@
         box.innerHTML = `<div class="am-card"><div class="text-sm" style="color:var(--mudo)">Patrimônio ${merc === 'br' ? 'no Brasil' : 'nos EUA'}</div><div class="am-preco-grande">${fmtPrecoM(atual)}</div>
                 <div class="text-sm mt-1" style="color:${res >= 0 ? 'var(--alta)' : 'var(--baixa)'}">${fmtPctM(res)} · ${fmtPrecoM(atual - invest)} sobre ${fmtPrecoM(invest)} investidos</div>
                 ${outros ? `<div class="text-xs mt-2" style="color:var(--mudo)">+ ${outros} papel(éis) no outro mercado (troque no topo para ver).</div>` : ''}</div>
+            ${htmlAnaliseCarteira(analisarCarteira())}
             <div class="space-y-3 mt-3">${daqui.map(({ x, k }) => cartaoCarteira(x, k)).join('')}</div>`;
+    }
+    // ===== Análise da carteira: sugestões de rebalanceamento (só leitura; usa os mesmos sinais do app) =====
+    // Regras (simples e explicáveis):
+    // - Viés de baixa (≤ -1,5 ponto) E a regra validada do Relatório está fora da operação → "Trocar ou reduzir".
+    // - Viés de baixa sem regra validada, ou com a regra ainda comprada → "Neutro" (o viés não foi testado).
+    // - Viés de alta → "Manter". Neutro → "Neutro".
+    // - Posição acima de 35% da carteira → aviso de concentração (sugere voltar para até 25%).
+    // Candidatos para troca: aprovados no Ranking (filtros atuais), fora da carteira, com viés de alta
+    // E sinal de entrada da regra validada no Relatório. Também sugere reforçar o papel
+    // mais forte da própria carteira. Sem nenhuma mudança justificada, a resposta é "Neutro".
+    const LIMITE_CONCENTRACAO = 0.35, PESO_ALVO = 0.25, CANDIDATOS_AVALIADOS = 15;
+    let analiseCarteiraCache = null;
+    function analisarCarteira() {
+        const merc = mercadoCodigo();
+        const itens = lerCarteira().filter(x => x.m === merc && allData[x.t]);
+        if (!itens.length) return null;
+        const ultimo = t => { const c = allData[t].close; return c[c.length - 1]; };
+        const total = itens.reduce((s, x) => s + x.qtd * ultimo(x.t), 0);
+        const relDe = t => relatorioValido() ? relatorioDados.ativos.find(a => a.t === t) : null;
+        const posicoes = itens.map(x => {
+            const v = viesDoPapel(x.t); const rel = relDe(x.t); const peso = total ? x.qtd * ultimo(x.t) / total : 0;
+            // Princípio dos livros: só agir com regra validada. O viés é contexto, não gatilho.
+            const validada = !!(rel && rel.confirmada);
+            const regraEmOperacao = validada && rel.situacao === 'posicao';
+            let acao = !v ? 'neutro' : v.vies === 'alta' ? 'manter' : v.vies === 'neutro' ? 'neutro' : (validada && !regraEmOperacao) ? 'trocar' : 'neutro';
+            const motivos = [];
+            if (v) motivos.push(`Viés ${v.vies === 'alta' ? 'de alta' : v.vies === 'baixa' ? 'de baixa' : 'neutro'} (${v.pts > 0 ? '+' : ''}${fmtNumM(v.pts, 1)} ponto${Math.abs(v.pts) === 1 ? '' : 's'})`);
+            else motivos.push('Histórico curto demais para medir o viés');
+            if (validada) motivos.push(`regra validada (${nomeRegra(rel.regra)}): ${regraEmOperacao ? 'ainda comprada' : 'fora da operação'}`);
+            else motivos.push('sem regra validada no Relatório');
+            if (v && v.vies === 'baixa' && regraEmOperacao) motivos.push('os sinais divergem: a regra testada ainda manda ficar');
+            if (v && v.vies === 'baixa' && !validada) motivos.push('viés de baixa sozinho não basta para trocar (não foi testado)');
+            const concentrada = peso > LIMITE_CONCENTRACAO;
+            if (concentrada) { motivos.push(`${fmtNumM(peso * 100, 0)}% da carteira num papel só`); if (acao !== 'trocar') acao = 'reduzir'; }
+            return { t: x.t, qtd: x.qtd, peso, v, rel, acao, motivos, concentrada };
+        });
+        // Candidatos de fora: os primeiros do Ranking (já passaram nos filtros de liquidez e fundamentos)
+        const naCarteira = new Set(itens.map(x => x.t));
+        const candidatos = filteredScreenerResults.filter(r => !naCarteira.has(r.ticker)).slice(0, CANDIDATOS_AVALIADOS)
+            .map(r => ({ t: r.ticker, score: r.score, v: viesDoPapel(r.ticker), rel: relDe(r.ticker) }))
+            .map(c => ({ ...c, entrada: !!(c.rel && c.rel.confirmada && c.rel.situacao === 'entrada') }))
+            .filter(c => c.v && c.v.vies === 'alta' && c.entrada)   // só troca por papel com entrada validada hoje
+            .sort((a, b) => (b.v.pts - a.v.pts) || (b.score - a.score)).slice(0, 3);
+        const fortes = posicoes.filter(p => p.acao === 'manter' && !p.concentrada && p.peso < PESO_ALVO)
+            .sort((a, b) => (b.v.pts - a.v.pts) || (b.v.score - a.v.score));
+        const mudar = posicoes.filter(p => p.acao === 'trocar' || p.acao === 'reduzir');
+        const veredito = mudar.length ? 'mudar' : 'neutro';
+        analiseCarteiraCache = { quando: new Date(), merc, total, posicoes, candidatos, reforcar: fortes[0] || null, veredito };
+        return analiseCarteiraCache;
+    }
+    function htmlAnaliseCarteira(A) {
+        if (!A) return '';
+        let ultima = null; for (const t in allData) { const d = allData[t].dates; if (d && d.length && (!ultima || d[d.length - 1] > ultima)) ultima = d[d.length - 1]; }
+        const quando = `${A.quando.toLocaleDateString('pt-BR')} ${A.quando.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+        const rot = { manter: ['verde', 'Manter'], neutro: ['amarelo', 'Neutro'], trocar: ['vermelho', 'Trocar ou reduzir'], reduzir: ['amarelo', 'Reduzir peso'] };
+        const nomeCand = c => `<button type="button" class="underline font-semibold" data-ativo="${c.t}">${c.t}</button> (score ${fmtNumM(c.score, 1)}, entrada validada no Relatório)`;
+        const sugestao = p => {
+            if (p.acao === 'manter') return 'Os indicadores sustentam a posição.';
+            if (p.acao === 'neutro') return 'Os indicadores não são suficientes para justificar mudança agora.';
+            const partes = [];
+            if (p.acao === 'reduzir') partes.push(`Voltar para até ${PESO_ALVO * 100}% da carteira`);
+            else partes.push('Reduzir ou zerar a posição');
+            if (A.candidatos.length) partes.push(`trocar por ${nomeCand(A.candidatos[0])}`);
+            if (A.reforcar && A.reforcar.t !== p.t) partes.push(`ou reforçar <button type="button" class="underline font-semibold" data-ativo="${A.reforcar.t}">${A.reforcar.t}</button>, que já está na carteira com viés de alta`);
+            if (!A.candidatos.length && !(A.reforcar && A.reforcar.t !== p.t)) partes.push('e ficar em caixa: nenhum papel do Ranking tem entrada validada hoje');
+            return partes.join(', ') + '.';
+        };
+        const cab = A.veredito === 'neutro'
+            ? `<div class="am-chip amarelo">● Neutro</div><p class="text-sm mt-2">Nenhuma posição pede mudança: os indicadores não são suficientes para estimular troca. Siga com os stops.</p>`
+            : `<div class="am-chip vermelho">${A.posicoes.filter(p => p.acao === 'trocar' || p.acao === 'reduzir').length} sugestão(ões) de rebalanceamento</div>`;
+        const linhas = A.posicoes.slice().sort((a, b) => ({ trocar: 0, reduzir: 1, neutro: 2, manter: 3 }[a.acao] - { trocar: 0, reduzir: 1, neutro: 2, manter: 3 }[b.acao]))
+            .map(p => `<div class="py-2" style="border-top:1px solid var(--borda)">
+                <div class="flex items-center justify-between gap-2"><button type="button" class="am-tk" data-ativo="${p.t}">${p.t}</button><span class="text-sm" style="color:var(--mudo)">${fmtNumM(p.peso * 100, 1)}% da carteira</span><span class="am-chip ${rot[p.acao][0]}">${rot[p.acao][1]}</span></div>
+                <div class="text-sm mt-1" style="color:var(--mudo)">${p.motivos.join(' · ')}</div>
+                <div class="text-sm mt-1">${sugestao(p)}</div></div>`).join('');
+        const cands = A.candidatos.length ? `<div class="text-sm mt-3" style="color:var(--mudo)">Melhores alternativas do Ranking agora: ${A.candidatos.map(nomeCand).join(', ')}.</div>` : '';
+        return `<div class="am-card mt-3" id="am-cart-analise"><div class="flex items-center justify-between"><div class="text-lg font-bold">Análise da carteira</div><button type="button" class="am-chip" id="am-cart-reanalisar">Analisar de novo</button></div>
+            <div class="text-xs mt-1 mb-2" style="color:var(--mudo)">Análise de ${quando} · preços de ${fmtDataBR(ultima)} · ${relatorioValido() ? `Relatório de ${fmtDataBR(relatorioDados.geradoEm)}` : 'sem Relatório: para ter sugestões de troca, gere em Mais → Relatório'}</div>
+            ${cab}<div class="mt-2">${linhas}</div>${cands}
+            <p class="text-xs mt-3" style="color:var(--mudo)">Sugestão automática a partir dos sinais do app (viés, Relatório e Ranking com os filtros atuais). Não é recomendação de investimento; confira o gráfico antes de agir.</p></div>`;
     }
     let cartEditando = null;
     function abrirFolhaCarteira(sim, k = null) {
@@ -2868,7 +2949,10 @@
         document.getElementById('am-cart-remover').addEventListener('click', () => {
             const lista = lerCarteira(); if (cartEditando !== null) lista.splice(cartEditando, 1); gravarCarteira(lista); abrirFolhaCarteira(false); desenharCarteira();
         });
-        document.getElementById('am-carteira').addEventListener('click', e => { const b = e.target.closest('[data-cart-editar]'); if (b) abrirFolhaCarteira(true, +b.dataset.cartEditar); });
+        document.getElementById('am-carteira').addEventListener('click', e => {
+            const b = e.target.closest('[data-cart-editar]'); if (b) abrirFolhaCarteira(true, +b.dataset.cartEditar);
+            if (e.target.closest('#am-cart-reanalisar')) desenharCarteira();
+        });
         document.querySelector('.am-nav [data-ir-pagina="carteira"]').addEventListener('click', () => desenharCarteira());
     }
 
@@ -3055,7 +3139,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { get graficos() { return graficos; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; } };
+    window.investDebug = { get graficos() { return graficos; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; } };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).
