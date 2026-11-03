@@ -8,10 +8,10 @@ on:
     # Dia 1 de cada mês: só o job "manter-ativo" (evita que o GitHub desative os agendamentos
     # depois de 60 dias sem atividade no repositório).
     - cron: "0 12 1 * *"
-  # Mudou só o app (app/**): republica o app reaproveitando os dados já publicados, sem nova coleta.
+  # Mudou só o app (app/**) ou os extras (vendidos, relatório): republica o app reaproveitando os dados já publicados, sem nova coleta.
   push:
     branches: [main]
-    paths: ["app/**"]
+    paths: ["app/**", "coleta/vendidos.py", "coleta/gerar_relatorio.js"]
   workflow_dispatch:
     inputs:
       ticker_limit:

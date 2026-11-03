@@ -21,19 +21,31 @@ class Resp:
 
 
 class SessaoFalsa:
-    def __init__(self, finra_linhas=None, b3_csv=None, b3_falha_dias=()):
+    def __init__(self, finra_linhas=None, b3_csv=None, b3_falha_dias=(), sem_ordenacao=False, b3_tabela=None):
         self.finra_linhas, self.b3_csv, self.b3_falha_dias, self.pedidos = finra_linhas or [], b3_csv, set(b3_falha_dias), []
+        self.sem_ordenacao, self.b3_tabela = sem_ordenacao, b3_tabela
 
     def post(self, url, json=None, **k):
         self.pedidos.append(('post', json))
         if json.get('sortFields'):
+            if self.sem_ordenacao:
+                return Resp(texto='{"message":"invalid sort"}', status=400)
             return Resp(payload=[{'settlementDate': '2026-10-15'}])
+        filtro = (json.get('compareFilters') or [{}])[0].get('fieldValue')
+        if filtro != '2026-10-15':
+            return Resp(payload=[])
         ini = json.get('offset', 0)
         return Resp(payload=self.finra_linhas[ini:ini + json['limit']])
 
     def get(self, url, params=None, **k):
         self.pedidos.append(('get', params))
+        if '/tabelas/table/' in url:
+            if self.b3_tabela is None:
+                return Resp(status=504)
+            return Resp(payload=self.b3_tabela)
         if url == v.B3_PEDIDO_URL:
+            if self.b3_csv is None:
+                return Resp(status=504)
             if params['date'] in self.b3_falha_dias:
                 return Resp(status=404)
             return Resp(payload={'token': 'tok-' + params['date']})
@@ -96,3 +108,23 @@ def test_main_grava_e_nao_quebra_quando_fonte_falha(tmp_path, monkeypatch):
     assert br['ativos']['MOVI3']['qtd'] == 12346678 and br['geradoEm'].endswith('Z')
     assert json.loads((tmp_path / 'br' / 'manifest.json').read_text())['arquivoVendidos'] == 'vendidos.json'
     assert 'arquivoVendidos' not in json.loads((tmp_path / 'manifest.json').read_text())
+
+
+def test_finra_sem_ordenacao_procura_a_data_dia_a_dia():
+    s = SessaoFalsa(finra_linhas=[{'symbolCode': 'AAPL', 'currentShortPositionQuantity': 10}], sem_ordenacao=True)
+    dados = v.baixar_finra({'AAPL'}, s, hoje=date(2026, 11, 3))
+    assert dados['data'] == '2026-10-15' and dados['ativos']['AAPL']['qtd'] == 10
+
+
+def test_b3_usa_a_tabela_json_quando_o_arquivo_falha():
+    tabela = {'pageCount': 1, 'table': {'columns': [{'name': 'TckrSymb'}, {'name': 'BalQty'}, {'name': 'BalVal'}],
+                                        'values': [['MOVI3', 1500000, 14250000.5], ['PETR4', 0, 0]]}}
+    dados = v.baixar_b3({'MOVI3', 'PETR4'}, date(2026, 11, 3), SessaoFalsa(b3_tabela=tabela))
+    assert dados['data'] == '2026-11-03'
+    assert dados['ativos'] == {'MOVI3': {'qtd': 1500000, 'valor': 14250000.5}}
+
+
+def test_erro_http_mostra_o_motivo():
+    import pytest
+    with pytest.raises(RuntimeError, match='invalid sort'):
+        v._erro_http(Resp(texto='{"message":"invalid sort"}', status=400), 'FINRA')

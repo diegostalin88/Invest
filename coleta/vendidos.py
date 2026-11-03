@@ -67,23 +67,43 @@ def _numero(txt, inteiro=False):
 
 
 # ---------------- EUA: FINRA ----------------
+def _erro_http(resp, onde):
+    """raise_for_status com o começo da resposta (a FINRA explica no corpo o que está errado)."""
+    if resp.status_code >= 400:
+        corpo = (getattr(resp, 'text', '') or '')[:300].replace('\n', ' ')
+        raise RuntimeError(f'{onde}: HTTP {resp.status_code} {corpo}'.strip())
+
+
 def _finra_post(corpo, sessao):
     resp = sessao.post(FINRA_URL, json=corpo, timeout=60,
                        headers={**UA, 'Accept': 'application/json', 'Content-Type': 'application/json'})
-    resp.raise_for_status()
+    _erro_http(resp, 'FINRA')
     return resp.json() if resp.text.strip() else []
 
 
-def baixar_finra(universo, sessao=requests):
-    ultimo = _finra_post({'limit': 1, 'fields': ['settlementDate'], 'sortFields': ['-settlementDate']}, sessao)
-    if not ultimo:
-        raise RuntimeError('FINRA não devolveu nenhuma data de liquidação')
-    data_liq = ultimo[0]['settlementDate']
+def _finra_ultima_data(sessao, hoje):
+    """Data de liquidação mais recente publicada. Tenta ordenar; se a API recusar, testa dia a dia
+    (as datas são por volta do dia 15 e do fim de cada mês, e saem uns 8 pregões depois)."""
+    try:
+        ultimo = _finra_post({'limit': 1, 'sortFields': ['-settlementDate']}, sessao)
+        if ultimo and ultimo[0].get('settlementDate'):
+            return ultimo[0]['settlementDate']
+    except Exception as e:  # noqa: BLE001 - segue para o plano B
+        log(f'FINRA: ordenação recusada ({e}); procurando a data dia a dia')
+    for k in range(5, 50):
+        dia = (hoje - timedelta(days=k)).isoformat()
+        linhas = _finra_post({'limit': 1, 'compareFilters': [
+            {'compareType': 'EQUAL', 'fieldName': 'settlementDate', 'fieldValue': dia}]}, sessao)
+        if linhas:
+            return dia
+    raise RuntimeError('FINRA não tem nenhuma data de liquidação nos últimos 50 dias')
+
+
+def baixar_finra(universo, sessao=requests, hoje=None):
+    data_liq = _finra_ultima_data(sessao, hoje or date.today())
     ativos, offset, lote = {}, 0, 5000
-    campos = ['symbolCode', 'currentShortPositionQuantity', 'previousShortPositionQuantity',
-              'daysToCoverQuantity', 'changePercent', 'settlementDate']
     while True:
-        linhas = _finra_post({'limit': lote, 'offset': offset, 'fields': campos,
+        linhas = _finra_post({'limit': lote, 'offset': offset,
                               'compareFilters': [{'compareType': 'EQUAL', 'fieldName': 'settlementDate',
                                                   'fieldValue': data_liq}]}, sessao)
         for l in linhas:
@@ -100,6 +120,11 @@ def baixar_finra(universo, sessao=requests):
 
 
 # ---------------- Brasil: B3 (aluguel) ----------------
+B3_TABELA_URL = 'https://arquivos.b3.com.br/tabelas/table/LendingOpenPosition/{d}/{d}/{p}'
+UA_NAVEGADOR = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) '
+                              'Chrome/130.0 Safari/537.36', 'Accept': '*/*', 'Accept-Language': 'pt-BR,pt;q=0.9'}
+
+
 def _ler_csv_b3(texto):
     """O arquivo tem uma linha de título antes do cabeçalho; procura o cabeçalho pelo nome da coluna."""
     linhas = texto.splitlines()
@@ -110,15 +135,26 @@ def _ler_csv_b3(texto):
     return list(leitor)
 
 
-def baixar_b3_um_dia(dia, sessao=requests):
-    pedido = sessao.get(B3_PEDIDO_URL, params={'fileName': 'LendingOpenPositionFile', 'date': dia.isoformat()},
-                        headers=UA, timeout=30)
-    pedido.raise_for_status()
+def _get_com_nova_tentativa(sessao, url, tentativas=2, **k):
+    erro = None
+    for _ in range(tentativas):
+        try:
+            resp = sessao.get(url, headers=UA_NAVEGADOR, timeout=90, **k)
+            _erro_http(resp, 'B3')
+            return resp
+        except Exception as e:  # noqa: BLE001 - 504 da B3 costuma ser passageiro
+            erro = e
+    raise erro
+
+
+def baixar_b3_arquivo(dia, sessao=requests):
+    """Caminho 1: arquivo CSV (pede um token e baixa com ele)."""
+    pedido = _get_com_nova_tentativa(sessao, B3_PEDIDO_URL, params={'fileName': 'LendingOpenPositionFile',
+                                                                     'date': dia.isoformat()})
     token = (pedido.json() or {}).get('token')
     if not token:
         raise ValueError('B3 não devolveu token')
-    arq = sessao.get(B3_DOWNLOAD_URL, params={'token': token}, headers=UA, timeout=60)
-    arq.raise_for_status()
+    arq = _get_com_nova_tentativa(sessao, B3_DOWNLOAD_URL, params={'token': token})
     try:
         texto = arq.content.decode('utf-8')
     except UnicodeDecodeError:
@@ -126,7 +162,33 @@ def baixar_b3_um_dia(dia, sessao=requests):
     return _ler_csv_b3(texto)
 
 
-def baixar_b3(universo, hoje, sessao=requests, dias_atras=7):
+def baixar_b3_tabela(dia, sessao=requests):
+    """Caminho 2: a mesma tabela em JSON, paginada (é o que a página de consultas da B3 usa)."""
+    linhas, pagina, total = [], 1, 1
+    while pagina <= total and pagina <= 200:
+        obj = _get_com_nova_tentativa(sessao, B3_TABELA_URL.format(d=dia.isoformat(), p=pagina), tentativas=1).json()
+        tab = obj.get('table') or obj
+        nomes = [c.get('name') if isinstance(c, dict) else c for c in (tab.get('columns') or [])]
+        for v in tab.get('values') or []:
+            linhas.append(dict(zip(nomes, v)) if isinstance(v, list) else v)
+        total = int(obj.get('pageCount') or tab.get('pageCount') or 1)
+        pagina += 1
+    if not linhas:
+        raise ValueError('tabela da B3 vazia')
+    return linhas
+
+
+def baixar_b3_um_dia(dia, sessao=requests):
+    try:
+        return baixar_b3_arquivo(dia, sessao)
+    except Exception as e1:  # noqa: BLE001
+        try:
+            return baixar_b3_tabela(dia, sessao)
+        except Exception as e2:  # noqa: BLE001
+            raise RuntimeError(f'{dia}: arquivo ({e1}); tabela ({e2})') from e2
+
+
+def baixar_b3(universo, hoje, sessao=requests, dias_atras=5):
     ultimo_erro = None
     for k in range(dias_atras + 1):
         dia = hoje - timedelta(days=k)
@@ -135,13 +197,14 @@ def baixar_b3(universo, hoje, sessao=requests, dias_atras=7):
         try:
             linhas = baixar_b3_um_dia(dia, sessao)
         except Exception as e:  # tenta o dia útil anterior
+            log(f'Vendidos Brasil: {e}')
             ultimo_erro = e
             continue
         ativos = {}
         for l in linhas:
             t = (l.get('TckrSymb') or '').strip().upper()
             if t in universo:
-                qtd = _numero(l.get('BalQty'), inteiro=True)
+                qtd = _numero(l.get('BalQty'), inteiro=isinstance(l.get('BalQty'), str))
                 if qtd > 0:
                     a = ativos.setdefault(t, {'qtd': 0, 'valor': 0.0})
                     a['qtd'] += int(qtd)
@@ -151,7 +214,7 @@ def baixar_b3(universo, hoje, sessao=requests, dias_atras=7):
                 a['valor'] = round(a['valor'], 2)
             return {'fonte': 'B3 (aluguel de ações, posições em aberto)', 'data': dia.isoformat(), 'ativos': ativos}
         ultimo_erro = ValueError(f'arquivo de {dia} sem nenhum papel da carteira')
-    raise RuntimeError(f'B3 indisponível nos últimos {dias_atras} dias: {ultimo_erro!r}')
+    raise RuntimeError(f'B3 indisponível nos últimos {dias_atras} dias: {ultimo_erro}')
 
 
 def gravar(pasta, dados):
@@ -177,7 +240,7 @@ def main(argv=None, hoje=None, sessao=requests):
     args = ap.parse_args(argv)
     hoje = hoje or date.today()
     resumo = ['', '## Vendidos (alerta de short squeeze)', '']
-    for nome, pasta, func in (('EUA', args.saida, lambda u: baixar_finra(u, sessao)),
+    for nome, pasta, func in (('EUA', args.saida, lambda u: baixar_finra(u, sessao, hoje)),
                               ('Brasil', os.path.join(args.saida, 'br'), lambda u: baixar_b3(u, hoje, sessao))):
         universo = tickers_com_preco(pasta)
         if not universo:
