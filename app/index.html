@@ -350,6 +350,15 @@
       </div>
     </div>
     
+    <div id="explicacao-modal" class="hidden fixed inset-0 z-50 bg-black/70 flex items-start sm:items-center justify-center p-2 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="explicacao-titulo">
+        <div class="card w-full max-w-3xl max-h-[92vh] overflow-y-auto border-2 border-green-500">
+            <div class="flex items-start justify-between gap-3 mb-3">
+                <div id="explicacao-titulo" class="text-xl font-bold"></div>
+                <button type="button" id="explicacao-fechar" class="text-gray-400 hover:text-white text-2xl leading-none" aria-label="Fechar">✕</button>
+            </div>
+            <div id="explicacao-corpo" class="text-sm space-y-4"></div>
+        </div>
+    </div>
     <script>
     document.addEventListener('DOMContentLoaded', () => {
     
@@ -780,7 +789,7 @@
 
             filteredScreenerResults = Object.entries(scoredAssets).map(([ticker, data]) => ({ ticker, score: data.score, details: data.strats, atrPct: data.atrPct })).sort((a, b) => b.score - a.score);
             const fmtAtr = (v) => v === null || v === undefined || isNaN(v) ? 's/dado' : v.toFixed(2) + '%';
-            screenerResultsContainer.innerHTML = filteredScreenerResults.length > 0 ? `<table class="results-table"><thead><tr><th>Ativo</th><th>Score</th><th title="ATR de 14 períodos como % do preço — quanto maior, mais o ativo costuma se mover por dia">Volatilidade (ATR%)</th><th>Teses Confirmadas</th></tr></thead><tbody>${filteredScreenerResults.map(r => `<tr onclick="document.getElementById('ticker-select').value='${r.ticker}';"><td><b>${r.ticker}</b></td><td>${r.score.toFixed(2)}</td><td>${fmtAtr(r.atrPct)}</td><td class="text-xs text-gray-400">${r.details.join(', ')}</td></tr>`).join('')}</tbody></table>` : `<p class="text-gray-400">Nenhum ativo sobreviveu aos filtros atuais.</p>`;
+            screenerResultsContainer.innerHTML = filteredScreenerResults.length > 0 ? `<table class="results-table"><thead><tr><th>Ativo</th><th>Score</th><th title="Critérios fundamentalistas aprovados (limites do Módulo 6). Entre parênteses: quantos dos 5 têm dado">Fund.</th><th>P/L</th><th>ROE</th><th title="ATR de 14 períodos como % do preço — quanto maior, mais o ativo costuma se mover por dia">Volatilidade (ATR%)</th><th>Teses Confirmadas</th></tr></thead><tbody>${filteredScreenerResults.map(r => { const fz = resumoFundamentalista(r.ticker); return `<tr onclick="document.getElementById('ticker-select').value='${r.ticker}';"><td><b>${r.ticker}</b> <button type="button" class="text-xs text-indigo-300 underline ml-1" data-explicar="${r.ticker}" title="Ver por que foi selecionado">🔎</button></td><td>${r.score.toFixed(2)}</td><td class="${fz.classe}">${fz.nota}</td><td>${fz.pe}</td><td>${fz.roe}</td><td>${fmtAtr(r.atrPct)}</td><td class="text-xs text-gray-400">${r.details.join(', ')}</td></tr>`; }).join('')}</tbody></table>` : `<p class="text-gray-400">Nenhum ativo sobreviveu aos filtros atuais.</p>`;
           } catch (err) {
             console.error('Erro no Screener:', err);
             screenerResultsContainer.innerHTML = `<p class="text-red-400">Erro ao executar o Screener: ${err && err.message ? err.message : err}</p>`;
@@ -1284,7 +1293,7 @@
         const targetPrice = Number(f.targetMeanPrice);
         if (Number.isFinite(targetPrice) && f.price) {
             const upside = ((targetPrice - f.price) / f.price) * 100;
-            parts.push(`🎯 Alvo analistas: $${targetPrice.toFixed(2)} (${upside >= 0 ? '+' : ''}${upside.toFixed(1)}%)`);
+            parts.push(`🎯 Alvo analistas: ${MERCADO.simbolo} ${targetPrice.toFixed(2)} (${upside >= 0 ? '+' : ''}${upside.toFixed(1)}%)`);
         }
         if (f.fiftyTwoWeekHigh && f.fiftyTwoWeekLow && f.price && f.fiftyTwoWeekHigh > f.fiftyTwoWeekLow) {
             const pos = ((f.price - f.fiftyTwoWeekLow) / (f.fiftyTwoWeekHigh - f.fiftyTwoWeekLow)) * 100;
@@ -1330,25 +1339,35 @@
     }
     runFundamentalsBtn.addEventListener('click', () => executarCruzamento());
 
+    // Limites do "Filtro de Qualidade" (Módulo 6). Usados pelo cruzamento, pelo Screener e pelo painel "por quê".
+    function lerLimitesFundamentos() {
+        return {
+            maxPE: parseFloat(document.getElementById('fund-max-pe').value),
+            maxPB: parseFloat(document.getElementById('fund-max-pb').value),
+            maxDE: parseFloat(document.getElementById('fund-max-de').value),
+            minROE: parseFloat(document.getElementById('fund-min-roe').value) / 100,
+            minMargin: parseFloat(document.getElementById('fund-min-margin').value) / 100,
+        };
+    }
+    // Cada critério só REPROVA se houver dado; ausência de dado não conta contra nem a favor (fica neutro)
+    function checarFundamentos(f, L) {
+        return {
+            pe: f.pe === null || f.pe === undefined ? null : f.pe <= L.maxPE,
+            pb: f.pb === null || f.pb === undefined ? null : f.pb <= L.maxPB,
+            de: f.debtToEquity === null || f.debtToEquity === undefined ? null : f.debtToEquity <= L.maxDE,
+            roe: f.roe === null || f.roe === undefined ? null : f.roe >= L.minROE,
+            margin: f.netMargin === null || f.netMargin === undefined ? null : f.netMargin >= L.minMargin,
+        };
+    }
+
     function runFundamentalsCrossReference(fundContainer) {
-        const maxPE = parseFloat(document.getElementById('fund-max-pe').value);
-        const maxPB = parseFloat(document.getElementById('fund-max-pb').value);
-        const maxDE = parseFloat(document.getElementById('fund-max-de').value);
-        const minROE = parseFloat(document.getElementById('fund-min-roe').value) / 100;
-        const minMargin = parseFloat(document.getElementById('fund-min-margin').value) / 100;
+        const limites = lerLimitesFundamentos();
 
         const rows = filteredScreenerResults.map(r => {
             const f = fundamentalsData[r.ticker];
             if (!f) return { ticker: r.ticker, techScore: r.score, noData: true };
 
-            // Cada critério só REPROVA se houver dado; ausência de dado não conta contra nem a favor (fica neutro)
-            const checks = {
-                pe: f.pe === null || f.pe === undefined ? null : f.pe <= maxPE,
-                pb: f.pb === null || f.pb === undefined ? null : f.pb <= maxPB,
-                de: f.debtToEquity === null || f.debtToEquity === undefined ? null : f.debtToEquity <= maxDE,
-                roe: f.roe === null || f.roe === undefined ? null : f.roe >= minROE,
-                margin: f.netMargin === null || f.netMargin === undefined ? null : f.netMargin >= minMargin,
-            };
+            const checks = checarFundamentos(f, limites);
             const checkValues = Object.values(checks);
             const passed = checkValues.filter(v => v === true).length;
             const failed = checkValues.filter(v => v === false).length;
@@ -1377,12 +1396,13 @@
                 <p class="text-xs text-gray-400 mb-4">Ranking por Score Combinado, só entre ativos com pelo menos ${MIN_DATA_COVERAGE_FOR_RANKING}/5 critérios fundamentalistas com dado real e SEM evento corporativo crítico recente (ETFs/fundos e ativos sob risco de falência/deslistagem/restatement/fusão ficam de fora daqui, mesmo que apareçam na tabela completa abaixo).</p>
                 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
                 ${topPicks.map((r, i) => `
-                    <div class="result-metric text-left">
+                    <div class="result-metric text-left cursor-pointer hover:border-green-400 border border-transparent" data-explicar="${r.ticker}" role="button" tabindex="0" title="Ver por que foi selecionado">
                         <div class="text-xs text-gray-400">${medals[i]} · Fund. ${r.fundScore}/5</div>
                         <div class="text-lg font-bold">${r.ticker}</div>
                         <div class="text-xs text-gray-500 mb-1">${r.f.longName || ''}</div>
                         <div class="value positive">${r.combinedScore.toFixed(2)}</div>
                         <div class="text-xs text-gray-400 mt-1">Téc ${r.techScore.toFixed(2)} + Fund ${r.fundScore}</div>
+                        <div class="text-xs text-green-300 mt-1 underline">🔎 por quê?</div>
                     </div>`).join('')}
                 </div>
             </div>`;
@@ -1402,13 +1422,13 @@
             const rankIdx = topPicks.indexOf(r);
             const rankBadge = rankIdx >= 0 ? medals[rankIdx] : '';
             if (r.noData) {
-                return `<tr class="opacity-50"><td></td><td><b>${r.ticker}</b></td><td>${r.techScore.toFixed(2)}</td><td colspan="6" class="text-xs text-gray-500">Sem dado fundamentalista carregado para este ativo</td><td class="text-xs text-gray-500">s/dado</td><td>-</td><td>${r.techScore.toFixed(2)}</td><td>-</td></tr>`;
+                return `<tr class="opacity-50 cursor-pointer" data-explicar="${r.ticker}"><td></td><td><b>${r.ticker}</b></td><td>${r.techScore.toFixed(2)}</td><td colspan="6" class="text-xs text-gray-500">Sem dado fundamentalista carregado para este ativo</td><td class="text-xs text-gray-500">s/dado</td><td>-</td><td>${r.techScore.toFixed(2)}</td><td>-</td></tr>`;
             }
             const f = r.f;
             const lowDataFlag = r.excludedForEvent
                 ? '<div class="text-xs text-red-500 font-bold">🚫 excluído do ranking: evento corporativo crítico</div>'
                 : (!r.reliable ? '<div class="text-xs text-yellow-500">⚠️ poucos dados (fora do ranking)</div>' : '');
-            return `<tr>
+            return `<tr class="cursor-pointer" data-explicar="${r.ticker}" title="Clique para ver por que este ativo foi selecionado">
                 <td class="text-center">${rankBadge}</td>
                 <td><b>${r.ticker}</b>${f.longName ? `<div class="text-xs text-gray-500">${f.longName}</div>` : ''}${lowDataFlag}${eventBadge(f)}</td>
                 <td>${r.techScore.toFixed(2)}</td>
@@ -1427,6 +1447,110 @@
         html += '</tbody></table>';
         fundContainer.innerHTML = html;
     }
+
+    // Resumo curto dos fundamentos para a tabela do Screener (Módulo 1).
+    function resumoFundamentalista(ticker) {
+        const f = fundamentalsData && fundamentalsData[ticker];
+        if (!f) return { nota: '<span class="text-gray-500">s/dado</span>', pe: '–', roe: '–', classe: '' };
+        const checks = Object.values(checarFundamentos(f, lerLimitesFundamentos()));
+        const ok = checks.filter(v => v === true).length, comDado = checks.filter(v => v !== null).length;
+        const classe = f.alertaEvento === 'critico' ? 'text-red-400 font-bold' : (comDado < MIN_DATA_COVERAGE_FOR_RANKING ? 'text-gray-500' : (ok >= 4 ? 'text-green-400 font-semibold' : ok >= 2 ? 'text-yellow-300' : 'text-red-400'));
+        return { nota: `${ok}/5 <span class="text-xs text-gray-500">(${comDado})</span>${f.alertaEvento === 'critico' ? ' 🚨' : ''}`, pe: fmtNum(f.pe, 1), roe: fmtPct(f.roe), classe };
+    }
+
+    // PAINEL "POR QUE FOI SELECIONADO": refaz, só para leitura, o mesmo cálculo do Screener no último pregão
+    // (mesmas funções e pesos) e mostra cada parte do score técnico e cada critério fundamentalista.
+    function explicarSelecao(ticker) {
+        const data = allData[ticker];
+        if (!data) return;
+        const f = (fundamentalsData && fundamentalsData[ticker]) || null;
+        const i = data.close.length - 1;
+        const params = getIndicatorParameters();
+        const pesos = getCurrentWeights();
+        const ok = '<span class="text-green-400">✅</span>', nao = '<span class="text-red-400">❌</span>', neutro = '<span class="text-gray-500">–</span>';
+        const fmtMoeda = (v) => Number.isFinite(v) ? v.toLocaleString(MERCADO.locale, { style: 'currency', currency: MERCADO.moeda, maximumFractionDigits: 2 }) : 's/dado';
+        const fmtMi = (v) => `${MERCADO.simbolo} ${(v / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi`;
+        let html = '';
+
+        // Técnica
+        let scoreTec = 0, tecHtml = '';
+        if (data.close.length < 201) {
+            tecHtml = '<p class="text-yellow-300">Histórico curto (menos de 201 pregões): o Screener não avalia este ativo.</p>';
+        } else {
+            const ind = precomputeAllIndicators(data, params);
+            const sinais = analyzeAllSignals(data, ind, i);
+            const linhas = Object.keys(strategyWeights).map(key => {
+                const est = confluenceStrategies[key]; if (!est) return '';
+                const achados = est.buy.filter(sg => sinais.buy[sg]);
+                const ativa = achados.length >= est.minVotes;
+                const peso = pesos[key] ?? strategyWeights[key].weight;
+                if (ativa) scoreTec += peso;
+                const detalhes = achados.length ? achados.map(sg => sinais.buy[sg]).join('; ') : 'nenhum sinal hoje';
+                return `<tr class="${ativa ? '' : 'opacity-60'}"><td>${ativa ? ok : neutro}</td><td>${strategyWeights[key].name}</td><td class="text-xs">${detalhes}<div class="text-gray-500">precisa de ${est.minVotes} de ${est.buy.length} sinal(is)</div></td><td class="text-right font-semibold ${ativa ? 'text-green-400' : 'text-gray-500'}">${ativa ? '+' + peso.toFixed(1) : '0'}</td></tr>`;
+            }).join('');
+            let somaVol = 0; for (let j = i - 19; j <= i; j++) somaVol += data.close[j] * data.volume[j];
+            const adtv = somaVol / 20, minAdtv = parseFloat(document.getElementById('filter-adtv').value) || 0;
+            const filtros = [`${adtv >= minAdtv ? ok : nao} Volume financeiro médio (20 dias): ${fmtMi(adtv)} (mínimo ${fmtMi(minAdtv)})`];
+            if (document.getElementById('filter-trend').checked && ind.EMA_200[i]) filtros.push(`${data.close[i] >= ind.EMA_200[i] ? ok : nao} Preço ${fmtMoeda(data.close[i])} ${data.close[i] >= ind.EMA_200[i] ? 'acima' : 'abaixo'} da MME 200 (${fmtMoeda(ind.EMA_200[i])})`);
+            const atrPct = ind.ATR[i] ? (ind.ATR[i] / data.close[i]) * 100 : null;
+            if (atrPct !== null) filtros.push(`ℹ️ Volatilidade (ATR 14): ${atrPct.toFixed(2)}% do preço por dia`);
+            tecHtml = `<table class="results-table w-full"><thead><tr><th></th><th>Tese técnica</th><th>Sinais no último pregão</th><th class="text-right">Pontos</th></tr></thead><tbody>${linhas}</tbody>
+                <tfoot><tr><td></td><td colspan="2" class="font-bold">Score técnico</td><td class="text-right font-bold text-indigo-300">${scoreTec.toFixed(2)}</td></tr></tfoot></table>
+                <div class="text-xs text-gray-300 mt-2 space-y-1">${filtros.map(x => `<div>${x}</div>`).join('')}</div>`;
+        }
+        html += `<div><h4 class="font-bold text-indigo-300 mb-2">📈 Análise técnica (Módulo 1)</h4>${tecHtml}</div>`;
+
+        // Fundamentos
+        let notaFund = 0;
+        if (!f) {
+            html += `<div><h4 class="font-bold text-purple-300 mb-2">🏛️ Fundamentos (Módulo 6)</h4><p class="text-gray-400">Sem dados fundamentalistas para este ativo.</p></div>`;
+        } else {
+            const L = lerLimitesFundamentos(); const c = checarFundamentos(f, L);
+            const vals = Object.values(c); notaFund = vals.filter(v => v === true).length; const comDado = vals.filter(v => v !== null).length;
+            const b = (v) => v === null ? neutro : (v ? ok : nao);
+            const crit = [
+                ['P/L (preço ÷ lucro)', fmtNum(f.pe), `≤ ${L.maxPE}`, c.pe],
+                ['P/VP (preço ÷ patrimônio)', fmtNum(f.pb), `≤ ${L.maxPB}`, c.pb],
+                ['Dívida ÷ Patrimônio', fmtNum(f.debtToEquity), `≤ ${L.maxDE}`, c.de],
+                ['ROE (lucro ÷ patrimônio)', fmtPct(f.roe), `≥ ${(L.minROE * 100).toFixed(0)}%`, c.roe],
+                ['Margem líquida', fmtPct(f.netMargin), `≥ ${(L.minMargin * 100).toFixed(0)}%`, c.margin],
+            ];
+            const fora = f.alertaEvento === 'critico' ? '<p class="text-red-400 font-bold mt-2">🚫 Fica fora das Melhores Opções: evento corporativo crítico recente.</p>'
+                : (comDado < MIN_DATA_COVERAGE_FOR_RANKING ? `<p class="text-yellow-400 mt-2">⚠️ Só ${comDado} de 5 critérios têm dado: fica fora das Melhores Opções (mínimo ${MIN_DATA_COVERAGE_FOR_RANKING}).</p>` : '');
+            html += `<div><h4 class="font-bold text-purple-300 mb-2">🏛️ Fundamentos (Módulo 6)</h4>
+                <table class="results-table w-full"><thead><tr><th></th><th>Critério</th><th>Valor</th><th>Limite</th></tr></thead><tbody>
+                ${crit.map(([n, v, lim, chk]) => `<tr><td>${b(chk)}</td><td>${n}</td><td>${v}</td><td class="text-gray-400">${lim}</td></tr>`).join('')}
+                </tbody><tfoot><tr><td></td><td colspan="2" class="font-bold">Nota fundamentalista</td><td class="font-bold text-purple-300">${notaFund}/5</td></tr></tfoot></table>
+                <div class="text-xs text-gray-300 mt-2 space-y-1"><div>Crescimento da receita: ${fmtPct(f.revenueGrowth)}${f.sector ? ` · Setor: ${f.sector}` : ''}</div>${marketSignalsCell(f)}</div>${eventBadge(f)}${fora}</div>`;
+        }
+
+        html += `<div class="bg-gray-900 rounded-lg p-3 flex flex-wrap items-center justify-between gap-3">
+            <div><span class="text-gray-400">Score combinado = técnico + fundamentos:</span> <b class="text-green-400 text-lg">${scoreTec.toFixed(2)} + ${notaFund} = ${(scoreTec + notaFund).toFixed(2)}</b></div>
+            <button type="button" id="explicacao-grafico" class="btn btn-primary">Ver no gráfico</button></div>
+            <p class="text-xs text-gray-500">Calculado com os pesos e filtros atuais da tela, no último pregão (${data.dates[i]}). Não é recomendação de investimento.</p>`;
+
+        document.getElementById('explicacao-titulo').innerHTML = `${ticker}${f && f.longName ? ` <span class="text-sm font-normal text-gray-400">${f.longName}</span>` : ''}<div class="text-sm font-normal text-gray-400">Por que foi selecionado</div>`;
+        document.getElementById('explicacao-corpo').innerHTML = html;
+        document.getElementById('explicacao-grafico').addEventListener('click', () => {
+            fecharExplicacao();
+            tickerSelect.value = ticker; tickerSelect.dispatchEvent(new Event('change'));
+            document.querySelector('button[data-tab="analysis"]').click();
+            document.getElementById('tabs').scrollIntoView({ behavior: 'smooth' });
+        });
+        document.getElementById('explicacao-modal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+    function fecharExplicacao() { document.getElementById('explicacao-modal').classList.add('hidden'); document.body.style.overflow = ''; }
+    document.getElementById('explicacao-fechar').addEventListener('click', fecharExplicacao);
+    document.getElementById('explicacao-modal').addEventListener('click', e => { if (e.target.id === 'explicacao-modal') fecharExplicacao(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharExplicacao(); });
+    document.addEventListener('click', e => {
+        const alvo = e.target.closest('[data-explicar]');
+        if (!alvo || e.target.closest('a')) return;
+        e.stopPropagation();
+        explicarSelecao(alvo.dataset.explicar);
+    }, true);
+    document.addEventListener('keydown', e => { const alvo = e.target.closest && e.target.closest('[data-explicar]'); if (alvo && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); explicarSelecao(alvo.dataset.explicar); } });
 
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).

@@ -55,13 +55,32 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     const banner = await page.textContent('#data-freshness-banner');
     ok(/Dados até \d{2}\/\d{2}\/\d{4}/.test(banner) && /Fundamentos de \d+ ativos/.test(banner) && /Atualizado em/.test(banner), `cabeçalho de status: "${banner.trim()}"`);
     ok(await page.isHidden('#load-progress'), 'barra de progresso some ao terminar');
-    const shortlist = await page.$$eval('#screener-results-container tbody tr td:first-child', tds => tds.map(td => td.textContent.trim()));
+    const shortlist = await page.$$eval('#screener-results-container tbody tr td:first-child b', tds => tds.map(td => td.textContent.trim()));
     ok(shortlist.includes('CRIT'), 'ativo crítico (CRIT) passou no Screener técnico');
 
     await page.waitForSelector('#melhores-opcoes-resumo .result-metric', { timeout: 60000 });
     const topResumo = await page.$$eval('#melhores-opcoes-resumo .result-metric .text-lg', els => els.map(e => e.textContent.trim()));
     ok(topResumo.length > 0 && !topResumo.includes('CRIT'), `"Melhores Opções" visível ao abrir, sem o CRIT: ${topResumo.join(', ')}`);
     await page.screenshot({ path: path.join(SHOTS, 'app_inicio.png'), fullPage: true });
+
+    // Fundamentos no Screener e painel "Por que foi selecionado"
+    const cab = await page.$$eval('#screener-results-container thead th', ths => ths.map(t => t.textContent.trim()));
+    ok(cab.includes('Fund.') && cab.includes('P/L') && cab.includes('ROE'), `Screener mostra fundamentos: ${cab.join(' | ')}`);
+    const valorCard = (await page.textContent('#melhores-opcoes-resumo [data-explicar] .value')).trim();
+    const tickerCard = (await page.textContent('#melhores-opcoes-resumo [data-explicar] .text-lg')).trim();
+    await page.click('#melhores-opcoes-resumo [data-explicar]');
+    await page.waitForSelector('#explicacao-modal:not(.hidden)', { timeout: 5000 });
+    const corpo = await page.textContent('#explicacao-corpo');
+    ok(/Por que foi selecionado/.test(await page.textContent('#explicacao-titulo')) && (await page.textContent('#explicacao-titulo')).includes(tickerCard), `clicar no card ${tickerCard} abre o "por quê"`);
+    ok(/Score técnico/.test(corpo) && /Nota fundamentalista/.test(corpo) && /P\/L/.test(corpo), 'painel mostra técnica e fundamentos, critério a critério');
+    ok(corpo.includes(`= ${valorCard}`), `painel fecha a conta do Score Combinado (${valorCard})`);
+    await page.screenshot({ path: path.join(SHOTS, 'app_por_que.png'), fullPage: false });
+    await page.click('#explicacao-fechar');
+    ok(await page.isHidden('#explicacao-modal'), 'painel fecha no ✕');
+    await page.click('#screener-results-container tbody tr [data-explicar]');
+    ok(await page.isVisible('#explicacao-modal'), 'botão 🔎 do Screener abre o painel');
+    await page.keyboard.press('Escape');
+    ok(await page.isHidden('#explicacao-modal'), 'painel fecha com Esc');
 
     await page.click('button[data-tab="fundamentals"]');
     const topMod6 = await page.$$eval('#fundamentals-results-container .result-metric .text-lg', els => els.map(e => e.textContent.trim()));
