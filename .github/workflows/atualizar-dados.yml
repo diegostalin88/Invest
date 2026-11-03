@@ -8,12 +8,20 @@ on:
     # Dia 1 de cada mês: só o job "manter-ativo" (evita que o GitHub desative os agendamentos
     # depois de 60 dias sem atividade no repositório).
     - cron: "0 12 1 * *"
+  # Mudou só o app (app/**): republica o app reaproveitando os dados já publicados, sem nova coleta.
+  push:
+    branches: [main]
+    paths: ["app/**"]
   workflow_dispatch:
     inputs:
       ticker_limit:
         description: "Modo teste: processar só os N primeiros tickers (vazio = universo completo)"
         required: false
         default: ""
+      somente_app:
+        description: "Só republicar o app com os dados atuais (sem nova coleta)"
+        type: boolean
+        default: false
 
 # Nenhuma permissão por padrão; cada job pede só o que precisa.
 permissions: {}
@@ -25,7 +33,7 @@ concurrency:
 jobs:
   coletar:
     name: Coletar dados e montar o site
-    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 22 * * 1-5'
+    if: (github.event_name == 'workflow_dispatch' && !inputs.somente_app) || github.event.schedule == '30 22 * * 1-5'
     runs-on: ubuntu-latest
     timeout-minutes: 180
     permissions:
@@ -73,9 +81,41 @@ jobs:
         with:
           path: site
 
+  so-app:
+    name: Republicar só o app (dados atuais)
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.somente_app)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Baixar os dados já publicados e montar o site
+        env:
+          BASE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data
+        run: |
+          mkdir -p site/data
+          curl -fsSL "$BASE/manifest.json" -o site/data/manifest.json
+          for f in $(python3 -c "import json;m=json.load(open('site/data/manifest.json'));print(' '.join(m['arquivosPrecos']+[m.get('arquivoFundamentos','fundamentos.json')]))"); do
+            curl -fsSL "$BASE/$f" -o "site/data/$f"
+          done
+          cp -r app/. site/
+          echo "### App republicado com os dados de $(python3 -c "import json;print(json.load(open('site/data/manifest.json'))['ultimoPregao'])")" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+
+      - name: Enviar artefato do Pages
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
   publicar:
     name: Publicar no GitHub Pages
-    needs: coletar
+    needs: [coletar, so-app]
+    if: always() && (needs.coletar.result == 'success' || needs.so-app.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

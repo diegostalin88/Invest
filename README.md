@@ -58,6 +58,9 @@ As constantes (cortes de liquidez, validade do cache, anos de histórico, limite
   Atenção: depois que o site já tiver os dados completos, o modo teste é bloqueado de propósito pelo portão de
   qualidade (a queda de tickers passa de 30%), para não substituir o site bom por um pequeno.
 
+- Marque `somente_app` para só republicar o app com os dados já publicados (sem nova coleta, ~1 minuto). Isso
+  também acontece sozinho a cada commit que mexe em `app/`.
+
 Ao final de cada execução, o resumo do job mostra: último pregão, quantidade de ativos, fundamentos
 atualizados, alertas críticos, tamanho dos arquivos, tempo de execução e avisos.
 
