@@ -302,6 +302,19 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     ok(await cel.page.isHidden('#am-grafico') && await cel.page.isVisible('#am-ativo'), 'celular: botão voltar do celular fecha o gráfico');
     await cel.page.goBack();
     ok(await cel.page.isHidden('#am-ativo'), 'celular: voltar de novo fecha o ativo');
+    // Relatório: sem o arquivo da noite, oferece "Gerar agora" no aparelho
+    await cel.page.click('.am-nav [data-ir-pagina="relatorio"]');
+    ok(await cel.page.isVisible('#am-relatorio [data-gerar-relatorio]'), 'celular: Relatório sem arquivo oferece "Gerar agora"');
+    await cel.page.click('#am-relatorio [data-gerar-relatorio]');
+    await cel.page.waitForFunction(() => /Último teste/.test(document.getElementById('am-relatorio').textContent), null, { timeout: 120000 });
+    const relTxt = await cel.page.textContent('#am-relatorio');
+    ok(/Entradas para o próximo pregão/.test(relTxt) && /Em operação/.test(relTxt) && /Saída que ganhou/.test(relTxt), 'celular: Relatório com entradas, operações abertas e saída vencedora');
+    const relInfo = await cel.page.evaluate(() => { const R = window.investDebug.relatorio; return { n: R.ativos.length, sq: R.ativos.filter(a => a.squeeze).length, vend: !!R.vendidos }; });
+    ok(relInfo.n > 0 && relInfo.vend && relInfo.sq > 0 && /short squeeze/.test(relTxt), `celular: alerta de short squeeze com os vendidos da B3 ${JSON.stringify(relInfo)}`);
+    await cel.page.waitForTimeout(300);
+    await cel.page.screenshot({ path: path.join(SHOTS, 'celular_relatorio.png'), fullPage: false });
+    const cartao = await cel.page.$('#am-relatorio .rel-card[data-ativo]');
+    if (cartao) { await cartao.click(); await cel.page.waitForSelector('#am-ativo.aberta', { timeout: 15000 }); ok(true, 'celular: tocar num papel do Relatório abre a tela do ativo'); await cel.page.goBack(); }
     // Testes e Mais
     await cel.page.click('.am-nav [data-ir-pagina="testes"]');
     await cel.page.click('#run-backtest-btn');

@@ -95,6 +95,17 @@ def main(destino):
     s = tendencia_com_spike(N_DIAS, 30, 3_000_000)
     precos_br['PETR4'] = {'dates': datas, **s}
     gravar_mercado(os.path.join(destino, 'data', 'br'), precos_br, fund_br, datas[-1], 'br', 'BRL')
+    # Vendidos sintéticos (como o arquivo da B3): 10 dias de volume vendidos em todos os papéis, para o
+    # alerta de short squeeze aparecer onde houver sinal de reversão.
+    vend = {t: {'qtd': int(sum(s['volume'][-20:]) / 20 * 10), 'valor': 0.0} for t, s in precos_br.items()}
+    with open(os.path.join(destino, 'data', 'br', 'vendidos.json'), 'w') as f:
+        json.dump({'fonte': 'B3 (aluguel de ações, posições em aberto)', 'data': datas[-1], 'geradoEm': '2026-01-01T00:00:00Z', 'ativos': vend}, f)
+    mbr = os.path.join(destino, 'data', 'br', 'manifest.json')
+    with open(mbr) as f:
+        m = json.load(f)
+    m['arquivoVendidos'] = 'vendidos.json'
+    with open(mbr, 'w') as f:
+        json.dump(m, f, indent=2)
     print(f"Site de exemplo em {destino}: {n_us} ativos EUA, {len(precos_br)} ativos Brasil.")
 
 

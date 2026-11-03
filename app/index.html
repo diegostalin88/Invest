@@ -115,6 +115,22 @@
             .result-metric .value { font-size: 1.45rem; }
             .checkbox-label { padding: 0.6rem 0.75rem; }
         }
+        /* =================== RELATÓRIO (celular e computador) =================== */
+        .rel-card { display: block; width: 100%; text-align: left; background: #151922; border: 1px solid #252b38; border-radius: 1rem; padding: 0.9rem 1rem; color: #f3f4f6; }
+        button.rel-card:active { background: #1c212c; }
+        .rel-titulo { font-weight: 700; font-size: 1.12rem; margin: 1.3rem 0 0.6rem; display: flex; align-items: center; gap: 0.5rem; }
+        .rel-lista > * + * { margin-top: 0.6rem; }
+        .rel-mudo { color: #9aa3b2; }
+        .rel-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.5rem; margin-top: 0.6rem; }
+        .rel-dado .r { font-size: 0.75rem; color: #9aa3b2; } .rel-dado .v { font-weight: 700; font-size: 1.05rem; }
+        .rel-chip { display: inline-flex; align-items: center; padding: 0.12rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; background: rgba(129,140,248,0.14); color: #c7d2fe; white-space: nowrap; }
+        .rel-chip.verde { background: rgba(34,197,94,0.14); color: #86efac; } .rel-chip.amarelo { background: rgba(245,158,11,0.14); color: #fcd34d; } .rel-chip.vermelho { background: rgba(240,82,82,0.15); color: #fca5a5; }
+        .rel-tk { font-weight: 800; font-size: 1.15rem; }
+        .rel-botao { display: block; width: 100%; padding: 0.85rem; border-radius: 0.9rem; background: #4f46e5; color: #fff; font-weight: 700; text-align: center; }
+        .rel-botao:disabled { opacity: 0.6; }
+        .rel-detalhes summary { cursor: pointer; font-weight: 700; padding: 0.4rem 0; }
+        .rel-tabela { width: 100%; font-size: 0.85rem; border-collapse: collapse; } .rel-tabela td, .rel-tabela th { padding: 0.45rem 0.3rem; border-top: 1px solid #252b38; text-align: left; }
+
         /* =================== APP DO CELULAR (casca nova, < 1024 px) =================== */
         #app-movel { display: none; }
         .am-ico { width: 1.4rem; height: 1.4rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
@@ -166,7 +182,7 @@
             .am-filtros::-webkit-scrollbar { display: none; }
             .am-pilula { flex-shrink: 0; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.95rem; border-radius: 999px; border: 1px solid var(--borda); background: var(--sup); color: var(--txt); font-size: 0.9rem; font-weight: 600; }
             .am-pilula.ativa { background: #eef0ff; color: #111827; border-color: #eef0ff; }
-            .am-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: repeat(4, 1fr);
+            .am-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: repeat(5, 1fr);
                 background: rgba(11,13,18,0.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--borda); padding: 0.45rem 0.5rem calc(0.45rem + env(safe-area-inset-bottom)); }
             .am-nav button { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; padding: 0.35rem 0; color: var(--mudo); font-size: 0.75rem; font-weight: 600; }
             .am-nav button.ativa { color: var(--txt); }
@@ -269,6 +285,7 @@
         <symbol id="i-busca" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.2-4.2"/></symbol>
         <symbol id="i-filtro" viewBox="0 0 24 24"><path d="M4 6h9"/><path d="M17 6h3"/><circle cx="15" cy="6" r="2"/><path d="M4 12h3"/><path d="M11 12h9"/><circle cx="9" cy="12" r="2"/><path d="M4 18h11"/><path d="M19 18h1"/><circle cx="17" cy="18" r="2"/></symbol>
         <symbol id="i-alvo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+        <symbol id="i-relatorio" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8.5 10h7M8.5 14h7M8.5 18h4"/></symbol>
         <symbol id="i-tabela" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M9 10v10"/></symbol>
         <symbol id="i-rede" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8 7.5 10.8 16"/><path d="M16 7.5 13.2 16"/><path d="M8.5 6h7"/></symbol>
         <symbol id="i-dados" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="8" ry="2.5"/><path d="M4 5.5v6c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5v-6"/><path d="M4 11.5v6c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5v-6"/></symbol>
@@ -306,6 +323,11 @@
             <button type="button" class="am-botao sec mt-3 hidden" id="am-ranking-mais">Mostrar mais</button>
         </section>
 
+        <section class="am-pagina" data-pagina="relatorio">
+            <div id="am-relatorio" class="relatorio-alvo"></div>
+            <p class="am-aviso">Ferramenta de apoio à análise. Não é recomendação de investimento.</p>
+        </section>
+
         <section class="am-pagina" data-pagina="testes">
             <div class="am-card mb-3"><div class="text-sm mb-2" style="color:var(--mudo)">Ativo testado</div><div id="am-slot-ticker"></div></div>
             <div class="am-segmento" id="am-seg-testes">
@@ -329,6 +351,7 @@
         <nav class="am-nav" aria-label="Navegação">
             <button type="button" data-ir-pagina="inicio" class="ativa"><svg class="am-ico"><use href="#i-inicio"/></svg>Início</button>
             <button type="button" data-ir-pagina="ranking"><svg class="am-ico"><use href="#i-ranking"/></svg>Ranking</button>
+            <button type="button" data-ir-pagina="relatorio"><svg class="am-ico"><use href="#i-relatorio"/></svg>Relatório</button>
             <button type="button" data-ir-pagina="testes"><svg class="am-ico"><use href="#i-testes"/></svg>Testes</button>
             <button type="button" data-ir-pagina="mais"><svg class="am-ico"><use href="#i-mais"/></svg>Mais</button>
         </nav>
@@ -423,6 +446,7 @@
 
         <div class="border-b border-gray-700 mb-6" id="tabs-wrap"><nav class="flex overflow-x-auto -mb-px" id="tabs">
             <button class="tab-btn active shrink-0" data-tab="screener">Módulo 1: Screener</button>
+            <button class="tab-btn shrink-0 text-emerald-400" data-tab="relatorio">Relatório</button>
             <button class="tab-btn shrink-0" data-tab="analysis">Módulo 2: Gráficos</button>
             <button class="tab-btn shrink-0" data-tab="backtest">Módulo 3: Backtest Base</button>
             <button class="tab-btn shrink-0 text-yellow-400" data-tab="walkforward">Módulo 4: Walk-Forward OOS</button>
@@ -662,6 +686,7 @@
             </div>
 
             <!-- Módulo 6: Fundamentos (NOVO) -->
+            <div id="relatorio-content" class="tab-content"><div class="max-w-4xl"><div id="relatorio-desktop" class="relatorio-alvo"></div></div></div>
             <div id="fundamentals-content" class="tab-content"><div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="lg:col-span-1 space-y-6 order-2 lg:order-1">
                     <div class="card border-l-4 border-purple-500" data-sanfona="celular-fechada" id="sec-fund-info">
@@ -1115,9 +1140,15 @@
             const precos = Object.assign({}, ...partes);
             atualizarProgresso('Preparando indicadores…', 1);
             await new Promise(r => setTimeout(r, 30)); // deixa a barra pintar 100% antes do cálculo pesado
+            // Extras opcionais: só busca o que o manifesto diz que foi publicado (evita 404 no console)
+            const [rel, vend] = await Promise.all([manifest.arquivoRelatorio, manifest.arquivoVendidos].map(nome =>
+                nome ? buscar(MERCADO.pasta + nome).then(r => r.json()).catch(() => null) : null));
+            relatorioDados = rel && Array.isArray(rel.ativos) ? rel : null;
+            vendidosDados = vend && vend.ativos ? vend : null;
             inicializarComDados(precos, fundamentos, { manifest });
             if (!fundamentos) mostrarMensagem('Preços carregados, mas o arquivo de fundamentos não veio. O Módulo 6 fica sem dados até a próxima coleta.', 'aviso');
             esconderProgresso();
+            desenharRelatorio();
             if (modoComputadorNoCelular()) mostrarMensagem('As letras estão pequenas porque o navegador está em <b>"Site para computador"</b>. No Chrome, toque em ⋮ e desmarque essa opção (depois, se instalou o app, reinstale o atalho).', 'aviso');
             await rodarFluxoCompleto();
             return true;
@@ -1530,7 +1561,7 @@
                 else if (riskParams.saidaDias > 0 && i - entryIdx + 1 >= riskParams.saidaDias) { exitPrice = dataSubset.close[i]; saidas.tempo++; }
                 if (exitPrice !== null) {
                     exitPrice *= (1 - costFraction);
-                    const pnl = (exitPrice - entryPrice) * positionSize; trades.push({ pnl, pct: pnl/capital });
+                    const pnl = (exitPrice - entryPrice) * positionSize; trades.push({ pnl, pct: pnl/capital, ent: entryIdx });
                     capital += pnl; position = 'out'; curEq = capital;
                 }
             }
@@ -1571,7 +1602,7 @@
         const profitFactor = grossLoss > 0 ? grossWin/grossLoss : (grossWin > 0 ? Infinity : 0);
         // Estado no último candle (só leitura, para o "Plano de operação"; não muda o resultado)
         const aberta = position === 'long' ? { entrada: entryPrice, data: dataSubset.dates[entryIdx], stop: stopPrice, alvo: targetPrice, dias: dataSubset.close.length - entryIdx } : null;
-        return { final: capital, returnPct, maxDD, winRate, expectancy, trades: trades.length, eq, profitFactor, aberta, sinalHoje: pendingEntry, atrHoje: pendingATR, saidas, retornosTrades: trades.map(t => t.pct) };
+        return { final: capital, returnPct, maxDD, winRate, expectancy, trades: trades.length, eq, profitFactor, aberta, sinalHoje: pendingEntry, atrHoje: pendingATR, saidas, retornosTrades: trades.map(t => t.pct), tradesDet: trades.map(t => ({ pct: t.pct, ent: t.ent })) };
     }
 
     // ===== Ferramentas de validação tiradas dos livros (só leitura: não mudam o resultado do Backtest) =====
@@ -1619,7 +1650,7 @@
         return { vr, tipo, nome, texto };
     }
     function avisoSobrevivencia() {
-        return MERCADO.pasta === 'br'
+        return mercadoAtual === 'br'
             ? 'O Brasil usa a carteira <b>atual</b> do IBOVESPA. Empresas que saíram do índice (ou quebraram) não entram no teste, então o resultado tende a ser otimista (viés de sobrevivência, Chan).'
             : 'A lista de ações é a de <b>hoje</b>. Empresas que deixaram a bolsa não entram no teste, então o resultado tende a ser otimista (viés de sobrevivência, Chan).';
     }
@@ -1704,6 +1735,209 @@
         } finally { carteiraRodando = false; }
     }
     document.getElementById('bt-carteira-btn').addEventListener('click', () => testarCarteira());
+
+    // ===================== RELATÓRIO AUTOMÁTICO =====================
+    // Para cada papel testa 6 regras (as do "Teste na carteira"), ESCOLHE a melhor só com os primeiros 60% do
+    // histórico e CONFIRMA nos 40% finais (walk-forward, Fitschen/Kaufman). Depois diz a situação de hoje com a
+    // regra escolhida: entrada no próximo pregão, operação em andamento (com stop/alvo/tempo) ou nada.
+    // Roda toda noite no GitHub (coleta/gerar_relatorio.js) e, se faltar, no próprio aparelho.
+    let relatorioDados = null, vendidosDados = null;
+    const FRACAO_ESCOLHA = 0.6, MIN_TRADES_ESCOLHA = 5, MIN_TRADES_CONFIRMA = 3, LIMITE_RELATORIO = 400;
+    function regrasRelatorio(base) {
+        const alvo = 3, dias = 10;
+        return [
+            { id: 'stop', nome: 'Score + stop móvel', saida: 'preço', rp: { ...base, modoEntrada: 'score', alvoAtr: 0, saidaDias: 0 } },
+            { id: 'alvo', nome: `Score + alvo ${alvo}×ATR`, saida: 'preço', rp: { ...base, modoEntrada: 'score', alvoAtr: alvo, saidaDias: 0 } },
+            { id: 'tempo', nome: `Score + saída em ${dias} pregões`, saida: 'tempo', rp: { ...base, modoEntrada: 'score', alvoAtr: 0, saidaDias: dias } },
+            { id: 'alvo_tempo', nome: `Score + alvo ${alvo}×ATR ou ${dias} pregões`, saida: 'preço ou tempo', rp: { ...base, modoEntrada: 'score', alvoAtr: alvo, saidaDias: dias } },
+            { id: 'recuo', nome: 'Tendência + recuo (IFR2)', saida: 'preço (média de 5)', rp: { ...base, modoEntrada: 'recuo', alvoAtr: 0, saidaDias: 0 } },
+            { id: 'recuo_tempo', nome: `Tendência + recuo ou ${dias} pregões`, saida: 'preço ou tempo', rp: { ...base, modoEntrada: 'recuo', alvoAtr: 0, saidaDias: dias } }
+        ];
+    }
+    function estatTrades(lista) {
+        let g = 0, p = 0, v = 0; lista.forEach(x => { if (x.pct > 0) { g += x.pct; v++; } else p += -x.pct; });
+        const pf = p > 0 ? g / p : (g > 0 ? 99 : 0);
+        return { n: lista.length, pf: Math.min(pf, 99), acerto: lista.length ? v / lista.length : 0, ret: lista.reduce((a, x) => a + x.pct, 0) };
+    }
+    function universoRelatorio() {
+        const vol = t => { const d = allData[t], n = d.close.length; let s = 0; for (let j = Math.max(0, n - 20); j < n; j++) s += d.close[j] * d.volume[j]; return s / 20; };
+        const minAdtv = MERCADO.adtvPadrao || 0;
+        return Object.keys(allData).filter(t => allData[t].close.length >= 260).map(t => [t, vol(t)])
+            .filter(([, v]) => v >= minAdtv).sort((a, b) => b[1] - a[1]).slice(0, LIMITE_RELATORIO).map(([t]) => t);
+    }
+    function dadosVendido(t) {
+        const a = vendidosDados && vendidosDados.ativos && vendidosDados.ativos[t]; const d = allData[t];
+        if (!a || !d) return null;
+        const n = d.volume.length; let s = 0, k = 0; for (let j = Math.max(0, n - 20); j < n; j++) { s += d.volume[j]; k++; }
+        const vm = k ? s / k : 0;
+        return { qtd: a.qtd, dias: vm > 0 ? a.qtd / vm : null, variacaoPct: a.variacaoPct ?? null, data: vendidosDados.data, fonte: vendidosDados.fonte };
+    }
+    // Sinal de reversão recente (últimos 5 pregões) pelo motor da v14: estratégias Otimista ou Exaustão e Reversão.
+    function reversaoRecente(t) {
+        const d = allData[t]; if (!d || d.close.length < 201) return null;
+        const ind = v14_precomputarIndicadores(d, getIndicatorParameters()); const n = d.close.length;
+        for (let i = n - 1; i >= n - 5; i--) {
+            const sig = v14_analisarSinais(d, ind, i); const compra = Object.keys(sig.buy || {});
+            for (const k of ['optimistic_buy', 'reversal_buy']) {
+                const e = estrategiasV14[k]; if (!e) continue;
+                if (e.buy.filter(x => compra.includes(x)).length >= (e.minVotes || 1)) return { estrategia: k === 'optimistic_buy' ? 'Otimista' : 'Exaustão e Reversão', data: d.dates[i] };
+            }
+        }
+        return null;
+    }
+    function avaliarPapelRelatorio(t, regras) {
+        const d = allData[t]; const n = d.close.length; const corte = Math.floor(n * FRACAO_ESCOLHA);
+        const testes = regras.map(r => {
+            const res = runCoreBacktest(d, r.rp); if (!res) return null;
+            const tr = res.tradesDet.filter(x => x.ent < corte), te = res.tradesDet.filter(x => x.ent >= corte);
+            return { r, res, treino: estatTrades(tr), teste: estatTrades(te) };
+        });
+        const candidatos = testes.filter(x => x && x.treino.n >= MIN_TRADES_ESCOLHA);
+        const perfil = perfilDoAtivo(d);
+        const base = { t, perfil: perfil ? perfil.tipo : null, comparacao: testes.map(x => x ? { id: x.r.id, pfTreino: +x.treino.pf.toFixed(2), nTreino: x.treino.n, pfTeste: +x.teste.pf.toFixed(2), nTeste: x.teste.n } : null) };
+        if (!candidatos.length) return { ...base, regra: null, motivo: 'poucas operações no histórico' };
+        // Nota de escolha: fator de lucro (limitado a 5) pesado pelo número de operações, para uma regra com
+        // poucos trades "perfeitos" não ganhar de uma regra boa e bem testada.
+        const nota = x => Math.min(x.treino.pf, 5) * Math.min(1, x.treino.n / 15);
+        const melhor = candidatos.reduce((m, x) => nota(x) > nota(m) ? x : m, candidatos[0]);
+        const confirmada = melhor.treino.pf >= 1 && melhor.teste.n >= MIN_TRADES_CONFIRMA && melhor.teste.pf >= 1;
+        const res = melhor.res; const fech = d.close[n - 1];
+        let situacao = 'nada', niveis = {};
+        if (res.aberta) {
+            situacao = 'posicao';
+            niveis = { entrada: res.aberta.entrada, desde: res.aberta.data, stop: res.aberta.stop, alvo: res.aberta.alvo, restam: melhor.r.rp.saidaDias > 0 ? Math.max(1, melhor.r.rp.saidaDias - res.aberta.dias) : null };
+        } else if (res.sinalHoje) {
+            situacao = 'entrada'; const atr = res.atrHoje; const rp = melhor.r.rp;
+            niveis = { entrada: fech, stop: Math.max(fech - atr * rp.atrMult, fech * (1 - rp.stopLossPct / 100)), alvo: rp.alvoAtr > 0 ? fech + atr * rp.alvoAtr : null, restam: rp.saidaDias > 0 ? rp.saidaDias : null };
+        }
+        const arred = v => (v === null || v === undefined) ? null : +(+v).toFixed(4);
+        Object.keys(niveis).forEach(k => { if (typeof niveis[k] === 'number' && k !== 'restam') niveis[k] = arred(niveis[k]); });
+        return { ...base, regra: melhor.r.id, confirmada, treino: { pf: +melhor.treino.pf.toFixed(2), n: melhor.treino.n, acerto: +melhor.treino.acerto.toFixed(3) },
+                 teste: { pf: +melhor.teste.pf.toFixed(2), n: melhor.teste.n, acerto: +melhor.teste.acerto.toFixed(3), ret: +melhor.teste.ret.toFixed(4) },
+                 situacao, ...niveis, preco: arred(fech) };
+    }
+    async function gerarRelatorio(aoProgredir = () => {}) {
+        const base = getBacktestRiskParams(); const regras = regrasRelatorio(base);
+        const universo = universoRelatorio(); const ativos = [];
+        let pausa = performance.now();
+        for (let k = 0; k < universo.length; k++) {
+            if (performance.now() - pausa > 60) { aoProgredir(k, universo.length); await new Promise(r => setTimeout(r, 0)); pausa = performance.now(); }
+            try {
+                const linha = avaliarPapelRelatorio(universo[k], regras);
+                const vend = dadosVendido(universo[k]);
+                if (vend) {
+                    linha.vendido = { qtd: vend.qtd, dias: vend.dias === null ? null : +vend.dias.toFixed(1), variacaoPct: vend.variacaoPct };
+                    if (vend.dias !== null && vend.dias >= 5) { const rv = reversaoRecente(universo[k]); if (rv) linha.squeeze = rv; }
+                }
+                ativos.push(linha);
+            } catch (e) { console.warn('Relatório: falhou em', universo[k], e); }
+        }
+        aoProgredir(universo.length, universo.length);
+        let ultimo = null; for (const t in allData) { const ds = allData[t].dates; if (ds.length && (!ultimo || ds[ds.length - 1] > ultimo)) ultimo = ds[ds.length - 1]; }
+        return { versao: 1, mercado: mercadoAtual === 'br' ? 'br' : 'us', geradoEm: new Date().toISOString(), ultimoPregao: ultimo,
+                 universo: universo.length, regras: regras.map(r => ({ id: r.id, nome: r.nome, saida: r.saida })),
+                 parametros: { fracaoEscolha: FRACAO_ESCOLHA, minTradesEscolha: MIN_TRADES_ESCOLHA, minTradesConfirma: MIN_TRADES_CONFIRMA, atrMult: base.atrMult, stopLossPct: base.stopLossPct, minScore: base.minScore, custoPct: base.costPct },
+                 vendidos: vendidosDados ? { fonte: vendidosDados.fonte, data: vendidosDados.data } : null, ativos };
+    }
+
+    // ---------- Tela do Relatório (mesmo HTML no celular e no computador) ----------
+    const fmtDataBR = iso => iso ? iso.slice(0, 10).split('-').reverse().join('/') : '—';
+    function relatorioValido() {
+        if (!relatorioDados) return false;
+        const merc = mercadoAtual === 'br' ? 'br' : 'us';
+        return relatorioDados.mercado === merc;
+    }
+    function ultimoPregaoDados() { let u = null; for (const t in allData) { const d = allData[t].dates; if (d.length && (!u || d[d.length - 1] > u)) u = d[d.length - 1]; } return u; }
+    function nomeRegra(id) { const r = relatorioDados && relatorioDados.regras.find(x => x.id === id); return r ? r.nome : id; }
+    function textoSaida(a) {
+        const p = [];
+        if (a.alvo) p.push(`alvo ${fmtPrecoM(a.alvo)}`);
+        if (a.restam) p.push(`${a.situacao === 'entrada' ? 'após' : 'em'} ${a.restam} pregão(ões)`);
+        if (a.regra && a.regra.startsWith('recuo')) p.push('fechar acima da média de 5');
+        p.push(`stop ${fmtPrecoM(a.stop)}`);
+        return p.join(' · ');
+    }
+    function cartaoRelatorio(a) {
+        const d = (r, v, cor) => `<div class="rel-dado"><div class="r">${r}</div><div class="v"${cor ? ` style="color:${cor}"` : ''}>${v}</div></div>`;
+        const res = a.situacao === 'posicao' && a.entrada ? (a.preco / a.entrada - 1) * 100 : null;
+        const regraSaida = a.alvo && a.restam ? 'preço ou tempo' : a.alvo ? 'preço (alvo)' : a.restam ? 'tempo' : (a.regra || '').startsWith('recuo') ? 'preço (média de 5)' : 'preço (stop móvel)';
+        return `<button type="button" class="rel-card" data-ativo="${a.t}">
+            <div class="flex items-center justify-between gap-2"><span class="rel-tk">${a.t}</span><span class="rel-chip">${nomeRegra(a.regra)}</span></div>
+            <div class="text-sm rel-mudo">${nomeAtivo(a.t) || ''}</div>
+            ${a.squeeze ? `<div class="mt-2"><span class="rel-chip amarelo">⚡ Possível short squeeze: ${fmtNumM(a.vendido.dias, 1)} dias para zerar + sinal ${a.squeeze.estrategia}</span></div>` : ''}
+            <div class="rel-grade">
+                ${a.situacao === 'entrada' ? d('Entrada (abertura)', '≈ ' + fmtPrecoM(a.entrada)) : d(`Entrada em ${fmtDataBR(a.desde)}`, fmtPrecoM(a.entrada))}
+                ${d('Stop', fmtPrecoM(a.stop), '#f87171')}
+                ${a.alvo ? d('Alvo', fmtPrecoM(a.alvo), '#4ade80') : ''}
+                ${a.restam ? d('Saída por tempo', `${a.situacao === 'entrada' ? 'após' : 'em'} ${a.restam} pregões`) : ''}
+                ${res !== null ? d('Resultado até hoje', fmtPctM(res), res >= 0 ? '#4ade80' : '#f87171') : ''}
+                ${d('Sai por', regraSaida)}
+            </div>
+            <div class="text-xs rel-mudo mt-2">Confirmado fora da amostra: fator de lucro ${fmtNumM(a.teste.pf, 2)} · acerto ${fmtNumM(a.teste.acerto * 100, 0)}% · ${a.teste.n} operações</div>
+        </button>`;
+    }
+    function desenharRelatorio() {
+        const alvos = document.querySelectorAll('.relatorio-alvo'); if (!alvos.length) return;
+        const ultimo = ultimoPregaoDados();
+        let html = '';
+        if (!relatorioValido()) {
+            html = `<div class="rel-card"><div class="font-bold">Relatório ainda não gerado para estes dados</div>
+                <p class="text-sm rel-mudo mt-1">Ele é gerado toda noite junto com a coleta. Enquanto isso, dá para gerar aqui no aparelho (leva de alguns segundos a alguns minutos).</p>
+                <button type="button" class="rel-botao mt-3" data-gerar-relatorio>Gerar agora</button></div>`;
+        } else {
+            const R = relatorioDados; const A = R.ativos;
+            const velho = ultimo && R.ultimoPregao && R.ultimoPregao < ultimo;
+            const entradas = A.filter(a => a.situacao === 'entrada' && a.confirmada).sort((x, y) => y.teste.pf - x.teste.pf);
+            const abertas = A.filter(a => a.situacao === 'posicao' && a.confirmada).sort((x, y) => y.teste.pf - x.teste.pf);
+            const squeeze = A.filter(a => a.squeeze).sort((x, y) => (y.vendido.dias || 0) - (x.vendido.dias || 0));
+            const confirmados = A.filter(a => a.confirmada);
+            const porTipo = { preço: 0, tempo: 0, 'preço ou tempo': 0 };
+            confirmados.forEach(a => { const r = R.regras.find(x => x.id === a.regra); const k = r && r.saida.startsWith('preço ou') ? 'preço ou tempo' : r && r.saida === 'tempo' ? 'tempo' : 'preço'; porTipo[k]++; });
+            const contRegra = {}; confirmados.forEach(a => contRegra[a.regra] = (contRegra[a.regra] || 0) + 1);
+            const regraTop = Object.entries(contRegra).sort((a, b) => b[1] - a[1])[0];
+            html = `<div class="rel-card">
+                <div class="flex items-center justify-between"><span class="font-bold">Último teste</span><span class="rel-chip ${velho ? 'amarelo' : 'verde'}">${velho ? 'desatualizado' : 'em dia'}</span></div>
+                <div class="text-sm rel-mudo mt-1">Rodado em ${new Date(R.geradoEm).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} com os dados de ${fmtDataBR(R.ultimoPregao)} · ${R.universo} papéis testados em ${R.regras.length} regras.</div>
+                <div class="text-sm mt-2"><b>${confirmados.length}</b> papéis têm uma regra confirmada fora da amostra.${regraTop ? ` A que mais venceu: <b>${nomeRegra(regraTop[0])}</b> (${regraTop[1]}).` : ''}</div>
+                <div class="text-sm mt-1">Saída que ganhou: por preço <b>${porTipo['preço']}</b> · por tempo <b>${porTipo.tempo}</b> · preço ou tempo <b>${porTipo['preço ou tempo']}</b>.</div>
+                ${velho ? '<button type="button" class="rel-botao mt-3" data-gerar-relatorio>Atualizar agora</button>' : ''}
+                ${R.vendidos ? `<div class="text-xs rel-mudo mt-2">Vendidos: ${R.vendidos.fonte}, posição de ${fmtDataBR(R.vendidos.data)}.</div>` : ''}
+            </div>
+            <div class="rel-titulo">▲ Entradas para o próximo pregão <span class="rel-chip">${entradas.length}</span></div>
+            <div class="rel-lista">${entradas.length ? entradas.map(cartaoRelatorio).join('') : '<p class="text-sm rel-mudo">Nenhum papel com sinal hoje numa regra confirmada.</p>'}</div>
+            ${squeeze.length ? `<div class="rel-titulo">⚡ Possível short squeeze <span class="rel-chip amarelo">${squeeze.length}</span></div>
+            <p class="text-sm rel-mudo mb-2">Muita gente vendida (5 dias ou mais de volume para zerar) e um sinal de reversão nos últimos 5 pregões. Se o preço sobe, os vendidos precisam recomprar e isso pode acelerar a alta.</p>
+            <div class="rel-lista">${squeeze.map(a => `<button type="button" class="rel-card" data-ativo="${a.t}"><div class="flex items-center justify-between"><span class="rel-tk">${a.t}</span><span class="rel-chip amarelo">${fmtNumM(a.vendido.dias, 1)} dias p/ zerar</span></div>
+                <div class="text-sm rel-mudo">${nomeAtivo(a.t) || ''}</div><div class="text-sm mt-1">Sinal <b>${a.squeeze.estrategia}</b> em ${fmtDataBR(a.squeeze.data)} · ${fmtGrandeM(a.vendido.qtd)} ações vendidas${a.vendido.variacaoPct !== null && a.vendido.variacaoPct !== undefined ? ` (${fmtPctM(a.vendido.variacaoPct)} no período)` : ''}${a.regra ? ` · melhor regra: ${nomeRegra(a.regra)}${a.confirmada ? '' : ' (não confirmada)'}` : ''}</div></button>`).join('')}</div>` : ''}
+            <div class="rel-titulo">● Em operação <span class="rel-chip">${abertas.length}</span></div>
+            <div class="rel-lista">${abertas.length ? abertas.map(cartaoRelatorio).join('') : '<p class="text-sm rel-mudo">Nenhuma operação aberta nas regras confirmadas.</p>'}</div>
+            <details class="rel-detalhes mt-5"><summary>Melhor regra de cada papel (${A.length})</summary>
+                <table class="rel-tabela mt-2"><thead><tr class="rel-mudo"><th>Papel</th><th>Melhor regra</th><th>Fator de lucro fora da amostra</th><th></th></tr></thead><tbody>
+                ${A.slice().sort((x, y) => (y.confirmada - x.confirmada) || ((y.teste ? y.teste.pf : 0) - (x.teste ? x.teste.pf : 0))).map(a => `<tr data-ativo="${a.t}" style="cursor:pointer"><td><b>${a.t}</b></td><td>${a.regra ? nomeRegra(a.regra) : `<span class="rel-mudo">${a.motivo || '—'}</span>`}</td><td>${a.teste ? `${fmtNumM(a.teste.pf, 2)} (${a.teste.n} op.)` : '—'}</td><td>${a.confirmada ? '✅' : '⚠️'}</td></tr>`).join('')}
+                </tbody></table></details>
+            <details class="rel-detalhes mt-3"><summary>Como o relatório é feito</summary>
+                <div class="text-sm rel-mudo space-y-2 mt-1">
+                    <p>Para cada papel, o app testa ${R.regras.length} regras: ${R.regras.map(r => r.nome).join('; ')}.</p>
+                    <p>A melhor é escolhida olhando só os primeiros ${Math.round(R.parametros.fracaoEscolha * 100)}% do histórico, pelo fator de lucro pesado pelo número de operações (mínimo de ${R.parametros.minTradesEscolha}). Ela só aparece nas listas se também tiver dado lucro nos ${100 - Math.round(R.parametros.fracaoEscolha * 100)}% finais, que ela "não viu" (mínimo de ${R.parametros.minTradesConfirma} operações). É o walk-forward de Fitschen e Kaufman, que evita escolher a regra que só deu certo por acaso.</p>
+                    <p>Entrada na abertura do pregão seguinte ao sinal; stop inicial = o mais protetor entre ${fmtNumM(R.parametros.atrMult, 1)}×ATR e ${fmtNumM(R.parametros.stopLossPct, 1)}%; custo de ${fmtNumM(R.parametros.custoPct, 2)}% por perna. ${avisoSobrevivencia().replace(/<\/?b>/g, '')}</p>
+                </div></details>`;
+        }
+        alvos.forEach(el => el.innerHTML = html);
+    }
+    let gerandoRelatorio = false;
+    async function gerarRelatorioNoAparelho() {
+        if (gerandoRelatorio || !Object.keys(allData).length) return; gerandoRelatorio = true;
+        const botoes = document.querySelectorAll('[data-gerar-relatorio]');
+        try {
+            relatorioDados = await gerarRelatorio((k, n) => botoes.forEach(b => { b.disabled = true; b.textContent = `Testando ${k} de ${n} papéis…`; }));
+        } catch (e) { console.error('Erro ao gerar o relatório:', e); mostrarMensagem('Não consegui gerar o relatório: ' + (e && e.message ? e.message : e), 'erro'); }
+        finally { gerandoRelatorio = false; desenharRelatorio(); }
+    }
+    document.addEventListener('click', e => {
+        if (e.target.closest('[data-gerar-relatorio]')) { gerarRelatorioNoAparelho(); return; }
+        const el = e.target.closest('#relatorio-desktop [data-ativo]');
+        if (el && !APP_MOVEL) { tickerSelect.value = el.dataset.ativo; document.querySelector('button[data-tab="analysis"]').click(); }
+    });
 
     // MÓDULO 4: WALK-FORWARD OUT-OF-SAMPLE (FITSCHEN)
     runWalkForwardBtn.addEventListener('click', () => {
@@ -2331,7 +2565,7 @@
     function agendarAtualizacaoMovel() { if (APP_MOVEL) setTimeout(atualizarAppMovel, 0); }
 
     // Navegação entre páginas e telas sobrepostas (com suporte ao botão "voltar" do Android)
-    const TITULOS = { inicio: 'Início', ranking: 'Ranking', testes: 'Testes', mais: 'Mais' };
+    const TITULOS = { inicio: 'Início', ranking: 'Ranking', relatorio: 'Relatório', testes: 'Testes', mais: 'Mais' };
     function mostrarPagina(nome) {
         document.querySelectorAll('#app-movel .am-pagina').forEach(p => p.classList.toggle('ativa', p.dataset.pagina === nome));
         document.querySelectorAll('.am-nav button').forEach(b => b.classList.toggle('ativa', b.dataset.irPagina === nome));
@@ -2465,7 +2699,11 @@
         if (rp.modoEntrada === 'recuo') regrasSaida.push('na regra "Tendência + recuo", vende quando o preço fecha acima da média de 5 dias');
         if (rp.alvoAtr > 0) regrasSaida.push(`o alvo vende quando o preço sobe ${fmtNumM(rp.alvoAtr, 1)} × ATR acima da entrada`);
         if (rp.saidaDias > 0) regrasSaida.push(`a saída por tempo vende após ${rp.saidaDias} pregões`);
-        return `${cab}<div class="am-grade mt-3">${grade}</div>${hist}${perfil}${fund}
+        const relA = relatorioValido() && relatorioDados.ativos.find(x => x.t === t);
+        const vend = dadosVendido(t);
+        const relCard = relA ? `<div class="am-card mb-3 text-sm">📋 <b>Relatório de ${fmtDataBR(relatorioDados.ultimoPregao)}</b>: ${relA.regra ? `a melhor regra para ${t} é <b>${nomeRegra(relA.regra)}</b> ${relA.confirmada ? `(confirmada fora da amostra: fator de lucro ${fmtNumM(relA.teste.pf, 2)} em ${relA.teste.n} operações)` : '(<b>não</b> confirmada fora da amostra: use com cautela)'}.` : 'nenhuma regra teve operações suficientes neste papel.'} O plano abaixo usa os parâmetros do Backtest.</div>` : '';
+        const vendCard = vend ? `<div class="am-card mt-4 text-sm">Vendidos: <b>${fmtGrandeM(vend.qtd)}</b> ações (${vend.fonte}, ${fmtDataBR(vend.data)}) = <b>${vend.dias === null ? '—' : fmtNumM(vend.dias, 1)} dias</b> de volume para zerar.${relA && relA.squeeze ? ` ⚡ <b>Possível short squeeze</b>: sinal ${relA.squeeze.estrategia} em ${fmtDataBR(relA.squeeze.data)}.` : ''}</div>` : '';
+        return `${relCard}${cab}<div class="am-grade mt-3">${grade}</div>${hist}${perfil}${vendCard}${fund}
             <p class="text-xs mt-4" style="color:var(--mudo)">Saída: ${regrasSaida.join('; ')}.${rp.alvoAtr > 0 || rp.saidaDias > 0 ? '' : ' Não há alvo de venda (dá para ligar em Testes → Backtest → Opções dos livros).'} ${avisoSobrevivencia().replace(/<\/?b>/g, '')} Não é recomendação de investimento.</p>`;
     }
     let ativoAberto = null;
@@ -2674,7 +2912,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { get graficos() { return graficos; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades };
+    window.investDebug = { get graficos() { return graficos; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; } };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).
