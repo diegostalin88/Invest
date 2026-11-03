@@ -23,8 +23,8 @@ const IGNORAR = [/cdn\.tailwindcss\.com should not be used in production/i, /bro
 let falhas = 0;
 function ok(cond, msg) { console.log(`${cond ? '✅' : '❌'} ${msg}`); if (!cond) falhas++; }
 
-async function abrir(browser, url, bloquearManifesto = false) {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+async function abrir(browser, url, bloquearManifesto = false, viewport = { width: 1440, height: 1000 }) {
+    const page = await browser.newPage({ viewport });
     const erros = [];
     page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') erros.push(`${m.type()}: ${m.text()}`); });
     page.on('pageerror', e => erros.push(`pageerror: ${e.message}`));
@@ -37,7 +37,7 @@ async function abrir(browser, url, bloquearManifesto = false) {
         });
         await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
     }
-    if (bloquearManifesto) await page.route('**/data/manifest.json', r => r.fulfill({ status: 404, body: 'not found' }));
+    if (bloquearManifesto) await page.route(bloquearManifesto === true ? '**/data/manifest.json' : bloquearManifesto, r => r.fulfill({ status: 404, body: 'not found' }));
     await page.goto(url);
     return { page, erros };
 }
@@ -123,7 +123,52 @@ async function abrir(browser, url, bloquearManifesto = false) {
     ok(errosReais.length === 0, `console sem erros (além do aviso do Tailwind)${errosReais.length ? ': ' + errosReais.join(' | ') : ''}`);
     await page.close();
 
-    // 2) Modo manual quando não existe manifesto
+    // 2) Mercado Brasil (IBOVESPA): troca pelo botão, lembra a escolha, moeda e volume mínimo em R$
+    const br = await abrir(browser, BASE);
+    await br.page.waitForSelector('#screener-results-container table', { timeout: 120000 });
+    ok(/EUA \(Nasdaq\/NYSE\)/.test(await br.page.textContent('#data-freshness-banner')), 'abre nos EUA por padrão');
+    await Promise.all([br.page.waitForURL(/mercado=br/), br.page.click('.mercado-btn[data-mercado="br"]')]);
+    await br.page.waitForFunction(() => /Brasil \(IBOVESPA\)/.test(document.getElementById('data-freshness-banner').textContent), null, { timeout: 120000 });
+    const bannerBr = await br.page.textContent('#data-freshness-banner');
+    ok(/Brasil \(IBOVESPA\)/.test(bannerBr) && /Dados até/.test(bannerBr), `Brasil: cabeçalho "${bannerBr.trim()}"`);
+    const tickersBr = await br.page.$$eval('#ticker-select option', o => o.map(x => x.value));
+    ok(tickersBr.includes('PETR4') && !tickersBr.includes('CRIT'), `Brasil: só ativos do IBOVESPA (${tickersBr.length})`);
+    ok(await br.page.inputValue('#filter-adtv') === '10000000' && (await br.page.textContent('.moeda-simbolo')) === 'R$', 'Brasil: volume mínimo padrão R$ 10 mi');
+    ok(await br.page.getAttribute('.mercado-btn[data-mercado="br"]', 'aria-pressed') === 'true', 'Brasil: botão marcado');
+    await br.page.screenshot({ path: path.join(SHOTS, 'app_brasil.png'), fullPage: false });
+    await br.page.click('button[data-tab="backtest"]');
+    await br.page.selectOption('#ticker-select', 'PETR4');
+    await br.page.click('#run-backtest-btn');
+    await br.page.waitForSelector('#backtest-results-container .result-metric', { timeout: 30000 });
+    ok(/R\$/.test(await br.page.textContent('#backtest-results-container')), 'Brasil: Backtest em reais');
+    await br.page.goto(BASE);   // sem ?mercado: lembra a última escolha
+    await br.page.waitForFunction(() => /Brasil \(IBOVESPA\)/.test(document.getElementById('data-freshness-banner').textContent), null, { timeout: 120000 });
+    ok(/Brasil \(IBOVESPA\)/.test(await br.page.textContent('#data-freshness-banner')), 'lembra o mercado escolhido ao reabrir');
+    await Promise.all([br.page.waitForURL(/mercado=us/), br.page.click('.mercado-btn[data-mercado="us"]')]);
+    await br.page.waitForSelector('#screener-results-container table', { timeout: 120000 });
+    ok(/EUA/.test(await br.page.textContent('#data-freshness-banner')) && await br.page.inputValue('#filter-adtv') === '50000000', 'volta para os EUA (US$ 50 mi)');
+    const errosBr = br.erros.filter(e => !IGNORAR.some(r => r.test(e)));
+    ok(errosBr.length === 0, `console sem erros na troca de mercado${errosBr.length ? ': ' + errosBr.join(' | ') : ''}`);
+    await br.page.close();
+
+    // Celular: seletor de mercado cabe na tela
+    const cel = await abrir(browser, BASE + '?mercado=br', false, { width: 390, height: 844 });
+    await cel.page.waitForFunction(() => /Brasil/.test(document.getElementById('data-freshness-banner').textContent), null, { timeout: 120000 });
+    const larg = await cel.page.evaluate(() => ({ doc: document.documentElement.scrollWidth, sw: document.getElementById('market-switch').getBoundingClientRect().right }));
+    ok(larg.doc <= 390 && larg.sw <= 390, `celular: seletor de mercado sem rolagem lateral (${JSON.stringify(larg)})`);
+    await cel.page.screenshot({ path: path.join(SHOTS, 'celular_brasil.png'), fullPage: false });
+    await cel.page.close();
+
+    // Brasil ainda não publicado: aviso claro e atalho para os EUA (sem abrir o modo manual)
+    const semBr = await abrir(browser, BASE + '?mercado=br', '**/data/br/manifest.json');
+    await semBr.page.waitForSelector('#voltar-eua', { timeout: 30000 });
+    ok(/ainda não foram publicados/.test(await semBr.page.textContent('#app-message')) && !(await semBr.page.evaluate(() => document.getElementById('manual-mode').open)), 'Brasil indisponível: aviso, sem modo manual');
+    await Promise.all([semBr.page.waitForURL(/mercado=us/), semBr.page.click('#voltar-eua')]);
+    await semBr.page.waitForSelector('#screener-results-container table', { timeout: 120000 });
+    ok(true, 'Brasil indisponível: botão "Ver os EUA" carrega os EUA');
+    await semBr.page.close();
+
+    // 3) Modo manual quando não existe manifesto
     const m = await abrir(browser, BASE, true);
     await m.page.waitForFunction(() => document.getElementById('manual-mode').open === true, null, { timeout: 30000 });
     const motivo = await m.page.textContent('#manual-mode-reason');

@@ -88,7 +88,13 @@
         </div>
 
         <div class="card mb-8 border-indigo-500 border-2">
-            <h2 class="text-xl font-semibold mb-4 text-indigo-400">Ingestão de Dados Temporais</h2>
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                <h2 class="text-xl font-semibold text-indigo-400">Ingestão de Dados Temporais</h2>
+                <div id="market-switch" class="flex rounded-lg overflow-hidden border border-gray-600 text-sm" role="group" aria-label="Mercado">
+                    <button type="button" data-mercado="us" class="mercado-btn flex-1 px-3 py-2 sm:whitespace-nowrap">🇺🇸 EUA (Nasdaq/NYSE)</button>
+                    <button type="button" data-mercado="br" class="mercado-btn flex-1 px-3 py-2 sm:whitespace-nowrap">🇧🇷 Brasil (IBOVESPA)</button>
+                </div>
+            </div>
             <div id="load-progress" class="mb-4">
                 <div class="flex justify-between text-sm text-gray-300 mb-1"><span id="load-progress-text">Carregando dados do último pregão…</span><span id="load-progress-pct">0%</span></div>
                 <div class="w-full bg-gray-700 rounded-full h-3"><div id="load-progress-bar" class="h-3 rounded-full bg-indigo-500" style="width: 0%; transition: width 0.2s;"></div></div>
@@ -127,7 +133,7 @@
                     <div class="card border-l-4 border-indigo-500">
                         <h3 class="text-lg font-bold mb-4">A. Restrição de Liquidez</h3>
                         <div class="space-y-4 text-sm">
-                            <label class="block"><span class="font-semibold text-indigo-300">Volume Financeiro Diário Mín. (US$):</span><input type="number" id="filter-adtv" value="50000000" class="w-full mt-1 bg-gray-900"></label>
+                            <label class="block"><span class="font-semibold text-indigo-300">Volume Financeiro Diário Mín. (<span class="moeda-simbolo">US$</span>):</span><input type="number" id="filter-adtv" value="50000000" class="w-full mt-1 bg-gray-900"></label>
                             <label class="checkbox-label"><input type="checkbox" id="filter-volatility" checked> Ignorar Anomalia de Volatilidade (> 3x ATR)</label>
                             <label class="checkbox-label mt-2"><input type="checkbox" id="filter-trend" checked> Filtro de Regime (Apenas > MME 200)</label>
                         </div>
@@ -306,7 +312,8 @@
                 <div class="lg:col-span-1 space-y-6 order-2 lg:order-1">
                     <div class="card border-l-4 border-purple-500">
                         <h3 class="text-lg font-bold mb-2 text-purple-400">A. Fundamentos</h3>
-                        <p class="text-xs text-gray-400 mb-4">Carregados automaticamente junto com os preços. A coleta diária busca fundamentos (Yahoo, com reserva na SEC EDGAR), radar de 8-K e sinais de mercado para todo ativo com volume financeiro médio ≥ US$ 10 mi/dia; os índices são renovados a cada 7 dias e o radar de 8-K todo dia. Para usar um arquivo próprio, abra o "Modo manual (avançado)" no topo.</p>
+                        <p id="fundamentos-explicacao-br" class="hidden text-xs text-gray-400 mb-4">Carregados automaticamente junto com os preços. Para o IBOVESPA, a coleta diária busca no Yahoo os fundamentos de todas as ações da carteira do índice (valores em R$), renovados a cada 7 dias. Não há radar de 8-K: esse é um documento da SEC americana, que empresas brasileiras não arquivam.</p>
+                        <p id="fundamentos-explicacao-us" class="text-xs text-gray-400 mb-4">Carregados automaticamente junto com os preços. A coleta diária busca fundamentos (Yahoo, com reserva na SEC EDGAR), radar de 8-K e sinais de mercado para todo ativo com volume financeiro médio ≥ US$ 10 mi/dia; os índices são renovados a cada 7 dias e o radar de 8-K todo dia. Para usar um arquivo próprio, abra o "Modo manual (avançado)" no topo.</p>
                         <p id="fundamentals-status" class="text-xs text-gray-500 mt-2">Aguardando carregamento…</p>
                     </div>
                     <div class="card">
@@ -363,6 +370,38 @@
     let regimeByDateMap = {}; // data (YYYY-MM-DD) -> % de ativos acima da MME200 naquela data (amplitude de mercado histórica)
     let fundamentalsData = {}; // ticker -> {pe, pb, roe, debtToEquity, netMargin, revenueGrowth, sector, ...} vindo da coleta (data/fundamentos.json)
     let lastManifest = null; // data/manifest.json da coleta automática (null no modo manual)
+
+    // MERCADO: EUA (data/) ou Brasil/IBOVESPA (data/br/). A escolha fica na URL (?mercado=br) e no navegador;
+    // trocar de mercado recarrega a página, então nenhum cálculo mistura os dois universos.
+    const MERCADOS = {
+        us: { pasta: 'data/', nome: 'EUA (Nasdaq/NYSE)', moeda: 'USD', simbolo: 'US$', locale: 'en-US', adtvPadrao: 50000000 },
+        br: { pasta: 'data/br/', nome: 'Brasil (IBOVESPA)', moeda: 'BRL', simbolo: 'R$', locale: 'pt-BR', adtvPadrao: 10000000 },
+    };
+    function lerMercadoEscolhido() {
+        const daUrl = new URLSearchParams(location.search).get('mercado');
+        if (daUrl && MERCADOS[daUrl]) return daUrl;
+        try { const salvo = localStorage.getItem('invest-mercado'); if (salvo && MERCADOS[salvo]) return salvo; } catch (e) { /* navegador sem armazenamento */ }
+        return 'us';
+    }
+    const mercadoAtual = lerMercadoEscolhido();
+    const MERCADO = MERCADOS[mercadoAtual];
+    function aplicarMercadoNaTela() {
+        document.querySelectorAll('.mercado-btn').forEach(b => {
+            const ativo = b.dataset.mercado === mercadoAtual;
+            b.className = 'mercado-btn flex-1 px-3 py-2 sm:whitespace-nowrap ' + (ativo ? 'bg-indigo-600 text-white font-semibold' : 'bg-gray-800 text-gray-300 hover:bg-gray-700');
+            b.setAttribute('aria-pressed', ativo ? 'true' : 'false');
+            b.addEventListener('click', () => {
+                if (b.dataset.mercado === mercadoAtual) return;
+                try { localStorage.setItem('invest-mercado', b.dataset.mercado); } catch (e) { /* ignora */ }
+                const u = new URL(location.href); u.searchParams.set('mercado', b.dataset.mercado); location.href = u.toString();
+            });
+        });
+        document.querySelectorAll('.moeda-simbolo').forEach(el => el.textContent = MERCADO.simbolo);
+        document.getElementById('filter-adtv').value = MERCADO.adtvPadrao;
+        document.getElementById('fundamentos-explicacao-br').classList.toggle('hidden', mercadoAtual !== 'br');
+        document.getElementById('fundamentos-explicacao-us').classList.toggle('hidden', mercadoAtual === 'br');
+    }
+    aplicarMercadoNaTela();
     const PIVOT_WINDOW = 5; // pivôs de topo/fundo só são "confirmados" PIVOT_WINDOW candles depois (janela centrada olha p/ frente e p/ trás)
     const fileInput = document.getElementById('file-input'); const tickerSelect = document.getElementById('ticker-select');
     const runStrategyScoringBtn = document.getElementById('run-strategy-scoring-btn');
@@ -518,7 +557,7 @@
         const manifest = meta.manifest || lastManifest;
         if (meta.manifest) lastManifest = meta.manifest;
         const nFund = Object.keys(fundamentalsData || {}).length;
-        const extras = [];
+        const extras = [MERCADO.nome];
         extras.push(nFund > 0 ? `Fundamentos de ${nFund.toLocaleString('pt-BR')} ativos` : 'Sem fundamentos');
         if (manifest && manifest.geradoEm) {
             const g = new Date(manifest.geradoEm);
@@ -614,6 +653,13 @@
         mostrarMensagem('Dados automáticos indisponíveis — use o "Modo manual (avançado)" abaixo.', 'aviso');
     }
 
+    function mostrarBrasilIndisponivel() {
+        esconderProgresso();
+        mostrarMensagem('Os dados do IBOVESPA ainda não foram publicados. Eles entram na próxima coleta automática (segunda a sexta, 19:30 de Brasília). <button type="button" id="voltar-eua" class="underline font-semibold">Ver os EUA</button>', 'aviso');
+        const b = document.getElementById('voltar-eua');
+        if (b) b.addEventListener('click', () => document.querySelector('.mercado-btn[data-mercado="us"]').click());
+    }
+
     // Lê o corpo da resposta contando bytes (já descomprimidos) para alimentar a barra de progresso.
     async function lerJsonComProgresso(resp, aoLer) {
         if (!resp.body || !resp.body.getReader) { const txt = await resp.text(); aoLer(txt.length); return JSON.parse(txt); }
@@ -639,10 +685,11 @@
         let manifest;
         try {
             atualizarProgresso('Buscando o manifesto dos dados…', 0.01);
-            manifest = await (await buscar('data/manifest.json')).json();
+            manifest = await (await buscar(MERCADO.pasta + 'manifest.json')).json();
             if (!manifest || !Array.isArray(manifest.arquivosPrecos) || manifest.arquivosPrecos.length === 0) throw new Error('manifesto inválido');
         } catch (err) {
             console.warn('Manifesto indisponível:', err);
+            if (mercadoAtual === 'br') { mostrarBrasilIndisponivel(); return false; }
             mostrarModoManual('manifesto não encontrado');
             return false;
         }
@@ -654,10 +701,10 @@
         const progresso = () => atualizarProgresso(rotulo, totalBytes > 0 ? Math.min(lidos / totalBytes, 0.99) : arquivosProntos / totalArquivos);
         progresso();
         try {
-            const promPrecos = manifest.arquivosPrecos.map(nome => buscar('data/' + nome)
+            const promPrecos = manifest.arquivosPrecos.map(nome => buscar(MERCADO.pasta + nome)
                 .then(r => lerJsonComProgresso(r, n => { lidos += n; progresso(); }))
                 .then(obj => { arquivosProntos++; progresso(); return expandirPrecos(obj); }));
-            const promFund = buscar('data/' + (manifest.arquivoFundamentos || 'fundamentos.json'))
+            const promFund = buscar(MERCADO.pasta + (manifest.arquivoFundamentos || 'fundamentos.json'))
                 .then(r => lerJsonComProgresso(r, n => { lidos += n; progresso(); }))
                 .then(obj => { arquivosProntos++; progresso(); return obj; })
                 .catch(err => { console.warn('Fundamentos indisponíveis:', err); return null; });
@@ -1088,7 +1135,7 @@
         const pfLabel = res.profitFactor === Infinity ? '∞' : res.profitFactor.toFixed(2);
         const pfPass = res.profitFactor >= pfTarget;
         const lowSample = res.trades < 20 ? `<p class="text-xs text-yellow-400 mt-3">⚠️ Amostra pequena (${res.trades} trades): resultado pouco confiável estatisticamente. Prefira ativos/períodos com mais operações antes de confiar nestes números.</p>` : '';
-        document.getElementById('backtest-results-container').innerHTML = `<div class="backtest-results-grid"><div class="result-metric"><span class="text-xs text-gray-400">Capital Final</span><div class="value">${res.final.toLocaleString('en-US',{style:'currency',currency:'USD'})}</div></div><div class="result-metric"><span class="text-xs text-gray-400">Retorno Ttl</span><div class="value ${res.returnPct>0?'positive':'negative'}">${(res.returnPct*100).toFixed(2)}%</div></div><div class="result-metric"><span class="text-xs text-gray-400">Max Drawdown</span><div class="value negative">${(res.maxDD*100).toFixed(2)}%</div></div><div class="result-metric"><span class="text-xs text-gray-400">Win Rate</span><div class="value">${(res.winRate*100).toFixed(1)}%</div></div><div class="result-metric"><span class="text-xs text-gray-400">Nº de Trades</span><div class="value">${res.trades}</div></div><div class="result-metric ${pfPass?'border-green-500':'border-red-500'} border-2"><span class="text-xs ${pfPass?'text-green-400':'text-red-400'}">Profit Factor (meta ${pfTarget.toFixed(2)})</span><div class="value ${pfPass?'positive':'negative'}">${pfLabel} ${pfPass?'✅':'❌'}</div></div><div class="result-metric border-indigo-500 border-2"><span class="text-xs text-indigo-400">Expectância (US$)</span><div class="value ${res.expectancy>0?'positive':'negative'}">${res.expectancy.toFixed(2)}</div></div></div>${lowSample}`;
+        document.getElementById('backtest-results-container').innerHTML = `<div class="backtest-results-grid"><div class="result-metric"><span class="text-xs text-gray-400">Capital Final</span><div class="value">${res.final.toLocaleString(MERCADO.locale,{style:'currency',currency:MERCADO.moeda})}</div></div><div class="result-metric"><span class="text-xs text-gray-400">Retorno Ttl</span><div class="value ${res.returnPct>0?'positive':'negative'}">${(res.returnPct*100).toFixed(2)}%</div></div><div class="result-metric"><span class="text-xs text-gray-400">Max Drawdown</span><div class="value negative">${(res.maxDD*100).toFixed(2)}%</div></div><div class="result-metric"><span class="text-xs text-gray-400">Win Rate</span><div class="value">${(res.winRate*100).toFixed(1)}%</div></div><div class="result-metric"><span class="text-xs text-gray-400">Nº de Trades</span><div class="value">${res.trades}</div></div><div class="result-metric ${pfPass?'border-green-500':'border-red-500'} border-2"><span class="text-xs ${pfPass?'text-green-400':'text-red-400'}">Profit Factor (meta ${pfTarget.toFixed(2)})</span><div class="value ${pfPass?'positive':'negative'}">${pfLabel} ${pfPass?'✅':'❌'}</div></div><div class="result-metric border-indigo-500 border-2"><span class="text-xs text-indigo-400">Expectância (${MERCADO.simbolo})</span><div class="value ${res.expectancy>0?'positive':'negative'}">${res.expectancy.toFixed(2)}</div></div></div>${lowSample}`;
         Plotly.newPlot('backtest-capital-curve', [{x: res.eq.map(e=>e.x), y: res.eq.map(e=>e.y), type:'scatter'}], {title:'In-Sample Equity', paper_bgcolor:'#1f2937', plot_bgcolor:'#1f2937', font:{color:'#fff'}});
     });
 

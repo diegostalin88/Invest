@@ -81,13 +81,27 @@ def main(destino):
     s = passeio(rng, N_DIAS - 3, 80, 0.0005, 0.015, 2_000_000)
     precos['GAP'] = {'dates': datas[:100] + datas[103:], **s}
 
-    precos = {t: fa.arredondar_serie(s) for t, s in precos.items()}
-    arquivos = fa.montar_arquivos_precos(precos, max_bytes=600_000)
-    dados = os.path.join(destino, 'data')
     if os.path.exists(destino):
         shutil.rmtree(destino)
     shutil.copytree(os.path.join(RAIZ, 'app'), destino)
-    os.makedirs(dados)
+    n_us = gravar_mercado(os.path.join(destino, 'data'), precos, fundamentos, datas[-1], 'us', 'USD')
+
+    # Brasil (IBOVESPA) em data/br/: poucos ativos, nomes da B3, volumes em R$
+    precos_br, fund_br = {}, {}
+    for i, t in enumerate(['PETR4', 'VALE3', 'ITUB4', 'BBDC4', 'ABEV3', 'WEGE3'] + [f'BR{i:02d}3' for i in range(30)]):
+        s = passeio(rng, N_DIAS, rng.uniform(8, 60), 0.0005, 0.02, rng.choice([2_000_000, 10_000_000]))
+        precos_br[t] = {'dates': datas, **s}
+        fund_br[t] = fundamento(rng, f'Empresa {t} S.A.', bom=rng.random() < 0.6)
+    s = tendencia_com_spike(N_DIAS, 30, 3_000_000)
+    precos_br['PETR4'] = {'dates': datas, **s}
+    gravar_mercado(os.path.join(destino, 'data', 'br'), precos_br, fund_br, datas[-1], 'br', 'BRL')
+    print(f"Site de exemplo em {destino}: {n_us} ativos EUA, {len(precos_br)} ativos Brasil.")
+
+
+def gravar_mercado(dados, precos, fundamentos, ultimo_pregao, mercado, moeda):
+    precos = {t: fa.arredondar_serie(s) for t, s in precos.items()}
+    arquivos = fa.montar_arquivos_precos(precos, max_bytes=600_000)
+    os.makedirs(dados, exist_ok=True)
     for nome, b in arquivos:
         with open(os.path.join(dados, nome), 'wb') as f:
             f.write(b)
@@ -95,14 +109,15 @@ def main(destino):
     with open(os.path.join(dados, 'fundamentos.json'), 'wb') as f:
         f.write(fund_b)
     stats = {'tickersPrecos': len(precos), 'tickersFundamentos': len(fundamentos),
-             'fundamentosComDados': len(fundamentos), 'fundamentosAtualizadosHoje': 10, 'alertasCriticos': 1}
+             'fundamentosComDados': len(fundamentos), 'fundamentosAtualizadosHoje': 10,
+             'alertasCriticos': sum(1 for f in fundamentos.values() if f.get('alertaEvento') == 'critico')}
     tamanhos = {'precosBytes': sum(len(b) for _, b in arquivos), 'fundamentosBytes': len(fund_b)}
     agora = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace('+00:00', 'Z')
-    m = fa.montar_manifesto(agora, datas[-1], 3, [n for n, _ in arquivos], stats, [], tamanhos)
+    m = fa.montar_manifesto(agora, ultimo_pregao, 3, [n for n, _ in arquivos], stats, [], tamanhos,
+                            mercado=mercado, moeda=moeda)
     with open(os.path.join(dados, 'manifest.json'), 'w') as f:
         json.dump(m, f, indent=2)
-    print(f"Site de exemplo em {destino}: {len(precos)} ativos, {len(arquivos)} arquivos de preço.")
-
+    return len(precos)
 
 if __name__ == '__main__':
     main(sys.argv[1] if len(sys.argv) > 1 else os.path.join(RAIZ, 'site_exemplo'))
