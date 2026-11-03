@@ -271,6 +271,11 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     ok(/Score técnico/.test(await cel.page.textContent('#am-aba-conteudo')), 'celular: aba Técnica explica o score');
     await cel.page.click('#am-abas [data-aba="fundamentos"]');
     ok(/Nota fundamentalista/.test(await cel.page.textContent('#am-aba-conteudo')), 'celular: aba Fundamentos');
+    await cel.page.click('#am-abas [data-aba="plano"]');
+    const plano = await cel.page.textContent('#am-aba-conteudo');
+    ok(/(Em operação|Sinal de entrada hoje|Sem sinal de entrada hoje)/.test(plano) && /Suporte mais próximo/.test(plano) && /Fator de lucro/.test(plano), 'celular: aba Plano com sinal de hoje, stops, suporte e histórico');
+    await cel.page.waitForTimeout(300);
+    await cel.page.screenshot({ path: path.join(SHOTS, 'celular_plano.png'), fullPage: false });
     // Gráfico em tela cheia
     await cel.page.click('#am-abrir-grafico');
     await cel.page.waitForSelector('#am-grafico.aberta #analysis-chart canvas', { timeout: 30000 });

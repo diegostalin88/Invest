@@ -343,7 +343,7 @@
                     <button type="button" data-meses="1">1M</button><button type="button" data-meses="3">3M</button><button type="button" data-meses="6" class="ativa">6M</button><button type="button" data-meses="12">1A</button><button type="button" data-meses="0">Tudo</button>
                     <button type="button" class="am-cheia" id="am-abrir-grafico"><svg class="am-ico" style="width:1.1rem;height:1.1rem"><use href="#i-cheia"/></svg>Tela cheia</button>
                 </div>
-                <div class="am-abas" id="am-abas"><button type="button" class="ativa" data-aba="resumo">Resumo</button><button type="button" data-aba="tecnica">Técnica</button><button type="button" data-aba="fundamentos">Fundamentos</button></div>
+                <div class="am-abas" id="am-abas"><button type="button" class="ativa" data-aba="resumo">Resumo</button><button type="button" data-aba="plano">Plano</button><button type="button" data-aba="tecnica">Técnica</button><button type="button" data-aba="fundamentos">Fundamentos</button></div>
                 <div id="am-aba-conteudo"></div>
             </div>
         </div>
@@ -1466,7 +1466,7 @@
         const indicators = precomputeAllIndicators(dataSubset, getIndicatorParameters());
         const costFraction = (riskParams.costPct || 0) / 100; // aplicado uma vez na entrada e uma vez na saída
         let position = 'out', entryPrice = 0, capital = riskParams.capital, peak = riskParams.capital, maxDD = 0, stopPrice = 0, positionSize = 0;
-        let pendingEntry = false, pendingATR = 0;
+        let pendingEntry = false, pendingATR = 0, entryIdx = -1;
         const trades = []; const eq = [{x: dataSubset.dates[0], y: capital}];
 
         for (let i = 200; i < dataSubset.close.length; i++) {
@@ -1483,7 +1483,7 @@
                 const maxRiskCash = capital * (riskParams.riskTrade / 100);
                 positionSize = stopDist > 0 ? maxRiskCash / stopDist : 0;
                 position = positionSize > 0 ? 'long' : 'out';
-                pendingEntry = false;
+                pendingEntry = false; entryIdx = i;
             }
 
             if (position !== 'out') {
@@ -1527,7 +1527,9 @@
         const returnPct = (capital/riskParams.capital)-1;
         const grossWin = wins.reduce((s,t)=>s+t.pnl,0); const grossLoss = Math.abs(losses.reduce((s,t)=>s+t.pnl,0));
         const profitFactor = grossLoss > 0 ? grossWin/grossLoss : (grossWin > 0 ? Infinity : 0);
-        return { final: capital, returnPct, maxDD, winRate, expectancy, trades: trades.length, eq, profitFactor };
+        // Estado no último candle (só leitura, para o "Plano de operação"; não muda o resultado)
+        const aberta = position === 'long' ? { entrada: entryPrice, data: dataSubset.dates[entryIdx], stop: stopPrice } : null;
+        return { final: capital, returnPct, maxDD, winRate, expectancy, trades: trades.length, eq, profitFactor, aberta, sinalHoje: pendingEntry, atrHoje: pendingATR };
     }
 
     runBacktestBtn.addEventListener('click', () => {
@@ -2223,6 +2225,7 @@
             box.innerHTML = ex.secTec + `<div class="am-card mt-3">Score técnico de hoje: <b>${fmtNumM(ex.scoreTec, 2)}</b> · com fundamentos: <b class="text-green-400">${fmtNumM(ex.scoreTec + ex.notaFund, 2)}</b></div>`;
             return;
         }
+        if (aba === 'plano') { box.innerHTML = planoOperacao(t, ex); return; }
         if (aba === 'fundamentos') { box.innerHTML = ex.secFund || '<p style="color:var(--mudo)">Sem dados fundamentalistas.</p>'; return; }
         const ult = d.close.slice(-252); let vol20 = 0; for (let j = n - 20; j < n; j++) vol20 += d.close[j] * d.volume[j];
         const r = filteredScreenerResults.find(x => x.ticker === t); const pos = filteredScreenerResults.indexOf(r);
@@ -2242,6 +2245,58 @@
                 <button type="button" class="am-botao sec" data-acao-ativo="backtest">Testar no Backtest</button>
                 <button type="button" class="am-botao sec" data-acao-ativo="tv">Abrir no TradingView</button>
             </div>`;
+    }
+    // PLANO DE OPERAÇÃO: só mostra, em preço, as regras que o Backtest já usa (entrada por score,
+    // stop inicial = o mais protetor entre ATR e Stop Fixo, trailing stop por ATR). Nada aqui decide trade novo.
+    function planoOperacao(t, ex) {
+        const d = allData[t]; const n = d.close.length; const rp = getBacktestRiskParams();
+        const res = runCoreBacktest(d, rp);
+        if (!res) return '<p style="color:var(--mudo)">Histórico curto demais para montar o plano (mínimo de ~201 candles).</p>';
+        const fech = d.close[n - 1];
+        const dado = (rot, val, cor) => `<div class="am-dado"><div class="r">${rot}</div><div class="v"${cor ? ` style="color:${cor}"` : ''}>${val}</div></div>`;
+        const dist = p => fmtPctM((p / fech - 1) * 100);
+        let cab, grade = '';
+        if (res.aberta) {
+            const lucro = (fech / res.aberta.entrada - 1) * 100;
+            cab = `<div class="am-chip" style="background:rgba(59,130,246,.15);color:#93c5fd">● Em operação desde ${res.aberta.data.split("-").reverse().join("/")}</div>
+                <p class="mt-2">Pelas regras do Backtest, a compra aconteceu em ${res.aberta.data.split("-").reverse().join("/")} e ainda não bateu no stop.</p>`;
+            grade = dado('Preço de entrada', fmtPrecoM(res.aberta.entrada)) + dado('Resultado até hoje', fmtPctM(lucro), lucro >= 0 ? '#22c55e' : '#ef4444')
+                + dado('Stop móvel (sair se tocar)', fmtPrecoM(res.aberta.stop), '#ef4444') + dado('Distância do stop', dist(res.aberta.stop));
+        } else if (res.sinalHoje) {
+            const atr = res.atrHoje;
+            const stopIni = Math.max(fech - atr * rp.atrMult, fech * (1 - rp.stopLossPct / 100));
+            const risco = fech - stopIni; const qtd = risco > 0 ? Math.floor(rp.capital * rp.riskTrade / 100 / risco) : 0;
+            cab = `<div class="am-chip" style="background:rgba(34,197,94,.15);color:#4ade80">▲ Sinal de entrada hoje</div>
+                <p class="mt-2">O score passou do mínimo (${fmtNumM(rp.minScore, 1)}) no fechamento de hoje. Pela regra, a compra é na <b>abertura do próximo pregão</b>. Os valores abaixo usam o fechamento de hoje como estimativa.</p>`;
+            grade = dado('Entrada estimada', fmtPrecoM(fech)) + dado('Stop inicial', fmtPrecoM(stopIni), '#ef4444')
+                + dado('Risco por ação', `${fmtPrecoM(risco)} (${fmtPctM(-risco / fech * 100).replace('+', '')})`) + dado(`Qtd. p/ arriscar ${fmtNumM(rp.riskTrade, 1)}%`, `${qtd} ações`);
+        } else {
+            const ind = precomputeAllIndicators(d, getIndicatorParameters());
+            const { totalScore } = computeStrategyScore(analyzeAllSignals(d, ind, n - 1), rp.weights);
+            const pctReg = regimeByDateMap[d.dates[n - 1]];
+            const travado = rp.regimeFilter && pctReg !== undefined && pctReg < 50;
+            cab = `<div class="am-chip" style="background:rgba(148,163,184,.15);color:#cbd5e1">○ Sem sinal de entrada hoje</div>
+                <p class="mt-2">${travado ? `O filtro de clima do mercado está bloqueando compras (só ${fmtNumM(pctReg, 1)}% dos ativos acima da média de 200 dias).` : `O score de hoje é <b>${fmtNumM(totalScore, 1)}</b>; a regra pede pelo menos <b>${fmtNumM(rp.minScore, 1)}</b>.`} A entrada acontece quando o score cruzar o mínimo (setas verdes no gráfico).</p>`;
+            const atr = (ind.ATR || [])[n - 1];
+            if (atr) grade = dado('Se entrasse hoje, stop em', fmtPrecoM(Math.max(fech - atr * rp.atrMult, fech * (1 - rp.stopLossPct / 100))), '#ef4444') + dado('Oscilação diária (ATR)', fmtPrecoM(atr));
+        }
+        // Suporte e resistência: pivôs já confirmados no último ano (mesma janela usada pelo motor)
+        const ini = Math.max(0, n - 252);
+        const pivos = findPivotPoints(d, PIVOT_WINDOW).filter(p => p.index >= ini && p.index + PIVOT_WINDOW <= n - 1);
+        const sup = pivos.filter(p => p.type === 'low' && p.price < fech).reduce((m, p) => Math.max(m, p.price), -Infinity);
+        const resis = pivos.filter(p => p.type === 'high' && p.price > fech).reduce((m, p) => Math.min(m, p.price), Infinity);
+        grade += dado('Suporte mais próximo', isFinite(sup) ? `${fmtPrecoM(sup)} <span class="text-sm" style="color:var(--mudo)">${dist(sup)}</span>` : '—')
+            + dado('Resistência mais próxima', isFinite(resis) ? `${fmtPrecoM(resis)} <span class="text-sm" style="color:var(--mudo)">${dist(resis)}</span>` : 'Acima das máximas do ano');
+        const pf = res.profitFactor === Infinity ? '∞' : fmtNumM(res.profitFactor, 2);
+        const passa = res.profitFactor >= rp.targetProfitFactor;
+        const hist = `<div class="font-bold mt-5 mb-2" style="font-size:1.05rem">Histórico desta regra em ${t}</div><div class="am-grade">
+                ${dado('Operações', res.trades)}${dado('Acerto', fmtNumM(res.winRate * 100, 0) + '%')}
+                ${dado(`Fator de lucro (meta ${fmtNumM(rp.targetProfitFactor, 1)})`, pf, passa ? '#22c55e' : '#ef4444')}${dado('Pior queda do capital', fmtNumM(res.maxDD * 100, 1) + '%')}
+            </div>
+            <p class="text-sm mt-2" style="color:var(--mudo)">${res.trades < 20 ? '⚠️ Poucas operações: o histórico ainda é pouco confiável. ' : ''}${passa ? 'A regra passou na meta de fator de lucro neste papel.' : 'A regra <b>não</b> passou na meta de fator de lucro neste papel: o histórico pede cautela.'}</p>`;
+        const fund = `<div class="am-card mt-4 text-sm">Fundamentos: <b>${ex.f ? ex.notaFund + '/5' : 'sem dados'}</b>. O preço diz <i>quando</i>; os fundamentos dizem <i>se vale a pena</i> ter o papel.</div>`;
+        return `${cab}<div class="am-grade mt-3">${grade}</div>${hist}${fund}
+            <p class="text-xs mt-4" style="color:var(--mudo)">A saída é só por stop: o stop móvel sobe junto com o preço (fechamento − ${fmtNumM(rp.atrMult, 1)} × ATR) e nunca desce. Não há alvo de venda. Parâmetros do Módulo 3; não é recomendação de investimento.</p>`;
     }
     let ativoAberto = null;
     function abrirAtivo(t, aba = 'resumo') {
