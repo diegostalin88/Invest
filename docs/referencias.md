@@ -47,3 +47,38 @@ relatório da XP, conversa exportada) **não foram lidos** e não entram aqui.
    resultado se mantém.
 6. **Preço baixo e volatilidade extrema.** Kaufman evita os dois. Proposta:
    filtros opcionais no bloco de liquidez.
+
+## Confluência de sinais: o que a pesquisa diz (internet, 03/11/2026)
+
+- **Regras técnicas isoladas perderam força.** Estudo com 6.406 regras em 41
+  bolsas (Springer, 2023): o Brasil teve regras vencedoras em 1995–2001, mas
+  deixou de ser previsível depois; com custos acima de 0,2% por operação quase
+  nada sobrevive, e a melhor regra de um período costuma perder no seguinte.
+  <https://link.springer.com/article/10.1007/s11408-023-00433-2>
+- **Data snooping (testar regras demais até uma "dar certo")** é o maior risco
+  de um score com muitas estratégias. Sullivan, Timmermann e White (1999).
+  <https://econpapers.repec.org/RePEc:bla:jfinan:v:54:y:1999:i:5:p:1647-1691>
+- **O que tem evidência longa:**
+  - Filtro de tendência (preço acima da média longa): Faber, 10 meses, testado
+    fora da amostra até 2016; AQR, um século de trend following.
+    <https://www.etf.com/sections/index-investor-corner/swedroe-why-financial-trends-persist>
+  - Média móvel funciona melhor em ações **mais voláteis** (Han, Yang e Zhou,
+    2013). <https://alphaarchitect.com/technical-analysis-may-actually-work/>
+  - Recuo dentro de tendência (Connors: IFR de 2 < 5–10 acima da MME200, saída
+    na média de 5): acerto alto (~75%), mas ganho modesto e fora do mercado na
+    maior parte do tempo.
+    <https://backtrex.com/en/backtests/connors-rsi-2-nasdaq-100>,
+    <https://cxoadvisory.com/technical-trading/a-few-notes-on-short-term-trading-strategies-that-work>
+- **Combinar sinais ajuda quando eles são diferentes entre si** (contexto +
+  gatilho + saída), não quando somam o mesmo tipo de sinal (contagem dobrada).
+  Kaufman: "mais regras, menos oportunidades, menos sucesso".
+
+**Conclusão aplicada ao app:** a confluência que tem respaldo é em camadas:
+1. *contexto* (clima do mercado e preço acima da MME200);
+2. *gatilho* coerente com o perfil do papel (recuo em ação que reverte,
+   rompimento em ação de tendência);
+3. *saída* definida (stop + alvo/tempo).
+
+O score atual soma 7 estratégias e mistura tendência e reversão. A regra
+"Tendência + recuo" foi adicionada como alternativa no Backtest (desligada por
+padrão), para comparar as duas no "Testar na Carteira Inteira" com dados reais.
