@@ -601,6 +601,12 @@
                         <hr class="border-gray-600 my-2">
                         <label class="checkbox-label text-sm"><input type="checkbox" id="param-regime-filter" checked> Abortar compras se Amplitude de Mercado (Termômetro) < 50% na data</label>
                         <hr class="border-gray-600 my-2">
+                        <label class="block"><span>Regra de Entrada:</span>
+                            <select id="param-modo-entrada" class="w-full mt-1">
+                                <option value="score" selected>Score de confluência (atual)</option>
+                                <option value="recuo">Tendência + recuo (Connors/Malheiros)</option>
+                            </select>
+                            <span class="text-xs text-gray-400">"Tendência + recuo": compra quando o IFR de 2 períodos cai abaixo de 10 com o preço acima da MME200; vende quando fecha acima da média de 5 dias (ou no stop).</span></label>
                         <p class="text-sm font-bold">Opções dos livros <span class="font-normal text-gray-400">(0 = desligado)</span></p>
                         <label class="block"><span>Alvo de Lucro (múltiplo do ATR):</span> <input type="number" id="param-alvo-atr" value="0" step="0.5" min="0" class="w-full mt-1"><span class="text-xs text-gray-400">Malheiros/Fitschen: vende quando o preço sobe N × ATR acima da entrada.</span></label>
                         <label class="block"><span>Saída por Tempo (pregões):</span> <input type="number" id="param-saida-dias" value="0" step="1" min="0" class="w-full mt-1"><span class="text-xs text-gray-400">Fitschen: vende no fechamento após N pregões, se nada antes.</span></label>
@@ -1464,6 +1470,7 @@
             saidaDias: Math.max(0, parseInt(document.getElementById('param-saida-dias').value, 10) || 0),
             precoMin: Math.max(0, parseFloat(document.getElementById('param-preco-min').value) || 0),
             volMax: Math.max(0, parseFloat(document.getElementById('param-vol-max').value) || 0),
+            modoEntrada: document.getElementById('param-modo-entrada').value,
             weights: getCurrentWeights()
         };
     }
@@ -1477,10 +1484,15 @@
     function runCoreBacktest(dataSubset, riskParams) {
         if (!dataSubset || dataSubset.close.length < 201) return null;
         const indicators = precomputeAllIndicators(dataSubset, getIndicatorParameters());
+        // Modo "Tendência + recuo" (Connors; Malheiros "estocástico na tendência"; Fitschen: ação reverte no curto prazo):
+        // compra recuo forte (IFR de 2 períodos < 10) só com o preço ACIMA da MME200; vende quando fecha acima da média de 5.
+        const modoRecuo = riskParams.modoEntrada === 'recuo';
+        const ifr2 = modoRecuo ? v14_calculateIFR(dataSubset, 2) : null;
+        const sma5 = modoRecuo ? calculateSMA(dataSubset, 5) : null;
         const costFraction = (riskParams.costPct || 0) / 100; // aplicado uma vez na entrada e uma vez na saída
         let position = 'out', entryPrice = 0, capital = riskParams.capital, peak = riskParams.capital, maxDD = 0, stopPrice = 0, positionSize = 0;
         let pendingEntry = false, pendingATR = 0, entryIdx = -1, targetPrice = null;
-        const saidas = { stop: 0, alvo: 0, tempo: 0 }; // por que cada trade terminou
+        const saidas = { stop: 0, alvo: 0, tempo: 0, sinal: 0 }; // por que cada trade terminou
         const trades = []; const eq = [{x: dataSubset.dates[0], y: capital}];
 
         for (let i = 200; i < dataSubset.close.length; i++) {
@@ -1513,6 +1525,7 @@
                 // Ordem conservadora: se no mesmo candle tocou stop e alvo, assume o stop.
                 let exitPrice = null;
                 if (dataSubset.low[i] <= stopPrice) { exitPrice = stopPrice; saidas.stop++; }
+                else if (modoRecuo && sma5[i] !== null && dataSubset.close[i] > sma5[i]) { exitPrice = dataSubset.close[i]; saidas.sinal++; }
                 else if (targetPrice !== null && dataSubset.high[i] >= targetPrice) { exitPrice = Math.max(targetPrice, dataSubset.open[i]); saidas.alvo++; }
                 else if (riskParams.saidaDias > 0 && i - entryIdx + 1 >= riskParams.saidaDias) { exitPrice = dataSubset.close[i]; saidas.tempo++; }
                 if (exitPrice !== null) {
@@ -1532,10 +1545,15 @@
                 if (regimeOk && riskParams.precoMin > 0 && dataSubset.close[i] < riskParams.precoMin) regimeOk = false;
                 if (regimeOk && riskParams.volMax > 0 && indicators.ATR[i] && indicators.ATR[i] / dataSubset.close[i] * 100 > riskParams.volMax) regimeOk = false;
                 if (regimeOk) {
-                    const signals = analyzeAllSignals(dataSubset, indicators, i);
-                    const { totalScore } = computeStrategyScore(signals, riskParams.weights);
-                    if (totalScore >= riskParams.minScore && totalScore > 0 && indicators.ATR[i]) {
-                        pendingEntry = true; pendingATR = indicators.ATR[i];
+                    if (modoRecuo) {
+                        const ema200 = indicators.EMA_200[i];
+                        if (ema200 && dataSubset.close[i] > ema200 && ifr2[i] !== null && ifr2[i] < 10 && indicators.ATR[i]) { pendingEntry = true; pendingATR = indicators.ATR[i]; }
+                    } else {
+                        const signals = analyzeAllSignals(dataSubset, indicators, i);
+                        const { totalScore } = computeStrategyScore(signals, riskParams.weights);
+                        if (totalScore >= riskParams.minScore && totalScore > 0 && indicators.ATR[i]) {
+                            pendingEntry = true; pendingATR = indicators.ATR[i];
+                        }
                     }
                 }
             }
@@ -1611,7 +1629,7 @@
         const perf = perfilDoAtivo(allData[ticker]);
         const extras = rp.alvoAtr > 0 || rp.saidaDias > 0;
         let h = '<div class="mt-4 space-y-3 text-sm" id="bt-livros">';
-        if (extras || res.saidas.stop) h += `<div class="result-metric"><span class="text-xs text-gray-400">Como os trades terminaram</span><div class="text-base mt-1">Stop: <b>${res.saidas.stop}</b>${rp.alvoAtr > 0 ? ` · Alvo: <b>${res.saidas.alvo}</b>` : ''}${rp.saidaDias > 0 ? ` · Tempo: <b>${res.saidas.tempo}</b>` : ''}</div></div>`;
+        if (extras || res.saidas.stop) h += `<div class="result-metric"><span class="text-xs text-gray-400">Como os trades terminaram</span><div class="text-base mt-1">Stop: <b>${res.saidas.stop}</b>${rp.alvoAtr > 0 ? ` · Alvo: <b>${res.saidas.alvo}</b>` : ''}${rp.saidaDias > 0 ? ` · Tempo: <b>${res.saidas.tempo}</b>` : ''}${res.saidas.sinal ? ` · Média de 5: <b>${res.saidas.sinal}</b>` : ''}</div></div>`;
         if (perf) h += `<div class="result-metric"><span class="text-xs text-gray-400">Perfil do papel (Razão de Variância ${perf.vr.toFixed(2)})</span><div class="text-base mt-1"><b>${perf.nome}</b>: ${perf.texto}</div></div>`;
         h += mc ? `<div class="result-metric"><span class="text-xs text-gray-400">Monte Carlo (1.000 sorteios dos ${res.trades} trades)</span><div class="text-base mt-1">Retorno provável entre <b>${pct(mc.p5)}</b> e <b>${pct(mc.p95)}</b> (mediana ${pct(mc.p50)}). Chance de terminar no prejuízo: <b>${pct(mc.probPerda)}</b>. Queda máxima no pior caso (95%): <b>${pct(mc.dd95)}</b>.</div></div>`
                 : '<div class="result-metric"><span class="text-xs text-gray-400">Monte Carlo</span><div class="text-base mt-1">Poucos trades (menos de 5) para sortear.</div></div>';
@@ -1658,8 +1676,11 @@
             { nome: 'Regra atual (só stop)', rp: { ...rp, alvoAtr: 0, saidaDias: 0 } },
             { nome: `+ Alvo de ${alvo} × ATR`, rp: { ...rp, alvoAtr: alvo, saidaDias: 0 } },
             { nome: `+ Saída em ${dias} pregões`, rp: { ...rp, alvoAtr: 0, saidaDias: dias } },
-            { nome: 'Alvo + tempo', rp: { ...rp, alvoAtr: alvo, saidaDias: dias } }
+            { nome: 'Alvo + tempo', rp: { ...rp, alvoAtr: alvo, saidaDias: dias } },
+            { nome: 'Tendência + recuo (Connors/Malheiros)', rp: { ...rp, modoEntrada: 'recuo', alvoAtr: 0, saidaDias: 0 } },
+            { nome: `Tendência + recuo + saída em ${dias} pregões`, rp: { ...rp, modoEntrada: 'recuo', alvoAtr: 0, saidaDias: dias } }
         ];
+        variantes.slice(0, 4).forEach(v => v.rp.modoEntrada = 'score');
         const soma = variantes.map(() => ({ ganho: 0, perda: 0, trades: 0, ganhos: 0, ret: 0, ativos: 0, passam: 0 }));
         try {
             for (let k = 0; k < universo.length; k++) {
@@ -2419,7 +2440,7 @@
             const pctReg = regimeByDateMap[d.dates[n - 1]];
             const travado = rp.regimeFilter && pctReg !== undefined && pctReg < 50;
             cab = `<div class="am-chip" style="background:rgba(148,163,184,.15);color:#cbd5e1">○ Sem sinal de entrada hoje</div>
-                <p class="mt-2">${travado ? `O filtro de clima do mercado está bloqueando compras (só ${fmtNumM(pctReg, 1)}% dos ativos acima da média de 200 dias).` : `O score de hoje é <b>${fmtNumM(totalScore, 1)}</b>; a regra pede pelo menos <b>${fmtNumM(rp.minScore, 1)}</b>.`} A entrada acontece quando o score cruzar o mínimo (setas verdes no gráfico).</p>`;
+                <p class="mt-2">${travado ? `O filtro de clima do mercado está bloqueando compras (só ${fmtNumM(pctReg, 1)}% dos ativos acima da média de 200 dias).` : rp.modoEntrada === 'recuo' ? (() => { const i2 = v14_calculateIFR(d, 2)[n - 1]; const e200 = ind.EMA_200[n - 1]; return `Regra "Tendência + recuo": IFR(2) hoje <b>${fmtNumM(i2, 1)}</b> (precisa ficar abaixo de 10) e o preço está <b>${e200 && fech > e200 ? 'acima' : 'abaixo'}</b> da MME200 (precisa estar acima).`; })() : `O score de hoje é <b>${fmtNumM(totalScore, 1)}</b>; a regra pede pelo menos <b>${fmtNumM(rp.minScore, 1)}</b>.`}${rp.modoEntrada === 'recuo' ? '' : ' A entrada acontece quando o score cruzar o mínimo (setas verdes no gráfico).'}</p>`;
             const atr = (ind.ATR || [])[n - 1];
             if (atr) grade = dado('Se entrasse hoje, stop em', fmtPrecoM(Math.max(fech - atr * rp.atrMult, fech * (1 - rp.stopLossPct / 100))), '#ef4444') + dado('Oscilação diária (ATR)', fmtPrecoM(atr));
         }
@@ -2441,6 +2462,7 @@
         const perf = perfilDoAtivo(d);
         const perfil = perf ? `<div class="am-card mt-4 text-sm">Perfil do papel: <b>${perf.nome}</b>. No histórico, ${perf.texto}</div>` : '';
         const regrasSaida = ['o stop móvel sobe junto com o preço (fechamento − ' + fmtNumM(rp.atrMult, 1) + ' × ATR) e nunca desce'];
+        if (rp.modoEntrada === 'recuo') regrasSaida.push('na regra "Tendência + recuo", vende quando o preço fecha acima da média de 5 dias');
         if (rp.alvoAtr > 0) regrasSaida.push(`o alvo vende quando o preço sobe ${fmtNumM(rp.alvoAtr, 1)} × ATR acima da entrada`);
         if (rp.saidaDias > 0) regrasSaida.push(`a saída por tempo vende após ${rp.saidaDias} pregões`);
         return `${cab}<div class="am-grade mt-3">${grade}</div>${hist}${perfil}${fund}

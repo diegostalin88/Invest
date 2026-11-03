@@ -169,7 +169,7 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     ok(opcoes.padraoSoStop && opcoes.somaBate && opcoes.usouAlvoOuTempo && opcoes.filtroPreco, `Backtest: opções dos livros (alvo, tempo, preço mínimo) funcionam e ficam desligadas por padrão ${JSON.stringify(opcoes)}`);
     await page.click('#bt-carteira-btn');
     await page.waitForFunction(() => /Teste na carteira/.test(document.getElementById('bt-carteira').textContent), null, { timeout: 120000 });
-    ok((await page.$$('#bt-carteira tbody tr')).length === 4, 'Backtest: teste na carteira compara 4 saídas');
+    ok((await page.$$('#bt-carteira tbody tr')).length === 6, 'Backtest: teste na carteira compara 6 regras (inclui Tendência + recuo)');
     await page.click('button[data-tab="walkforward"]');
     await page.click('#run-walkforward-btn');
     await page.waitForSelector('#walkforward-summary .result-metric', { timeout: 30000 });
