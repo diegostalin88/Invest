@@ -87,6 +87,9 @@
             </details>
         </div>
 
+        <!-- Resumo das "Melhores Opções" (Módulo 6), visível logo ao abrir -->
+        <div id="melhores-opcoes-resumo" class="hidden mb-6"></div>
+
         <div class="border-b border-gray-700 mb-6"><nav class="flex overflow-x-auto -mb-px" id="tabs">
             <button class="tab-btn active shrink-0" data-tab="screener">Módulo 1: Screener</button>
             <button class="tab-btn shrink-0" data-tab="analysis">Módulo 2: Gráficos</button>
@@ -520,6 +523,7 @@
             try {
                 inicializarComDados(expandirPrecos(JSON.parse(event.target.result)));
                 esconderProgresso();
+                rodarFluxoCompleto();
             } catch (err) {
                 console.error('Erro ao ler JSON de preços:', err);
                 mostrarMensagem('Não consegui ler esse JSON de preços. Confira se é o arquivo gerado pela coleta.', 'erro');
@@ -614,6 +618,7 @@
             inicializarComDados(precos, fundamentos, { manifest });
             if (!fundamentos) mostrarMensagem('Preços carregados, mas o arquivo de fundamentos não veio. O Módulo 6 fica sem dados até a próxima coleta.', 'aviso');
             esconderProgresso();
+            await rodarFluxoCompleto();
             return true;
         } catch (err) {
             console.error('Falha ao carregar os dados automáticos:', err);
@@ -622,16 +627,38 @@
         }
     }
 
+    // Fluxo sem cliques: depois de carregar os dados, roda o Screener com os parâmetros atuais (padrão) e, se houver
+    // fundamentos, o cruzamento do Módulo 6. Mudar filtros depois NÃO dispara nada sozinho: o usuário clica em Executar.
+    async function rodarFluxoCompleto() {
+        await executarScreener();
+        if (fundamentalsData && Object.keys(fundamentalsData).length > 0) executarCruzamento();
+    }
+
     // MÓDULO 1: SCREENER
-    runStrategyScoringBtn.addEventListener('click', () => {
-        document.getElementById('screener-loading').style.display = 'block'; screenerResultsContainer.innerHTML = '';
-        setTimeout(() => {
+    // Processa os tickers em blocos (cedendo a vez ao navegador a cada ~40 ms) para a página não travar
+    // com milhares de ativos. O cálculo de cada ticker é exatamente o mesmo de antes.
+    let screenerRodando = null;
+    function executarScreener() {
+        if (screenerRodando) return screenerRodando;
+        const loading = document.getElementById('screener-loading');
+        loading.style.display = 'block'; loading.textContent = 'Processando Tensores...'; screenerResultsContainer.innerHTML = '';
+        runStrategyScoringBtn.disabled = true;
+        screenerRodando = new Promise(resolve => setTimeout(async () => {
+          try {
             const currentWeights = getCurrentWeights();
             const minAdtv = parseFloat(document.getElementById('filter-adtv').value) || 0;
             const blacklist = document.getElementById('param-blacklist').value.toUpperCase().split(',').map(t => t.trim()).filter(t => t !== "");
             let scoredAssets = {}; const params = getIndicatorParameters();
-            
-            for (const ticker of Object.keys(allData)) {
+            const todosTickers = Object.keys(allData);
+            let ultimaPausa = performance.now();
+
+            for (let k = 0; k < todosTickers.length; k++) {
+                if (performance.now() - ultimaPausa > 40) {
+                    loading.textContent = `Processando Tensores... ${k.toLocaleString('pt-BR')}/${todosTickers.length.toLocaleString('pt-BR')} ativos (${Math.round(100 * k / todosTickers.length)}%)`;
+                    await new Promise(r => setTimeout(r, 0));
+                    ultimaPausa = performance.now();
+                }
+                const ticker = todosTickers[k];
                 if (blacklist.includes(ticker)) continue;
                 const data = allData[ticker]; if (!data || data.close.length < 201) continue;
                 const i = data.close.length - 1;
@@ -658,9 +685,19 @@
             filteredScreenerResults = Object.entries(scoredAssets).map(([ticker, data]) => ({ ticker, score: data.score, details: data.strats, atrPct: data.atrPct })).sort((a, b) => b.score - a.score);
             const fmtAtr = (v) => v === null || v === undefined || isNaN(v) ? 's/dado' : v.toFixed(2) + '%';
             screenerResultsContainer.innerHTML = filteredScreenerResults.length > 0 ? `<table class="results-table"><thead><tr><th>Ativo</th><th>Score</th><th title="ATR de 14 períodos como % do preço — quanto maior, mais o ativo costuma se mover por dia">Volatilidade (ATR%)</th><th>Teses Confirmadas</th></tr></thead><tbody>${filteredScreenerResults.map(r => `<tr onclick="document.getElementById('ticker-select').value='${r.ticker}';"><td><b>${r.ticker}</b></td><td>${r.score.toFixed(2)}</td><td>${fmtAtr(r.atrPct)}</td><td class="text-xs text-gray-400">${r.details.join(', ')}</td></tr>`).join('')}</tbody></table>` : `<p class="text-gray-400">Nenhum ativo sobreviveu aos filtros atuais.</p>`;
-            document.getElementById('screener-loading').style.display = 'none';
-        }, 50);
-    });
+          } catch (err) {
+            console.error('Erro no Screener:', err);
+            screenerResultsContainer.innerHTML = `<p class="text-red-400">Erro ao executar o Screener: ${err && err.message ? err.message : err}</p>`;
+          } finally {
+            loading.style.display = 'none';
+            runStrategyScoringBtn.disabled = false;
+            screenerRodando = null;
+            resolve(filteredScreenerResults);
+          }
+        }, 50));
+        return screenerRodando;
+    }
+    runStrategyScoringBtn.addEventListener('click', () => executarScreener());
 
     // Exporta o shortlist do Screener em CSV — serve de ponte para o fetch_fundamentals.py (rodar fundamentos
     // só nos ativos que já passaram no filtro técnico, e não no universo inteiro, é o que torna viável usar
@@ -866,6 +903,7 @@
             try {
                 carregarFundamentos(JSON.parse(event.target.result));
                 mostrarMensagem(`Fundamentos de ${Object.keys(fundamentalsData).length.toLocaleString('pt-BR')} ativo(s) carregados.`, 'sucesso');
+                if (filteredScreenerResults.length > 0) executarCruzamento();
             } catch (err) {
                 mostrarMensagem('Não consegui ler esse JSON de fundamentos. Confirme se é o fundamentos.json gerado pela coleta.', 'erro');
             }
@@ -941,26 +979,27 @@
 
     const MIN_DATA_COVERAGE_FOR_RANKING = 3; // de 5 critérios; abaixo disso, o ativo (tipicamente um ETF/fundo sem 10-K) não entra no ranking de "Melhores Opções"
 
-    runFundamentalsBtn.addEventListener('click', () => {
+    function executarCruzamento() {
         const fundContainer = document.getElementById('fundamentals-results-container');
         // Os avisos abaixo vão pro próprio container (e não só num alert()), porque um alert() pode passar
         // despercebido, ser fechado sem querer, ou ser bloqueado dependendo de como a página está sendo aberta —
         // e nesse caso o container ficava vazio sem explicação nenhuma do motivo.
         if (filteredScreenerResults.length === 0) {
-            fundContainer.innerHTML = `<div class="card border-2 border-yellow-500"><p class="text-sm text-yellow-400">⚠️ Nenhum shortlist técnico encontrado. Vá até o <b>Módulo 1: Screener</b>, carregue o JSON de preços (se ainda não carregou) e clique em "Rodar Screener" antes de cruzar com os fundamentos — esse cruzamento depende do resultado do Screener estar pronto <b>nesta mesma sessão da página</b> (recarregar a página zera esse resultado).</p></div>`;
+            fundContainer.innerHTML = `<div class="card border-2 border-yellow-500"><p class="text-sm text-yellow-400">⚠️ Nenhum shortlist técnico encontrado. Vá até o <b>Módulo 1: Screener</b> e clique em "Executar Motor de Rastreio" (ou afrouxe os filtros) antes de cruzar com os fundamentos.</p></div>`;
             return;
         }
         if (!fundamentalsData || Object.keys(fundamentalsData).length === 0) {
-            fundContainer.innerHTML = `<div class="card border-2 border-yellow-500"><p class="text-sm text-yellow-400">⚠️ Nenhum arquivo de fundamentos carregado (ou o arquivo carregado veio vazio). Gere o <code>fundamentos.json</code> com o fetch_fundamentals.py e carregue-o no campo acima antes de clicar em "Cruzar com Shortlist do Screener".</p></div>`;
+            fundContainer.innerHTML = `<div class="card border-2 border-yellow-500"><p class="text-sm text-yellow-400">⚠️ Nenhum dado de fundamentos carregado (ou o arquivo veio vazio). Normalmente eles vêm sozinhos com a coleta diária; se a página está em modo manual, carregue o <code>fundamentos.json</code> no "Modo manual (avançado)" no topo.</p></div>`;
             return;
         }
         try {
         runFundamentalsCrossReference(fundContainer);
         } catch (err) {
             console.error('Erro ao cruzar Screener x Fundamentos:', err);
-            fundContainer.innerHTML = `<div class="card border-2 border-red-500"><p class="text-sm text-red-400">🚫 Ocorreu um erro inesperado ao processar o cruzamento: <code>${(err && err.message) ? err.message : String(err)}</code>. Confira se o arquivo de fundamentos carregado foi realmente gerado pelo fetch_fundamentals.py mais recente. Se o erro persistir, abra o Console do navegador (F12) para ver os detalhes técnicos.</p></div>`;
+            fundContainer.innerHTML = `<div class="card border-2 border-red-500"><p class="text-sm text-red-400">🚫 Ocorreu um erro inesperado ao processar o cruzamento: <code>${(err && err.message) ? err.message : String(err)}</code>. Confira se o arquivo de fundamentos carregado foi realmente gerado pela coleta mais recente. Se o erro persistir, abra o Console do navegador (F12) para ver os detalhes técnicos.</p></div>`;
         }
-    });
+    }
+    runFundamentalsBtn.addEventListener('click', () => executarCruzamento());
 
     function runFundamentalsCrossReference(fundContainer) {
         const maxPE = parseFloat(document.getElementById('fund-max-pe').value);
@@ -1019,7 +1058,13 @@
                 </div>
             </div>`;
         } else {
-            topHtml = `<div class="card border-2 border-yellow-500 mb-6"><p class="text-sm text-yellow-400">Nenhum ativo do shortlist tem dados fundamentalistas suficientes (≥ ${MIN_DATA_COVERAGE_FOR_RANKING}/5 critérios) pra montar um ranking confiável ainda. Confira a tabela completa abaixo — provavelmente é ETF/fundo sem 10-K, ou o fetch_fundamentals.py não achou dado pra esses tickers.</p></div>`;
+            topHtml = `<div class="card border-2 border-yellow-500 mb-6"><p class="text-sm text-yellow-400">Nenhum ativo do shortlist tem dados fundamentalistas suficientes (≥ ${MIN_DATA_COVERAGE_FOR_RANKING}/5 critérios) pra montar um ranking confiável ainda. Confira a tabela completa abaixo — provavelmente é ETF/fundo sem 10-K, ou a coleta ainda não achou dado pra esses tickers (ativos novos no pool são buscados nas próximas execuções).</p></div>`;
+        }
+
+        const resumo = document.getElementById('melhores-opcoes-resumo');
+        if (resumo) {
+            resumo.innerHTML = topHtml.replace('card border-2', 'card border-2 mb-0') + '<p class="text-xs text-gray-500 mt-2">Tabela completa no <button type="button" class="underline text-purple-300" onclick="document.querySelector(\'button[data-tab=fundamentals]\').click()">Módulo 6: Fundamentos</button>.</p>';
+            resumo.classList.remove('hidden');
         }
 
         let html = topHtml;
