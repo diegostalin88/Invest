@@ -167,6 +167,9 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
         return { padraoSoStop: r0.saidas.alvo === 0 && r0.saidas.tempo === 0, somaBate: fechados === r1.trades, usouAlvoOuTempo: r1.saidas.alvo + r1.saidas.tempo > 0, filtroPreco: r2.trades === 0 };
     });
     ok(opcoes.padraoSoStop && opcoes.somaBate && opcoes.usouAlvoOuTempo && opcoes.filtroPreco, `Backtest: opções dos livros (alvo, tempo, preço mínimo) funcionam e ficam desligadas por padrão ${JSON.stringify(opcoes)}`);
+    await page.click('#bt-carteira-btn');
+    await page.waitForFunction(() => /Teste na carteira/.test(document.getElementById('bt-carteira').textContent), null, { timeout: 120000 });
+    ok((await page.$$('#bt-carteira tbody tr')).length === 4, 'Backtest: teste na carteira compara 4 saídas');
     await page.click('button[data-tab="walkforward"]');
     await page.click('#run-walkforward-btn');
     await page.waitForSelector('#walkforward-summary .result-metric', { timeout: 30000 });

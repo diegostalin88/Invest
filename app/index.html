@@ -608,11 +608,14 @@
                         <label class="block"><span>Volatilidade Máxima p/ Entrar (ATR em % do preço):</span> <input type="number" id="param-vol-max" value="0" step="0.5" min="0" class="w-full mt-1"><span class="text-xs text-gray-400">Kaufman: não entrar com volatilidade extrema.</span></label>
                     </div>
                     <button id="run-backtest-btn" class="btn btn-primary w-full p-3 mt-6" disabled>Executar Teste Isolado</button>
+                    <button id="bt-carteira-btn" type="button" class="btn btn-secondary w-full p-3 mt-3">Testar na Carteira Inteira</button>
+                    <p class="text-xs text-gray-400 mt-1">Malheiros/Kaufman: uma regra boa precisa funcionar em muitos papéis, não só em um. Compara a regra atual com alvo de lucro e saída por tempo.</p>
                 </div></div>
                 <div class="lg:col-span-2 card">
                     <h3 class="text-lg font-bold mb-4">Relatório In-Sample</h3>
                     <div id="backtest-results-container" class="overflow-x-auto"></div>
                     <div id="backtest-capital-curve" class="mt-4" style="min-height: 400px;"></div>
+                    <div id="bt-carteira" class="mt-4"></div>
                 </div>
             </div></div>
             
@@ -1639,6 +1642,47 @@
         setTimeout(() => preencherRobustez(ticker, rp), 30);
         Plotly.newPlot('backtest-capital-curve', [{x: res.eq.map(e=>e.x), y: res.eq.map(e=>e.y), type:'scatter'}], {title:'In-Sample Equity', paper_bgcolor:'#1f2937', plot_bgcolor:'#1f2937', font:{color:'#fff'}});
     });
+
+    // TESTE NA CARTEIRA (Malheiros: "teste de carteira"; Kaufman: "mais mercados, mais robustez").
+    // Roda a mesma regra em muitos papéis e soma tudo, comparando variações de saída. Só leitura.
+    let carteiraRodando = false;
+    async function testarCarteira() {
+        if (carteiraRodando) return; const box = document.getElementById('bt-carteira');
+        const todos = Object.keys(allData); if (!todos.length) return;
+        carteiraRodando = true;
+        const vol = t => { const d = allData[t], n = d.close.length; let s = 0; for (let j = Math.max(0, n - 20); j < n; j++) s += d.close[j] * d.volume[j]; return s; };
+        const universo = todos.length <= 150 ? todos : todos.sort((a, b) => vol(b) - vol(a)).slice(0, 150);
+        const rp = getBacktestRiskParams();
+        const alvo = rp.alvoAtr || 3, dias = rp.saidaDias || 10;
+        const variantes = [
+            { nome: 'Regra atual (só stop)', rp: { ...rp, alvoAtr: 0, saidaDias: 0 } },
+            { nome: `+ Alvo de ${alvo} × ATR`, rp: { ...rp, alvoAtr: alvo, saidaDias: 0 } },
+            { nome: `+ Saída em ${dias} pregões`, rp: { ...rp, alvoAtr: 0, saidaDias: dias } },
+            { nome: 'Alvo + tempo', rp: { ...rp, alvoAtr: alvo, saidaDias: dias } }
+        ];
+        const soma = variantes.map(() => ({ ganho: 0, perda: 0, trades: 0, ganhos: 0, ret: 0, ativos: 0, passam: 0 }));
+        try {
+            for (let k = 0; k < universo.length; k++) {
+                if (k % 3 === 0) { box.innerHTML = `<p class="text-sm text-gray-400">Testando ${k + 1} de ${universo.length} papéis…</p>`; await new Promise(r => setTimeout(r, 0)); }
+                variantes.forEach((v, idx) => {
+                    const res = runCoreBacktest(allData[universo[k]], v.rp); if (!res) return;
+                    const S = soma[idx]; S.ativos++; S.ret += res.returnPct; S.trades += res.trades;
+                    res.retornosTrades.forEach(x => { if (x > 0) { S.ganho += x; S.ganhos++; } else S.perda += -x; });
+                    if (res.trades > 0 && res.profitFactor >= rp.targetProfitFactor) S.passam++;
+                });
+            }
+            const pct = v => (v * 100).toFixed(1) + '%';
+            const linhas = variantes.map((v, i) => { const S = soma[i]; const pf = S.perda > 0 ? S.ganho / S.perda : (S.ganho > 0 ? Infinity : 0); return { nome: v.nome, pf, acerto: S.trades ? S.ganhos / S.trades : 0, trades: S.trades, retMedio: S.ativos ? S.ret / S.ativos : 0, passam: S.ativos ? S.passam / S.ativos : 0 }; });
+            const melhor = linhas.reduce((m, l) => l.pf > m.pf ? l : m, linhas[0]);
+            box.innerHTML = `<h4 class="font-bold mb-2">Teste na carteira (${universo.length} papéis${todos.length > 150 ? ', os 150 mais líquidos' : ''})</h4>
+                <div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-gray-400 text-left"><th class="p-2">Saída</th><th class="p-2">Fator de lucro</th><th class="p-2">Acerto</th><th class="p-2">Trades</th><th class="p-2">Retorno médio por papel</th><th class="p-2">Papéis na meta</th></tr></thead>
+                <tbody>${linhas.map(l => `<tr class="border-t border-gray-700 ${l === melhor ? 'text-green-400 font-bold' : ''}"><td class="p-2">${l.nome}</td><td class="p-2">${l.pf === Infinity ? '∞' : l.pf.toFixed(2)}</td><td class="p-2">${pct(l.acerto)}</td><td class="p-2">${l.trades}</td><td class="p-2">${pct(l.retMedio)}</td><td class="p-2">${pct(l.passam)}</td></tr>`).join('')}</tbody></table></div>
+                <p class="text-xs text-gray-400 mt-2">Fator de lucro somando os trades de todos os papéis (cada trade em % do capital). Em verde, a melhor variação neste teste. Para adotar uma saída, preencha o valor em "Opções dos livros". ${avisoSobrevivencia()}</p>`;
+        } catch (e) {
+            console.error('Erro no teste de carteira:', e); box.innerHTML = `<p class="text-red-400 text-sm">Erro no teste de carteira: ${e && e.message ? e.message : e}</p>`;
+        } finally { carteiraRodando = false; }
+    }
+    document.getElementById('bt-carteira-btn').addEventListener('click', () => testarCarteira());
 
     // MÓDULO 4: WALK-FORWARD OUT-OF-SAMPLE (FITSCHEN)
     runWalkForwardBtn.addEventListener('click', () => {
