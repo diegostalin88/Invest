@@ -56,6 +56,16 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     ok(true, 'carregou sozinho e rodou o Screener automaticamente');
     const nLinhas = await page.$$eval('#screener-results-container tbody tr', trs => trs.length);
     ok(nLinhas > 0, `shortlist com ${nLinhas} ativos`);
+    const visiveis = await page.$$eval('#screener-results-container tbody tr', trs => trs.filter(t => t.offsetParent !== null).length);
+    ok(nLinhas <= 10 || visiveis === 10, `lista começa com os 10 primeiros (${visiveis} de ${nLinhas})`);
+    if (nLinhas > 10) {
+        await page.click('#screener-mostrar-todos');
+        ok(await page.$$eval('#screener-results-container tbody tr', trs => trs.filter(t => t.offsetParent !== null).length) === nLinhas, '"Mostrar todos" abre a lista inteira');
+    }
+    await page.click('#sec-vetor h3');
+    ok(await page.isHidden('#screener-results-container'), 'Vetor de Ativos Aprovados minimiza pelo título');
+    await page.click('#sec-vetor h3');
+    ok(await page.isVisible('#screener-results-container'), 'e abre de novo');
     const banner = await page.textContent('#data-freshness-banner');
     ok(/Dados até \d{2}\/\d{2}\/\d{4}/.test(banner) && /Fundamentos de \d+ ativos/.test(banner) && /Atualizado em/.test(banner), `cabeçalho de status: "${banner.trim()}"`);
     ok(await page.isHidden('#load-progress'), 'barra de progresso some ao terminar');

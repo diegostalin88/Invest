@@ -59,6 +59,7 @@
         .sanfona-fechada .sanfona-cab::after { transform: rotate(45deg); margin-top: -0.3rem; }
         .sanfona-aberta .sanfona-cab { margin-bottom: 1rem !important; }
         .sanfona-oculto { display: none !important; }
+        .lista-recolhida tbody tr:nth-child(n+11) { display: none !important; }
         .card[data-sanfona] { transition: border-color 0.2s; }
         .card[data-sanfona]:hover { border-color: #4b5563; }
         /* ---- Visual geral ---- */
@@ -243,9 +244,9 @@
                     </div>
                 </div>
 
-                <div class="lg:col-span-2 card order-1 lg:order-2">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-bold">Vetor de Ativos Aprovados</h3>
+                <div class="lg:col-span-2 card order-1 lg:order-2" data-sanfona="aberta" id="sec-vetor">
+                    <div class="flex justify-between items-center gap-3 mb-4">
+                        <h3 class="text-lg font-bold flex-1">Vetor de Ativos Aprovados</h3>
                         <div class="flex gap-2"><button id="run-strategy-scoring-btn" class="btn btn-primary text-sm" disabled title="Executar Motor de Rastreio com os filtros e pesos atuais">↻ Executar</button><button id="download-btn" class="btn btn-secondary text-sm" disabled>CSV</button></div>
                     </div>
                     <div id="estrategias-results" class="hidden mb-6"></div>
@@ -911,6 +912,16 @@
             filteredScreenerResults = Object.entries(scoredAssets).map(([ticker, data]) => ({ ticker, score: data.score, details: data.strats, atrPct: data.atrPct })).sort((a, b) => b.score - a.score);
             const fmtAtr = (v) => v === null || v === undefined || isNaN(v) ? 's/dado' : v.toFixed(2) + '%';
             screenerResultsContainer.innerHTML = filteredScreenerResults.length > 0 ? `<table class="results-table tabela-cartoes"><thead><tr><th>Ativo</th><th>Score</th><th title="Critérios fundamentalistas aprovados (limites do Módulo 6). Entre parênteses: quantos dos 5 têm dado">Fund.</th><th>P/L</th><th>ROE</th><th title="ATR de 14 períodos como % do preço — quanto maior, mais o ativo costuma se mover por dia">Volatilidade (ATR%)</th><th>Teses Confirmadas</th></tr></thead><tbody>${filteredScreenerResults.map(r => { const fz = resumoFundamentalista(r.ticker); return `<tr onclick="document.getElementById('ticker-select').value='${r.ticker}';"><td class="whitespace-nowrap cel-titulo"><b>${r.ticker}</b> <button type="button" class="text-xs text-indigo-300 underline ml-1" data-explicar="${r.ticker}" title="Ver por que foi selecionado">🔎<span class="lg:hidden"> por quê?</span></button></td><td data-label="Score técnico"><b>${r.score.toFixed(2)}</b></td><td data-label="Fundamentos" class="${fz.classe}">${fz.nota}</td><td data-label="P/L">${fz.pe}</td><td data-label="ROE">${fz.roe}</td><td data-label="Volatilidade (ATR)">${fmtAtr(r.atrPct)}</td><td class="text-xs text-gray-400 cel-bloco">${r.details.join(', ')}</td></tr>`; }).join('')}</tbody></table>` : `<p class="text-gray-400">Nenhum ativo sobreviveu aos filtros atuais.</p>`;
+            if (filteredScreenerResults.length > 10) {
+                const tabela = screenerResultsContainer.querySelector('table');
+                tabela.classList.add('lista-recolhida');
+                const mais = document.createElement('button');
+                mais.type = 'button'; mais.id = 'screener-mostrar-todos'; mais.className = 'btn btn-secondary w-full mt-3 text-sm';
+                const rotulo = () => tabela.classList.contains('lista-recolhida') ? `Mostrar todos (${filteredScreenerResults.length}) ▾` : 'Mostrar só os 10 primeiros ▴';
+                mais.textContent = rotulo();
+                mais.addEventListener('click', () => { tabela.classList.toggle('lista-recolhida'); mais.textContent = rotulo(); });
+                screenerResultsContainer.appendChild(mais);
+            }
           } catch (err) {
             console.error('Erro no Screener:', err);
             screenerResultsContainer.innerHTML = `<p class="text-red-400">Erro ao executar o Screener: ${err && err.message ? err.message : err}</p>`;
