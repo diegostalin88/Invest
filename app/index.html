@@ -53,6 +53,30 @@
         .corr-high { background-color: #7f1d1d; } /* Alta correlação positiva (Perigo) */
         .corr-mid { background-color: #92400e; }
         .corr-low { background-color: #064e3b; } /* Correlação baixa/negativa (Bom para diversificar) */
+        /* ---- Sanfonas (seções que abrem e fecham) ---- */
+        .sanfona-cab { cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; user-select: none; margin-bottom: 0 !important; }
+        .sanfona-cab::after { content: ''; width: 0.6rem; height: 0.6rem; flex-shrink: 0; border-right: 2px solid #9ca3af; border-bottom: 2px solid #9ca3af; transform: rotate(-135deg); transition: transform 0.2s; margin-right: 0.25rem; }
+        .sanfona-fechada .sanfona-cab::after { transform: rotate(45deg); margin-top: -0.3rem; }
+        .sanfona-aberta .sanfona-cab { margin-bottom: 1rem !important; }
+        .sanfona-oculto { display: none !important; }
+        .card[data-sanfona] { transition: border-color 0.2s; }
+        .card[data-sanfona]:hover { border-color: #4b5563; }
+        /* ---- Visual geral ---- */
+        .card { border-radius: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5); }
+        .topo-app { position: sticky; top: 0; z-index: 30; background: rgba(17,24,39,0.85); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+        /* ---- Barra de módulos embaixo (celular e tablet) ---- */
+        #nav-inferior { display: none; }
+        @media (max-width: 1023px) {
+            #tabs-wrap { display: none; }
+            #nav-inferior { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+                background: rgba(17,24,39,0.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-top: 1px solid #374151;
+                padding: 0.35rem 0.25rem calc(0.35rem + env(safe-area-inset-bottom)); }
+            #nav-inferior button { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; padding: 0.3rem 0; border-radius: 0.75rem; color: #9ca3af; font-size: 0.68rem; font-weight: 600; line-height: 1.1; }
+            #nav-inferior button .ico { font-size: 1.25rem; line-height: 1; filter: grayscale(0.6); opacity: 0.8; }
+            #nav-inferior button.active { color: #a5b4fc; background: rgba(99,102,241,0.18); }
+            #nav-inferior button.active .ico { filter: none; opacity: 1; }
+            body { padding-bottom: calc(5rem + env(safe-area-inset-bottom)) !important; }
+        }
         /* ---- Celular ---- */
         @media (max-width: 640px) {
             body { padding: 0.75rem !important; }
@@ -74,10 +98,18 @@
 </head>
 <body class="p-4 md:p-8">
     <div class="max-w-screen-2xl mx-auto">
+        <div class="topo-app -mx-3 sm:-mx-4 md:-mx-8 px-3 sm:px-4 md:px-8 py-3 mb-4 flex items-center justify-between gap-3 border-b border-gray-800">
+            <div class="min-w-0">
+                <h1 class="text-xl sm:text-2xl font-bold truncate">📊 Invest <span class="text-gray-500 font-normal text-base hidden sm:inline">· Dashboard Quantitativo</span></h1>
+            </div>
+            <div id="market-switch" class="flex rounded-full overflow-hidden border border-gray-600 text-xs sm:text-sm shrink-0" role="group" aria-label="Mercado">
+                <button type="button" data-mercado="us" class="mercado-btn flex-1 px-3 py-2 whitespace-nowrap" title="EUA (Nasdaq/NYSE)">🇺🇸 EUA</button>
+                <button type="button" data-mercado="br" class="mercado-btn flex-1 px-3 py-2 whitespace-nowrap" title="Brasil (IBOVESPA)">🇧🇷 Brasil</button>
+            </div>
+        </div>
         <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
             <div>
-                <h1 class="text-2xl sm:text-4xl font-bold">Dashboard Quantitativo</h1>
-                <p class="text-gray-400">Arquitetura Fitschen/Kaufman: Walk-Forward & Paridade de Risco</p>
+                <p class="text-gray-400 text-sm">Arquitetura Fitschen/Kaufman: Walk-Forward & Paridade de Risco</p>
             </div>
             <div id="market-sentiment-module" class="card w-full md:w-96 hidden">
                 <h3 class="text-base font-bold mb-2">Filtro de Regime (Ativos > MME 200)</h3>
@@ -88,14 +120,8 @@
             </div>
         </div>
 
-        <div class="card mb-8 border-indigo-500 border-2">
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <h2 class="text-xl font-semibold text-indigo-400">Ingestão de Dados Temporais</h2>
-                <div id="market-switch" class="flex rounded-lg overflow-hidden border border-gray-600 text-sm" role="group" aria-label="Mercado">
-                    <button type="button" data-mercado="us" class="mercado-btn flex-1 px-3 py-2 sm:whitespace-nowrap">🇺🇸 EUA (Nasdaq/NYSE)</button>
-                    <button type="button" data-mercado="br" class="mercado-btn flex-1 px-3 py-2 sm:whitespace-nowrap">🇧🇷 Brasil (IBOVESPA)</button>
-                </div>
-            </div>
+        <div class="card mb-8 border-indigo-500 border-2" data-sanfona="aberta" id="sec-dados">
+            <h2 class="text-xl font-semibold text-indigo-400 mb-4">Dados e ativo em foco</h2>
             <div id="load-progress" class="mb-4">
                 <div class="flex justify-between text-sm text-gray-300 mb-1"><span id="load-progress-text">Carregando dados do último pregão…</span><span id="load-progress-pct">0%</span></div>
                 <div class="w-full bg-gray-700 rounded-full h-3"><div id="load-progress-bar" class="h-3 rounded-full bg-indigo-500" style="width: 0%; transition: width 0.2s;"></div></div>
@@ -118,7 +144,7 @@
         <!-- Resumo das "Melhores Opções" (Módulo 6), visível logo ao abrir -->
         <div id="melhores-opcoes-resumo" class="hidden mb-6"></div>
 
-        <div class="border-b border-gray-700 mb-6"><nav class="flex overflow-x-auto -mb-px" id="tabs">
+        <div class="border-b border-gray-700 mb-6" id="tabs-wrap"><nav class="flex overflow-x-auto -mb-px" id="tabs">
             <button class="tab-btn active shrink-0" data-tab="screener">Módulo 1: Screener</button>
             <button class="tab-btn shrink-0" data-tab="analysis">Módulo 2: Gráficos</button>
             <button class="tab-btn shrink-0" data-tab="backtest">Módulo 3: Backtest Base</button>
@@ -127,11 +153,20 @@
             <button class="tab-btn shrink-0 text-purple-400" data-tab="fundamentals">Módulo 6: Fundamentos</button>
         </nav></div>
 
+        <nav id="nav-inferior" aria-label="Módulos">
+            <button type="button" data-ir="screener" class="active"><span class="ico">🔍</span>Screener</button>
+            <button type="button" data-ir="analysis"><span class="ico">📈</span>Gráfico</button>
+            <button type="button" data-ir="backtest"><span class="ico">🧪</span>Backtest</button>
+            <button type="button" data-ir="walkforward"><span class="ico">🔁</span>Walk-F.</button>
+            <button type="button" data-ir="portfolio"><span class="ico">🔗</span>Correl.</button>
+            <button type="button" data-ir="fundamentals"><span class="ico">🏛️</span>Fund.</button>
+        </nav>
+
         <div id="tab-contents">
             <!-- Módulo 1 -->
             <div id="screener-content" class="tab-content active"><div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="lg:col-span-1 space-y-6 order-2 lg:order-1">
-                    <div class="card border-l-4 border-indigo-500">
+                    <div class="card border-l-4 border-indigo-500" data-sanfona="celular-fechada" id="sec-liquidez">
                         <h3 class="text-lg font-bold mb-4">A. Restrição de Liquidez</h3>
                         <div class="space-y-4 text-sm">
                             <label class="block"><span class="font-semibold text-indigo-300">Volume Financeiro Diário Mín. (<span class="moeda-simbolo">US$</span>):</span><input type="number" id="filter-adtv" value="50000000" class="w-full mt-1 bg-gray-900"></label>
@@ -140,7 +175,7 @@
                         </div>
                     </div>
 
-                    <div class="card border-l-4 border-yellow-500">
+                    <div class="card border-l-4 border-yellow-500" data-sanfona="celular-fechada" id="sec-estrategias">
                         <h3 class="text-lg font-bold mb-2">B. Screener de Estratégias</h3>
                         <p class="text-xs text-gray-400 mb-3">Filtra os ativos que dispararam, no último pregão, os sinais de uma estratégia específica (motor da versão 14). Usa os mesmos filtros de liquidez, volatilidade e regime do bloco A. Não altera o shortlist do Módulo 1 usado no Módulo 6.</p>
                         <select id="confluence-select" class="w-full">
@@ -179,19 +214,17 @@
                         <div class="flex gap-4 mt-4"><button id="run-filter-btn" class="btn btn-primary flex-1" disabled>Executar Filtro</button></div>
                     </div>
 
-                    <div class="card">
-                        <details open>
-                            <summary class="cursor-pointer font-semibold text-lg">C. Matriz de Pontuação Multi-Fatorial</summary>
-                            <div id="strategy-weights-container" class="space-y-2 text-sm mt-3 max-h-60 overflow-y-auto pr-2"></div>
-                             <button id="run-strategy-scoring-btn" class="btn btn-secondary w-full mt-4" disabled>Executar Motor de Rastreio</button>
-                        </details>
+                    <div class="card" data-sanfona="celular-fechada" id="sec-pesos">
+                        <h3 class="text-lg font-bold mb-3">C. Matriz de Pontuação Multi-Fatorial</h3>
+                        <div id="strategy-weights-container" class="space-y-2 text-sm max-h-60 overflow-y-auto pr-2"></div>
+                        <p class="text-xs text-gray-500 mt-3">Mudou um peso ou filtro? Toque em "Executar" no quadro de resultados.</p>
                     </div>
                 </div>
 
                 <div class="lg:col-span-2 card order-1 lg:order-2">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-lg font-bold">Vetor de Ativos Aprovados</h3>
-                        <button id="download-btn" class="btn btn-secondary text-sm" disabled>Exportar CSV</button>
+                        <div class="flex gap-2"><button id="run-strategy-scoring-btn" class="btn btn-primary text-sm" disabled title="Executar Motor de Rastreio com os filtros e pesos atuais">↻ Executar</button><button id="download-btn" class="btn btn-secondary text-sm" disabled>CSV</button></div>
                     </div>
                     <div id="estrategias-results" class="hidden mb-6"></div>
                     <div id="screener-loading" class="text-center py-10" style="display:none;">Processando Tensores...</div>
@@ -276,7 +309,7 @@
             
             <!-- Módulo 3 -->
             <div id="backtest-content" class="tab-content"><div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-1 space-y-6"><div class="card">
+                <div class="lg:col-span-1 space-y-6"><div class="card" data-sanfona="aberta" id="sec-risco">
                     <h3 class="text-lg font-bold mb-4">Parâmetros de Risco (Kaufman)</h3>
                     <div class="space-y-3">
                         <div class="flex items-center justify-between"><label class="text-sm font-medium">Capital Inicial:</label><input type="number" id="param-capital" value="10000" step="1000" class="w-32 text-right"></div>
@@ -302,7 +335,7 @@
             
             <!-- Módulo 4: Walk-Forward (NOVO) -->
             <div id="walkforward-content" class="tab-content"><div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div class="lg:col-span-3 card space-y-4">
+                <div class="lg:col-span-3 card space-y-4" data-sanfona="aberta" id="sec-wf">
                     <div>
                         <h3 class="text-lg font-bold mb-2">Walk-Forward Analysis</h3>
                         <p class="text-xs text-gray-400 mb-4">Divide o histórico para testar a estratégia em dados não vistos (Evita Curve Fitting).</p>
@@ -339,13 +372,13 @@
             <!-- Módulo 6: Fundamentos (NOVO) -->
             <div id="fundamentals-content" class="tab-content"><div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="lg:col-span-1 space-y-6 order-2 lg:order-1">
-                    <div class="card border-l-4 border-purple-500">
+                    <div class="card border-l-4 border-purple-500" data-sanfona="celular-fechada" id="sec-fund-info">
                         <h3 class="text-lg font-bold mb-2 text-purple-400">A. Fundamentos</h3>
                         <p id="fundamentos-explicacao-br" class="hidden text-xs text-gray-400 mb-4">Carregados automaticamente junto com os preços. Para o IBOVESPA, a coleta diária busca no Yahoo os fundamentos de todas as ações da carteira do índice (valores em R$), renovados a cada 7 dias. Não há radar de 8-K: esse é um documento da SEC americana, que empresas brasileiras não arquivam.</p>
                         <p id="fundamentos-explicacao-us" class="text-xs text-gray-400 mb-4">Carregados automaticamente junto com os preços. A coleta diária busca fundamentos (Yahoo, com reserva na SEC EDGAR), radar de 8-K e sinais de mercado para todo ativo com volume financeiro médio ≥ US$ 10 mi/dia; os índices são renovados a cada 7 dias e o radar de 8-K todo dia. Para usar um arquivo próprio, abra o "Modo manual (avançado)" no topo.</p>
                         <p id="fundamentals-status" class="text-xs text-gray-500 mt-2">Aguardando carregamento…</p>
                     </div>
-                    <div class="card">
+                    <div class="card" data-sanfona="celular-fechada" id="sec-fund-filtro">
                         <h3 class="text-lg font-bold mb-4">B. Filtro de Qualidade</h3>
                         <div class="space-y-3 text-sm">
                             <label class="block"><span>P/L Máximo:</span> <input type="number" id="fund-max-pe" value="25" step="1" class="w-full mt-1"></label>
@@ -399,8 +432,42 @@
             tabs.querySelector('.active').classList.remove('active'); e.target.classList.add('active');
             tabContents.querySelector('.active').classList.remove('active');
             document.getElementById(e.target.dataset.tab + '-content').classList.add('active');
+            document.querySelectorAll('#nav-inferior button').forEach(b => b.classList.toggle('active', b.dataset.ir === e.target.dataset.tab));
         }
     });
+    // Barra de módulos embaixo (celular/tablet): repassa o toque para a aba correspondente e volta ao topo do módulo
+    document.querySelectorAll('#nav-inferior button').forEach(b => b.addEventListener('click', () => {
+        tabs.querySelector(`[data-tab="${b.dataset.ir}"]`).click();
+        const alvo = document.getElementById('tab-contents');
+        const y = alvo.getBoundingClientRect().top + window.scrollY - 70;
+        if (window.scrollY > y) window.scrollTo({ top: y, behavior: 'smooth' });
+    }));
+
+    // SANFONAS: o título do cartão abre/fecha o conteúdo. "celular-fechada" começa fechada em telas < 1024 px.
+    // A escolha de cada seção fica lembrada no navegador.
+    function prepararSanfonas() {
+        const celular = window.matchMedia('(max-width: 1023px)').matches;
+        document.querySelectorAll('.card[data-sanfona]').forEach(card => {
+            const cab = card.querySelector('h2, h3'); if (!cab) return;
+            cab.classList.add('sanfona-cab'); cab.setAttribute('role', 'button'); cab.setAttribute('tabindex', '0');
+            const chave = 'invest-sanfona-' + (card.id || cab.textContent.trim());
+            let salvo = null; try { salvo = localStorage.getItem(chave); } catch (e) { /* sem armazenamento */ }
+            const abrir = salvo !== null ? salvo === '1' : !(card.dataset.sanfona === 'celular-fechada' && celular);
+            const aplicar = (aberta) => {
+                card.classList.toggle('sanfona-aberta', aberta); card.classList.toggle('sanfona-fechada', !aberta);
+                cab.setAttribute('aria-expanded', aberta ? 'true' : 'false');
+                // esconde tudo que não está no "caminho" do título até o cartão
+                for (let no = cab; no && no !== card; no = no.parentElement) {
+                    [...no.parentElement.children].forEach(irmao => { if (irmao !== no) irmao.classList.toggle('sanfona-oculto', !aberta); });
+                }
+            };
+            aplicar(abrir);
+            const alternar = () => { const aberta = !card.classList.contains('sanfona-aberta'); aplicar(aberta); try { localStorage.setItem(chave, aberta ? '1' : '0'); } catch (e) { /* ignora */ } };
+            cab.addEventListener('click', alternar);
+            cab.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternar(); } });
+        });
+    }
+    prepararSanfonas();
 
 
     // GLOBAIS
@@ -426,7 +493,7 @@
     function aplicarMercadoNaTela() {
         document.querySelectorAll('.mercado-btn').forEach(b => {
             const ativo = b.dataset.mercado === mercadoAtual;
-            b.className = 'mercado-btn flex-1 px-3 py-2 sm:whitespace-nowrap ' + (ativo ? 'bg-indigo-600 text-white font-semibold' : 'bg-gray-800 text-gray-300 hover:bg-gray-700');
+            b.className = 'mercado-btn flex-1 px-3 py-2 whitespace-nowrap ' + (ativo ? 'bg-indigo-600 text-white font-semibold' : 'bg-gray-800 text-gray-300 hover:bg-gray-700');
             b.setAttribute('aria-pressed', ativo ? 'true' : 'false');
             b.addEventListener('click', () => {
                 if (b.dataset.mercado === mercadoAtual) return;
@@ -818,7 +885,7 @@
 
             filteredScreenerResults = Object.entries(scoredAssets).map(([ticker, data]) => ({ ticker, score: data.score, details: data.strats, atrPct: data.atrPct })).sort((a, b) => b.score - a.score);
             const fmtAtr = (v) => v === null || v === undefined || isNaN(v) ? 's/dado' : v.toFixed(2) + '%';
-            screenerResultsContainer.innerHTML = filteredScreenerResults.length > 0 ? `<table class="results-table"><thead><tr><th>Ativo</th><th>Score</th><th title="Critérios fundamentalistas aprovados (limites do Módulo 6). Entre parênteses: quantos dos 5 têm dado">Fund.</th><th>P/L</th><th>ROE</th><th title="ATR de 14 períodos como % do preço — quanto maior, mais o ativo costuma se mover por dia">Volatilidade (ATR%)</th><th>Teses Confirmadas</th></tr></thead><tbody>${filteredScreenerResults.map(r => { const fz = resumoFundamentalista(r.ticker); return `<tr onclick="document.getElementById('ticker-select').value='${r.ticker}';"><td><b>${r.ticker}</b> <button type="button" class="text-xs text-indigo-300 underline ml-1" data-explicar="${r.ticker}" title="Ver por que foi selecionado">🔎</button></td><td>${r.score.toFixed(2)}</td><td class="${fz.classe}">${fz.nota}</td><td>${fz.pe}</td><td>${fz.roe}</td><td>${fmtAtr(r.atrPct)}</td><td class="text-xs text-gray-400">${r.details.join(', ')}</td></tr>`; }).join('')}</tbody></table>` : `<p class="text-gray-400">Nenhum ativo sobreviveu aos filtros atuais.</p>`;
+            screenerResultsContainer.innerHTML = filteredScreenerResults.length > 0 ? `<table class="results-table"><thead><tr><th>Ativo</th><th>Score</th><th title="Critérios fundamentalistas aprovados (limites do Módulo 6). Entre parênteses: quantos dos 5 têm dado">Fund.</th><th>P/L</th><th>ROE</th><th title="ATR de 14 períodos como % do preço — quanto maior, mais o ativo costuma se mover por dia">Volatilidade (ATR%)</th><th>Teses Confirmadas</th></tr></thead><tbody>${filteredScreenerResults.map(r => { const fz = resumoFundamentalista(r.ticker); return `<tr onclick="document.getElementById('ticker-select').value='${r.ticker}';"><td class="whitespace-nowrap"><b>${r.ticker}</b> <button type="button" class="text-xs text-indigo-300 underline ml-1" data-explicar="${r.ticker}" title="Ver por que foi selecionado">🔎</button></td><td>${r.score.toFixed(2)}</td><td class="${fz.classe}">${fz.nota}</td><td>${fz.pe}</td><td>${fz.roe}</td><td>${fmtAtr(r.atrPct)}</td><td class="text-xs text-gray-400">${r.details.join(', ')}</td></tr>`; }).join('')}</tbody></table>` : `<p class="text-gray-400">Nenhum ativo sobreviveu aos filtros atuais.</p>`;
           } catch (err) {
             console.error('Erro no Screener:', err);
             screenerResultsContainer.innerHTML = `<p class="text-red-400">Erro ao executar o Screener: ${err && err.message ? err.message : err}</p>`;

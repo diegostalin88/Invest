@@ -235,7 +235,15 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     const larg = await cel.page.evaluate(() => ({ doc: document.documentElement.scrollWidth, sw: document.getElementById('market-switch').getBoundingClientRect().right }));
     ok(larg.doc <= 390 && larg.sw <= 390, `celular: seletor de mercado sem rolagem lateral (${JSON.stringify(larg)})`);
     await cel.page.screenshot({ path: path.join(SHOTS, 'celular_brasil.png'), fullPage: false });
-    await cel.page.click('button[data-tab="analysis"]');
+    // Celular: módulos na barra de baixo e seções em sanfona (parâmetros começam fechados)
+    ok(await cel.page.isVisible('#nav-inferior') && await cel.page.isHidden('#tabs'), 'celular: módulos na barra de baixo');
+    ok(await cel.page.evaluate(() => document.getElementById('sec-liquidez').classList.contains('sanfona-fechada')) && await cel.page.isHidden('#filter-adtv'), 'celular: "A. Restrição de Liquidez" começa fechada');
+    await cel.page.click('#sec-liquidez h3');
+    ok(await cel.page.isVisible('#filter-adtv'), 'tocar no título abre a sanfona');
+    await cel.page.click('#nav-inferior [data-ir="fundamentals"]');
+    ok(await cel.page.isVisible('#fundamentals-content') && await cel.page.evaluate(() => document.querySelector('#nav-inferior [data-ir="fundamentals"]').classList.contains('active')), 'barra de baixo troca de módulo');
+    await cel.page.screenshot({ path: path.join(SHOTS, 'celular_layout.png'), fullPage: false });
+    await cel.page.click('#nav-inferior [data-ir="analysis"]');
     await cel.page.waitForSelector('#analysis-chart canvas', { timeout: 30000 });
     const largG = await cel.page.evaluate(() => document.documentElement.scrollWidth);
     ok(largG <= 390, `celular: gráfico sem rolagem lateral (${largG}px)`);
