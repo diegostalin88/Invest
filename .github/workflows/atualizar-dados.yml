@@ -1,0 +1,111 @@
+name: Atualizar dados
+
+on:
+  schedule:
+    # Seg a sex, 22:30 UTC: depois do fechamento da bolsa americana tanto no horário de verão
+    # (fecha 20:00 UTC) quanto no de inverno (fecha 21:00 UTC). O GitHub pode atrasar alguns minutos.
+    - cron: "30 22 * * 1-5"
+    # Dia 1 de cada mês: só o job "manter-ativo" (evita que o GitHub desative os agendamentos
+    # depois de 60 dias sem atividade no repositório).
+    - cron: "0 12 1 * *"
+  workflow_dispatch:
+    inputs:
+      ticker_limit:
+        description: "Modo teste: processar só os N primeiros tickers (vazio = universo completo)"
+        required: false
+        default: ""
+
+# Nenhuma permissão por padrão; cada job pede só o que precisa.
+permissions: {}
+
+concurrency:
+  group: atualizar-dados
+  cancel-in-progress: false
+
+jobs:
+  coletar:
+    name: Coletar dados e montar o site
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 22 * * 1-5'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: coleta/requirements.txt
+
+      - name: Instalar dependências
+        run: pip install -r coleta/requirements.txt
+
+      - name: Testes da coleta (sem rede)
+        run: python -m pytest -q coleta/tests
+
+      - name: Coletar preços e fundamentos
+        env:
+          SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+          TICKER_LIMIT: ${{ inputs.ticker_limit }}
+        run: python coleta/fetch_all.py --saida site/data
+
+      - name: Montar o site (app + dados)
+        run: |
+          cp -r app/. site/
+          touch site/.nojekyll
+          {
+            echo "### Arquivos publicados"
+            echo '```'
+            ls -la site site/data
+            du -sh site/data
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+
+      - name: Enviar artefato do Pages
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  publicar:
+    name: Publicar no GitHub Pages
+    needs: coletar
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Publicar
+        id: deploy
+        uses: actions/deploy-pages@v4
+
+  manter-ativo:
+    name: Manter agendamento ativo
+    if: github.event.schedule == '0 12 1 * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Registrar data (só um arquivinho de texto; nunca os dados)
+        run: |
+          mkdir -p status
+          date -u +"Última verificação automática: %Y-%m-%d %H:%M UTC" > status/ultima_execucao.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add status/ultima_execucao.txt
+          git commit -m "Mantém o agendamento ativo ($(date -u +%Y-%m-%d))" || echo "Nada a commitar"
+          git push
