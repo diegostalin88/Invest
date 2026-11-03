@@ -649,10 +649,11 @@ def _registro_vazio():
             'longName': None, 'price': None}
 
 
-def buscar_fundamento(ticker, price, sec_map):
+def buscar_fundamento(ticker, price, sec_map, sufixo_yahoo=''):
     """Mesma lógica do build_fundamentals original, para um ticker. Não inclui o radar de 8-K
-    (que roda à parte, para o pool inteiro). Devolve (registro, yahoo_respondeu, sucesso)."""
-    yf_data = fetch_from_yfinance(ticker)
+    (que roda à parte, para o pool inteiro). Devolve (registro, yahoo_respondeu, sucesso).
+    `sufixo_yahoo` = '.SA' para ações da B3 (o ticker guardado fica sem o sufixo)."""
+    yf_data = fetch_from_yfinance(ticker + sufixo_yahoo)
     n_fields = count_key_fields(yf_data)
     used = set()
     if yf_data and any(v is not None for v in yf_data.values()):
@@ -700,7 +701,7 @@ def precisa_atualizar(ticker, cache, hoje, validade=None):
 
 
 def atualizar_fundamentos(pool, cache, price_lookup, hoje, sec_map, orcamento_seg=None,
-                          dormir=True, relogio=time.monotonic):
+                          dormir=True, relogio=time.monotonic, sufixo_yahoo='', radar=True):
     """Aplica as regras de cache incremental e devolve (fundamentos, stats).
 
     - Re-busca no Yahoo só quem é novo no pool ou tem atualizadoEm com mais de
@@ -736,7 +737,7 @@ def atualizar_fundamentos(pool, cache, price_lookup, hoje, sec_map, orcamento_se
                 f"{stats['pendentes']} tickers ficam com o valor do cache.")
             break
         price = price_lookup.get(ticker)
-        registro, yahoo_ok, sucesso = buscar_fundamento(ticker, price, sec_map)
+        registro, yahoo_ok, sucesso = buscar_fundamento(ticker, price, sec_map, sufixo_yahoo)
         falhas_seguidas = 0 if yahoo_ok else falhas_seguidas + 1
         if sucesso:
             registro['atualizadoEm'] = hoje_iso
@@ -765,9 +766,14 @@ def atualizar_fundamentos(pool, cache, price_lookup, hoje, sec_map, orcamento_se
             reg.update({'fonte': 'indisponivel', 'atualizadoEm': None, 'alertaEvento': None, 'eventosCorporativos': []})
             saida[t] = reg
 
-    # Radar de 8-K: pool inteiro, todo dia.
-    log(f"Radar de 8-K para {len(pool)} tickers...")
+    # Radar de 8-K: pool inteiro, todo dia (só EUA; a B3 não arquiva 8-K na SEC).
+    if radar:
+        log(f"Radar de 8-K para {len(pool)} tickers...")
     for t in pool:
+        if not radar:
+            if price_lookup.get(t):
+                saida[t]['price'] = price_lookup[t]
+            continue
         cik = (sec_map or {}).get(t)
         ev = fetch_corporate_events(t, cik, hoje) if sec_map else {'ok': False}
         if ev.get('ok'):
@@ -800,9 +806,12 @@ def baixar_json_publicado(nome, base_url):
     return None
 
 
-def montar_manifesto(gerado_em, ultimo_pregao, anos, arquivos_precos, stats, avisos=None, tamanhos=None):
+def montar_manifesto(gerado_em, ultimo_pregao, anos, arquivos_precos, stats, avisos=None, tamanhos=None,
+                     mercado='us', moeda='USD'):
     return {
         'versao': VERSAO_MANIFESTO,
+        'mercado': mercado,
+        'moeda': moeda,
         'geradoEm': gerado_em,
         'ultimoPregao': ultimo_pregao,
         'anosHistorico': anos,
@@ -882,6 +891,7 @@ def main(argv=None):
     t0 = time.monotonic()
     ap = argparse.ArgumentParser(description="Coleta preços e fundamentos para o app Invest.")
     ap.add_argument('--saida', default='site/data', help='pasta de saída (padrão: site/data)')
+    ap.add_argument('--sem-brasil', action='store_true', help='não coletar o IBOVESPA')
     ap.add_argument('--url-publicado', default=os.environ.get('SITE_URL') or URL_DADOS_PUBLICADOS,
                     help='URL base dos dados já publicados (cache e portão de qualidade)')
     args = ap.parse_args(argv)
@@ -990,6 +1000,10 @@ def main(argv=None):
         linhas += ["", "### ⚠️ Avisos"] + [f"- {a}" for a in avisos]
     if erros:
         linhas += ["", "### Motivos do bloqueio (nada foi publicado; o site anterior continua no ar)"] + [f"- {e}" for e in erros]
+    elif not args.sem_brasil and os.environ.get('SEM_BRASIL', '') != '1':
+        # Brasil (IBOVESPA): roda depois e nunca bloqueia a publicação americana.
+        import brasil
+        linhas += brasil.coletar_brasil(os.path.join(args.saida, 'br'), args.url_publicado.rstrip('/') + '/br/', hoje)
     escrever_resumo(linhas)
     return 2 if erros else 0
 
