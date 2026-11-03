@@ -1,0 +1,15 @@
+# Pasta gerada pelo workflow / pela coleta local (app + dados)
+site/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# Dados gerados localmente (nunca commitar: vivem só no GitHub Pages)
+dados_mercado*.json
+fundamentos.json
+precos_*.json
+manifest.json
+screener_shortlist*.csv
