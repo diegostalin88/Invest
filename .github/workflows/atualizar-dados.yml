@@ -96,11 +96,16 @@ jobs:
         env:
           BASE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data
         run: |
-          mkdir -p site/data
-          curl -fsSL "$BASE/manifest.json" -o site/data/manifest.json
-          for f in $(python3 -c "import json;m=json.load(open('site/data/manifest.json'));print(' '.join(m['arquivosPrecos']+[m.get('arquivoFundamentos','fundamentos.json')]))"); do
-            curl -fsSL "$BASE/$f" -o "site/data/$f"
-          done
+          baixar() {  # $1 = URL base, $2 = pasta de destino
+            mkdir -p "$2"
+            curl -fsSL "$1/manifest.json" -o "$2/manifest.json" || return 1
+            for f in $(python3 -c "import json,sys;m=json.load(open(sys.argv[1]));print(' '.join(m['arquivosPrecos']+[m.get('arquivoFundamentos','fundamentos.json')]))" "$2/manifest.json"); do
+              curl -fsSL "$1/$f" -o "$2/$f" || return 1
+            done
+          }
+          baixar "$BASE" site/data
+          # Brasil é opcional: se ainda não existir (ou falhar), publica só os EUA
+          baixar "$BASE/br" site/data/br || { rm -rf site/data/br; echo "Brasil (IBOVESPA) ainda não publicado." >> "$GITHUB_STEP_SUMMARY"; }
           cp -r app/. site/
           echo "### App republicado com os dados de $(python3 -c "import json;print(json.load(open('site/data/manifest.json'))['ultimoPregao'])")" >> "$GITHUB_STEP_SUMMARY"
 
