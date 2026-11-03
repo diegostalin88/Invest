@@ -68,12 +68,23 @@
 
         <div class="card mb-8 border-indigo-500 border-2">
             <h2 class="text-xl font-semibold mb-4 text-indigo-400">Ingestão de Dados Temporais</h2>
+            <div id="load-progress" class="mb-4">
+                <div class="flex justify-between text-sm text-gray-300 mb-1"><span id="load-progress-text">Carregando dados do último pregão…</span><span id="load-progress-pct">0%</span></div>
+                <div class="w-full bg-gray-700 rounded-full h-3"><div id="load-progress-bar" class="h-3 rounded-full bg-indigo-500" style="width: 0%; transition: width 0.2s;"></div></div>
+            </div>
             <div class="flex flex-col md:flex-row gap-4 items-end">
-                <div class="flex-1"><label class="block text-sm font-medium text-gray-400 mb-1">Carregar Base de Dados (JSON)</label><input type="file" id="file-input" accept=".json" class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"></div>
                 <div class="flex-1"><label for="ticker-select" class="block text-sm font-medium text-gray-400 mb-1">Foco Analítico</label><select id="ticker-select" class="w-full"></select></div>
             </div>
             <div id="data-freshness-banner" class="mt-3 text-sm hidden"></div>
             <div id="app-message" class="hidden" role="status"></div>
+            <details id="manual-mode" class="mt-4 bg-gray-900 rounded-lg p-3">
+                <summary class="cursor-pointer text-sm font-semibold text-gray-300">Modo manual (avançado)</summary>
+                <p id="manual-mode-reason" class="text-xs text-gray-400 mt-2">Normalmente você não precisa disto: os dados são carregados sozinhos a cada abertura. Use só para testar com arquivos próprios.</p>
+                <div class="flex flex-col md:flex-row gap-4 mt-3">
+                    <div class="flex-1"><label class="block text-sm font-medium text-gray-400 mb-1">Preços (JSON no formato <code>{TICKER: {dates, open, ...}}</code> ou um <code>precos_NNN.json</code>)</label><input type="file" id="file-input" accept=".json" class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"></div>
+                    <div class="flex-1"><label class="block text-sm font-medium text-gray-400 mb-1">Fundamentos (<code>fundamentos.json</code>)</label><input type="file" id="fundamentals-file-input" accept=".json" class="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 cursor-pointer"></div>
+                </div>
+            </details>
         </div>
 
         <div class="border-b border-gray-700 mb-6"><nav class="flex overflow-x-auto -mb-px" id="tabs">
@@ -241,11 +252,9 @@
             <div id="fundamentals-content" class="tab-content"><div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="lg:col-span-1 space-y-6">
                     <div class="card border-l-4 border-purple-500">
-                        <h3 class="text-lg font-bold mb-2 text-purple-400">A. Carregar Fundamentos</h3>
-                        <p class="text-xs text-gray-400 mb-4">Gerado pelo script <code>fetch_fundamentals.py</code>, rodado localmente sobre o CSV exportado no Módulo 1 (botão "Exportar CSV").</p>
-                        <label class="block"><span class="text-sm font-medium text-gray-400">Arquivo fundamentos.json:</span>
-                        <input type="file" id="fundamentals-file-input" accept=".json" class="w-full mt-1 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 cursor-pointer"></label>
-                        <p id="fundamentals-status" class="text-xs text-gray-500 mt-2">Nenhum arquivo carregado.</p>
+                        <h3 class="text-lg font-bold mb-2 text-purple-400">A. Fundamentos</h3>
+                        <p class="text-xs text-gray-400 mb-4">Carregados automaticamente junto com os preços. A coleta diária busca fundamentos (Yahoo, com reserva na SEC EDGAR), radar de 8-K e sinais de mercado para todo ativo com volume financeiro médio ≥ US$ 10 mi/dia; os índices são renovados a cada 7 dias e o radar de 8-K todo dia. Para usar um arquivo próprio, abra o "Modo manual (avançado)" no topo.</p>
+                        <p id="fundamentals-status" class="text-xs text-gray-500 mt-2">Aguardando carregamento…</p>
                     </div>
                     <div class="card">
                         <h3 class="text-lg font-bold mb-4">B. Filtro de Qualidade</h3>
@@ -509,13 +518,109 @@
         const reader = new FileReader();
         reader.onload = (event) => {
             try {
-                inicializarComDados(JSON.parse(event.target.result));
+                inicializarComDados(expandirPrecos(JSON.parse(event.target.result)));
+                esconderProgresso();
             } catch (err) {
                 console.error('Erro ao ler JSON de preços:', err);
                 mostrarMensagem('Não consegui ler esse JSON de preços. Confira se é o arquivo gerado pela coleta.', 'erro');
             }
         }; reader.readAsText(file);
     });
+
+    // CARREGAMENTO AUTOMÁTICO (data/manifest.json + data/precos_NNN.json + data/fundamentos.json, publicados
+    // pelo GitHub Actions no mesmo domínio do app — sem CORS, sem script local, sem upload de arquivo).
+    // Os arquivos de preço vêm no formato "colunar-v1" (calendário de datas gravado uma vez por arquivo);
+    // expandirPrecos remonta exatamente o mesmo {TICKER: {dates, open, high, low, close, volume}} de antes.
+    function expandirPrecos(obj) {
+        if (!obj || obj.formato !== 'colunar-v1') return obj; // formato antigo {TICKER: {...}}
+        const cal = obj.datas; const saida = {};
+        for (const [t, a] of Object.entries(obj.ativos)) {
+            const n = a.close.length;
+            saida[t] = { dates: a.dates || cal.slice(a.i0, a.i0 + n), open: a.open, high: a.high, low: a.low, close: a.close, volume: a.volume };
+        }
+        return saida;
+    }
+
+    function atualizarProgresso(texto, frac) {
+        const pct = Math.max(0, Math.min(100, Math.round(frac * 100)));
+        document.getElementById('load-progress').classList.remove('hidden');
+        document.getElementById('load-progress-text').textContent = texto;
+        document.getElementById('load-progress-pct').textContent = pct + '%';
+        document.getElementById('load-progress-bar').style.width = pct + '%';
+    }
+    function esconderProgresso() { document.getElementById('load-progress').classList.add('hidden'); }
+
+    function mostrarModoManual(motivo) {
+        esconderProgresso();
+        const det = document.getElementById('manual-mode');
+        det.open = true;
+        document.getElementById('manual-mode-reason').innerHTML = `<span class="text-yellow-300 font-semibold">Não consegui carregar os dados automáticos (${motivo}).</span> Isso acontece quando a página é aberta direto do computador (<code>file://</code>), quando a primeira coleta ainda não rodou ou quando o GitHub Pages está fora do ar. Carregue os arquivos manualmente abaixo.`;
+        document.getElementById('fundamentals-status').textContent = 'Nenhum arquivo carregado.';
+        mostrarMensagem('Dados automáticos indisponíveis — use o "Modo manual (avançado)" abaixo.', 'aviso');
+    }
+
+    // Lê o corpo da resposta contando bytes (já descomprimidos) para alimentar a barra de progresso.
+    async function lerJsonComProgresso(resp, aoLer) {
+        if (!resp.body || !resp.body.getReader) { const txt = await resp.text(); aoLer(txt.length); return JSON.parse(txt); }
+        const reader = resp.body.getReader(); const partes = []; let total = 0;
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            partes.push(value); total += value.length; aoLer(value.length);
+        }
+        const tudo = new Uint8Array(total); let pos = 0;
+        for (const p of partes) { tudo.set(p, pos); pos += p.length; }
+        return JSON.parse(new TextDecoder('utf-8').decode(tudo));
+    }
+
+    async function buscar(url) {
+        const resp = await fetch(url, { cache: 'no-cache' }); // revalida no servidor: nunca usar dado velho do cache
+        if (!resp.ok) throw new Error(`HTTP ${resp.status} em ${url}`);
+        return resp;
+    }
+
+    async function carregarAutomaticamente() {
+        if (location.protocol === 'file:') { mostrarModoManual('página aberta como arquivo local'); return false; }
+        let manifest;
+        try {
+            atualizarProgresso('Buscando o manifesto dos dados…', 0.01);
+            manifest = await (await buscar('data/manifest.json')).json();
+            if (!manifest || !Array.isArray(manifest.arquivosPrecos) || manifest.arquivosPrecos.length === 0) throw new Error('manifesto inválido');
+        } catch (err) {
+            console.warn('Manifesto indisponível:', err);
+            mostrarModoManual('manifesto não encontrado');
+            return false;
+        }
+        const nAtivos = (manifest.stats && manifest.stats.tickersPrecos) || 0;
+        const rotulo = `Carregando ${nAtivos ? nAtivos.toLocaleString('pt-BR') + ' ' : ''}ativos…`;
+        const totalBytes = ((manifest.tamanhos && manifest.tamanhos.precosBytes) || 0) + ((manifest.tamanhos && manifest.tamanhos.fundamentosBytes) || 0);
+        const totalArquivos = manifest.arquivosPrecos.length + 1;
+        let lidos = 0, arquivosProntos = 0;
+        const progresso = () => atualizarProgresso(rotulo, totalBytes > 0 ? Math.min(lidos / totalBytes, 0.99) : arquivosProntos / totalArquivos);
+        progresso();
+        try {
+            const promPrecos = manifest.arquivosPrecos.map(nome => buscar('data/' + nome)
+                .then(r => lerJsonComProgresso(r, n => { lidos += n; progresso(); }))
+                .then(obj => { arquivosProntos++; progresso(); return expandirPrecos(obj); }));
+            const promFund = buscar('data/' + (manifest.arquivoFundamentos || 'fundamentos.json'))
+                .then(r => lerJsonComProgresso(r, n => { lidos += n; progresso(); }))
+                .then(obj => { arquivosProntos++; progresso(); return obj; })
+                .catch(err => { console.warn('Fundamentos indisponíveis:', err); return null; });
+            const partes = await Promise.all(promPrecos);
+            const fundamentos = await promFund;
+            const precos = Object.assign({}, ...partes);
+            atualizarProgresso('Preparando indicadores…', 1);
+            await new Promise(r => setTimeout(r, 30)); // deixa a barra pintar 100% antes do cálculo pesado
+            inicializarComDados(precos, fundamentos, { manifest });
+            if (!fundamentos) mostrarMensagem('Preços carregados, mas o arquivo de fundamentos não veio. O Módulo 6 fica sem dados até a próxima coleta.', 'aviso');
+            esconderProgresso();
+            return true;
+        } catch (err) {
+            console.error('Falha ao carregar os dados automáticos:', err);
+            mostrarModoManual('falha ao baixar os arquivos de preço');
+            return false;
+        }
+    }
 
     // MÓDULO 1: SCREENER
     runStrategyScoringBtn.addEventListener('click', () => {
@@ -948,6 +1053,9 @@
         html += '</tbody></table>';
         fundContainer.innerHTML = html;
     }
+
+    // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
+    carregarAutomaticamente();
 
     });
     </script>
