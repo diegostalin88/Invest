@@ -149,5 +149,6 @@ coleta/tests/                testes da coleta, sem rede
 testes_app/                  site de exemplo sintético + teste em navegador (Playwright)
 .github/workflows/           workflow "Atualizar dados"
 legado/                      GRAFICO16.html, fetch_data4.py e fetch_fundamentals.py originais (referência)
+docs/referencias.md          livros que embasam a estratégia, o que o app já usa de cada um e o que falta
 status/                      arquivinho atualizado mensalmente para manter o agendamento ativo
 ```
