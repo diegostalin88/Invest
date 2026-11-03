@@ -327,7 +327,8 @@
     // GLOBAIS
     let allData = {}; let filteredScreenerResults = []; let currentScreenerIndex = -1; let historicalRegimeData = [];
     let regimeByDateMap = {}; // data (YYYY-MM-DD) -> % de ativos acima da MME200 naquela data (amplitude de mercado histórica)
-    let fundamentalsData = {}; // ticker -> {pe, pb, roe, debtToEquity, netMargin, revenueGrowth, sector, ...} vindo do fetch_fundamentals.py
+    let fundamentalsData = {}; // ticker -> {pe, pb, roe, debtToEquity, netMargin, revenueGrowth, sector, ...} vindo da coleta (data/fundamentos.json)
+    let lastManifest = null; // data/manifest.json da coleta automática (null no modo manual)
     const PIVOT_WINDOW = 5; // pivôs de topo/fundo só são "confirmados" PIVOT_WINDOW candles depois (janela centrada olha p/ frente e p/ trás)
     const fileInput = document.getElementById('file-input'); const tickerSelect = document.getElementById('ticker-select');
     const runStrategyScoringBtn = document.getElementById('run-strategy-scoring-btn');
@@ -462,7 +463,9 @@
     }
 
     // BOOTSTRAP
-    function updateDataFreshnessBanner(data) {
+    // Cabeçalho de status: "Dados até DD/MM/AAAA · Fundamentos de N ativos · Atualizado em …".
+    // `meta.manifest` (quando os dados vieram da coleta automática) traz a data/hora da coleta e eventuais avisos.
+    function updateDataFreshnessBanner(data, meta = {}) {
         const banner = document.getElementById('data-freshness-banner');
         if (!banner) return;
         let maxDate = null;
@@ -478,17 +481,31 @@
         const today = new Date(); today.setHours(0, 0, 0, 0);
         const diffDays = Math.round((today - lastDate) / 86400000);
         const parts = maxDate.split('-'); const displayDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+        const manifest = meta.manifest || lastManifest;
+        if (meta.manifest) lastManifest = meta.manifest;
+        const nFund = Object.keys(fundamentalsData || {}).length;
+        const extras = [];
+        extras.push(nFund > 0 ? `Fundamentos de ${nFund.toLocaleString('pt-BR')} ativos` : 'Sem fundamentos');
+        if (manifest && manifest.geradoEm) {
+            const g = new Date(manifest.geradoEm);
+            if (!isNaN(g.getTime())) extras.push(`Atualizado em ${g.toLocaleDateString('pt-BR')} às ${g.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
+        } else {
+            extras.push('Carregado manualmente');
+        }
+        const sufixo = ' · ' + extras.join(' · ');
         banner.classList.remove('hidden');
         if (diffDays <= 4) {
             banner.className = 'mt-3 text-sm text-green-400';
-            banner.textContent = `✅ Dados até: ${displayDate} (${diffDays <= 0 ? 'hoje' : diffDays + (diffDays === 1 ? ' dia atrás' : ' dias atrás')})`;
+            banner.textContent = `✅ Dados até ${displayDate} (${diffDays <= 0 ? 'hoje' : diffDays + (diffDays === 1 ? ' dia atrás' : ' dias atrás')})${sufixo}`;
         } else if (diffDays <= 10) {
             banner.className = 'mt-3 text-sm text-yellow-400 font-semibold';
-            banner.textContent = `⚠️ Dados até: ${displayDate} — ${diffDays} dias atrás. Considere rodar o fetch_data4.py novamente antes de decidir operações.`;
+            banner.textContent = `⚠️ Dados até ${displayDate} — ${diffDays} dias atrás${sufixo}. A atualização automática pode ter falhado (confira a aba Actions do GitHub) — cuidado antes de decidir operações.`;
         } else {
             banner.className = 'mt-3 text-sm text-red-400 font-semibold';
-            banner.textContent = `🚨 Dados DESATUALIZADOS — até ${displayDate} (${diffDays} dias atrás). Scores e sinais podem estar obsoletos. Rode o fetch_data4.py para atualizar antes de usar esses resultados para decisões.`;
+            banner.textContent = `🚨 Dados DESATUALIZADOS — até ${displayDate} (${diffDays} dias atrás)${sufixo}. Scores e sinais podem estar obsoletos. Confira a aba Actions do GitHub (workflow "Atualizar dados") antes de usar esses resultados para decisões.`;
         }
+        const avisos = (manifest && Array.isArray(manifest.avisos)) ? manifest.avisos : [];
+        avisos.forEach(a => { const d = document.createElement('div'); d.className = 'text-xs text-yellow-400 font-normal mt-1'; d.textContent = '⚠️ ' + a; banner.appendChild(d); });
     }
 
     // Mensagem na própria página (substitui os alert() de carregamento, que podem passar despercebidos ou ser bloqueados)
@@ -699,9 +716,8 @@
     }
     runStrategyScoringBtn.addEventListener('click', () => executarScreener());
 
-    // Exporta o shortlist do Screener em CSV — serve de ponte para o fetch_fundamentals.py (rodar fundamentos
-    // só nos ativos que já passaram no filtro técnico, e não no universo inteiro, é o que torna viável usar
-    // fontes de dados fundamentalistas gratuitas sem tomar bloqueio por limite de taxa).
+    // Exporta o shortlist do Screener em CSV (para análise em planilha). Os fundamentos não dependem mais
+    // dele: a coleta diária já busca fundamentos para todo o pool líquido.
     downloadBtn.addEventListener('click', () => {
         if (filteredScreenerResults.length === 0) { alert('Execute o Screener (Módulo 1) primeiro — não há shortlist para exportar.'); return; }
         const header = 'Ticker,Score,Volatilidade (ATR%),Teses Confirmadas\n';
@@ -888,7 +904,7 @@
     });
 
     // MÓDULO 6: FUNDAMENTOS (cruza o shortlist técnico do Screener com dados fundamentalistas gerados
-    // offline pelo fetch_fundamentals.py — ver docstring daquele script para as fontes usadas)
+    // pela coleta diária, coleta/fetch_all.py — ver a docstring daquele script para as fontes usadas)
     function carregarFundamentos(dados) {
         fundamentalsData = dados || {};
         const n = Object.keys(fundamentalsData).length;
@@ -903,6 +919,7 @@
             try {
                 carregarFundamentos(JSON.parse(event.target.result));
                 mostrarMensagem(`Fundamentos de ${Object.keys(fundamentalsData).length.toLocaleString('pt-BR')} ativo(s) carregados.`, 'sucesso');
+                if (Object.keys(allData).length > 0) updateDataFreshnessBanner(allData);
                 if (filteredScreenerResults.length > 0) executarCruzamento();
             } catch (err) {
                 mostrarMensagem('Não consegui ler esse JSON de fundamentos. Confirme se é o fundamentos.json gerado pela coleta.', 'erro');
@@ -964,7 +981,7 @@
         return parts.map(p => `<div>${p}</div>`).join('');
     }
 
-    // Selo de evento corporativo (radar 8-K do SEC EDGAR, populado pelo fetch_fundamentals.py).
+    // Selo de evento corporativo (radar 8-K do SEC EDGAR, populado pela coleta diária).
     // 'critico' = falência, deslistagem, restatement contábil ou M&A/fusão detectados via 8-K recente;
     // 'atencao' = acordo material relevante ou conclusão de aquisição/venda, sem ser necessariamente crítico.
     function eventBadge(f) {
