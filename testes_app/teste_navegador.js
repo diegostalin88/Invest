@@ -239,28 +239,61 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     ok(errosBr.length === 0, `console sem erros na troca de mercado${errosBr.length ? ': ' + errosBr.join(' | ') : ''}`);
     await br.page.close();
 
-    // Celular: seletor de mercado cabe na tela
+    // Celular: casca nova (Início / Ranking / Testes / Mais), tela do ativo e gráfico em tela cheia
     const cel = await abrir(browser, BASE + '?mercado=br', false, { width: 390, height: 844 });
-    await cel.page.waitForFunction(() => /Brasil/.test(document.getElementById('data-freshness-banner').textContent), null, { timeout: 120000 });
+    await cel.page.waitForSelector('#am-top .am-linha', { timeout: 120000 });
+    ok(await cel.page.isVisible('.am-nav') && await cel.page.isHidden('#tabs'), 'celular: barra de baixo com Início / Ranking / Testes / Mais');
+    ok(/Brasil/.test(await cel.page.textContent('#am-sub')) && (await cel.page.$$('#am-melhores .am-opcao')).length > 0, 'celular: Início com data dos dados, clima e Melhores Opções');
     const larg = await cel.page.evaluate(() => ({ doc: document.documentElement.scrollWidth, sw: document.getElementById('market-switch').getBoundingClientRect().right }));
-    ok(larg.doc <= 390 && larg.sw <= 390, `celular: seletor de mercado sem rolagem lateral (${JSON.stringify(larg)})`);
-    await cel.page.screenshot({ path: path.join(SHOTS, 'celular_brasil.png'), fullPage: false });
-    // Celular: módulos na barra de baixo e seções em sanfona (parâmetros começam fechados)
-    ok(await cel.page.isVisible('#nav-inferior') && await cel.page.isHidden('#tabs'), 'celular: módulos na barra de baixo');
-    ok(await cel.page.evaluate(() => document.getElementById('sec-liquidez').classList.contains('sanfona-fechada')) && await cel.page.isHidden('#filter-adtv'), 'celular: "A. Restrição de Liquidez" começa fechada');
-    await cel.page.click('#sec-liquidez h3');
-    ok(await cel.page.isVisible('#filter-adtv'), 'tocar no título abre a sanfona');
-    await cel.page.click('#nav-inferior [data-ir="fundamentals"]');
-    ok(await cel.page.isVisible('#fundamentals-content') && await cel.page.evaluate(() => document.querySelector('#nav-inferior [data-ir="fundamentals"]').classList.contains('active')), 'barra de baixo troca de módulo');
-    await cel.page.screenshot({ path: path.join(SHOTS, 'celular_layout.png'), fullPage: false });
-    await cel.page.click('#nav-inferior [data-ir="screener"]');
-    const visual = await cel.page.evaluate(() => ({ fonte: parseFloat(getComputedStyle(document.documentElement).fontSize), thead: getComputedStyle(document.querySelector('#screener-results-container thead')).display, linha: getComputedStyle(document.querySelector('#screener-results-container tbody tr')).display, carrossel: getComputedStyle(document.querySelector('#melhores-opcoes-resumo .carrossel-opcoes')).display }));
-    ok(visual.fonte >= 17 && visual.thead === 'none' && visual.linha === 'block' && visual.carrossel === 'flex', `celular: letras maiores, lista em cartões e carrossel (${JSON.stringify(visual)})`);
-    await cel.page.click('#nav-inferior [data-ir="analysis"]');
-    await cel.page.waitForSelector('#analysis-chart canvas', { timeout: 30000 });
-    const largG = await cel.page.evaluate(() => document.documentElement.scrollWidth);
-    ok(largG <= 390, `celular: gráfico sem rolagem lateral (${largG}px)`);
-    await cel.page.locator('#analysis-content').screenshot({ path: path.join(SHOTS, 'celular_grafico.png') });
+    ok(larg.doc <= 390 && larg.sw <= 390, `celular: sem rolagem lateral (${JSON.stringify(larg)})`);
+    await cel.page.screenshot({ path: path.join(SHOTS, 'celular_inicio.png'), fullPage: false });
+    await cel.page.click('.am-nav [data-ir-pagina="ranking"]');
+    const nRank = await cel.page.$$eval('#am-ranking .am-linha', l => l.length);
+    ok(nRank > 0, `celular: Ranking com ${nRank} linhas`);
+    await cel.page.fill('#am-busca', 'PETR');
+    ok((await cel.page.$$eval('#am-ranking .am-linha', l => l.map(x => x.dataset.ativo))).includes('PETR4'), 'celular: busca acha PETR4');
+    await cel.page.fill('#am-busca', '');
+    await cel.page.click('#am-abrir-filtros');
+    ok(await cel.page.isVisible('#filter-adtv'), 'celular: filtros num painel que sobe de baixo');
+    await cel.page.fill('#filter-adtv', '0');
+    await cel.page.click('#am-aplicar-filtros');
+    await cel.page.waitForFunction(() => /aprovados/.test(document.getElementById('am-ranking-info').textContent), null, { timeout: 60000 });
+    ok(true, 'celular: "Aplicar" roda o ranking de novo');
+    // Tela do ativo
+    await cel.page.click('#am-ranking .am-linha');
+    await cel.page.waitForSelector('#am-ativo.aberta #am-mini canvas', { timeout: 15000 });
+    ok(/R\$/.test(await cel.page.textContent('#am-ativo-cab')), 'celular: tela do ativo com preço em R$');
+    const toque = await cel.page.evaluate(() => { const r = document.getElementById('am-mini-toque').getBoundingClientRect(); const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return el && el.id; });
+    ok(toque === 'am-mini-toque', 'celular: gráfico compacto não prende o dedo (camada de toque por cima)');
+    await cel.page.waitForTimeout(400);
+    await cel.page.screenshot({ path: path.join(SHOTS, 'celular_ativo.png'), fullPage: false });
+    await cel.page.click('#am-abas [data-aba="tecnica"]');
+    ok(/Score técnico/.test(await cel.page.textContent('#am-aba-conteudo')), 'celular: aba Técnica explica o score');
+    await cel.page.click('#am-abas [data-aba="fundamentos"]');
+    ok(/Nota fundamentalista/.test(await cel.page.textContent('#am-aba-conteudo')), 'celular: aba Fundamentos');
+    // Gráfico em tela cheia
+    await cel.page.click('#am-abrir-grafico');
+    await cel.page.waitForSelector('#am-grafico.aberta #analysis-chart canvas', { timeout: 30000 });
+    const altG = await cel.page.evaluate(() => document.getElementById('analysis-chart').getBoundingClientRect().height);
+    ok(altG > 300, `celular: gráfico em tela cheia (${Math.round(altG)} px de altura)`);
+    await cel.page.waitForTimeout(400);
+    await cel.page.screenshot({ path: path.join(SHOTS, 'celular_grafico.png'), fullPage: false });
+    await cel.page.goBack();
+    ok(await cel.page.isHidden('#am-grafico') && await cel.page.isVisible('#am-ativo'), 'celular: botão voltar do celular fecha o gráfico');
+    await cel.page.goBack();
+    ok(await cel.page.isHidden('#am-ativo'), 'celular: voltar de novo fecha o ativo');
+    // Testes e Mais
+    await cel.page.click('.am-nav [data-ir-pagina="testes"]');
+    await cel.page.click('#run-backtest-btn');
+    await cel.page.waitForSelector('#backtest-results-container .result-metric', { timeout: 30000 });
+    ok(true, 'celular: Backtest roda na aba Testes');
+    await cel.page.click('.am-nav [data-ir-pagina="mais"]');
+    await cel.page.click('[data-sub="fundamentos"]');
+    ok(await cel.page.isVisible('#fundamentals-results-container'), 'celular: Mais → Técnica × Fundamentos');
+    await cel.page.click('#fundamentals-results-container tbody tr[data-explicar]');
+    ok(await cel.page.isVisible('#am-ativo'), 'celular: tocar numa linha do Módulo 6 abre a tela do ativo');
+    const errosCel = cel.erros.filter(e => !IGNORAR.some(r => r.test(e)));
+    ok(errosCel.length === 0, `celular: console sem erros${errosCel.length ? ': ' + errosCel.join(' | ') : ''}`);
     await cel.page.close();
 
     // Brasil ainda não publicado: aviso claro e atalho para os EUA (sem abrir o modo manual)

@@ -115,11 +115,265 @@
             .result-metric .value { font-size: 1.45rem; }
             .checkbox-label { padding: 0.6rem 0.75rem; }
         }
+        /* =================== APP DO CELULAR (casca nova, < 1024 px) =================== */
+        #app-movel { display: none; }
+        .am-ico { width: 1.4rem; height: 1.4rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+        @media (max-width: 1023px) {
+            body.com-app-movel { padding: 0 !important; background: #0b0d12; }
+            body.com-app-movel > .max-w-screen-2xl { display: none !important; }
+            body.com-app-movel #app-movel { display: block; }
+            #app-movel { --fundo: #0b0d12; --sup: #151922; --sup2: #1c212c; --borda: #252b38; --txt: #f3f4f6; --mudo: #9aa3b2; --acento: #818cf8; --alta: #22c55e; --baixa: #f05252;
+                color: var(--txt); min-height: 100dvh; padding-bottom: calc(5.2rem + env(safe-area-inset-bottom)); }
+            .am-topo { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+                padding: calc(0.9rem + env(safe-area-inset-top)) 1.1rem 0.8rem; background: rgba(11,13,18,0.88); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+            .am-titulo { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+            .am-sub { font-size: 0.82rem; color: var(--mudo); margin-top: 0.2rem; display: flex; align-items: center; gap: 0.4rem; }
+            .am-ponto { width: 0.5rem; height: 0.5rem; border-radius: 999px; background: var(--alta); display: inline-block; }
+            .am-ponto.velho { background: #f59e0b; } .am-ponto.muito-velho { background: var(--baixa); }
+            #app-movel #market-switch { border-color: var(--borda); }
+            .am-pagina { display: none; padding: 0.25rem 1.1rem 1rem; }
+            .am-pagina.ativa { display: block; animation: fadeIn 0.25s; }
+            .am-secao { display: flex; align-items: center; justify-content: space-between; font-size: 1.15rem; font-weight: 700; margin: 1.6rem 0 0.75rem; }
+            .am-secao button { font-size: 0.9rem; font-weight: 600; color: var(--acento); display: flex; align-items: center; }
+            .am-card { background: var(--sup); border: 1px solid var(--borda); border-radius: 1.25rem; padding: 1.1rem; }
+            .am-clima-num { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; }
+            .am-barra { height: 0.5rem; border-radius: 999px; background: #2a3040; overflow: hidden; margin: 0.7rem 0 0.4rem; }
+            .am-barra > div { height: 100%; border-radius: 999px; }
+            .am-carrossel { display: flex; gap: 0.75rem; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -1.1rem; padding: 0 1.1rem 0.3rem; scrollbar-width: none; }
+            .am-carrossel::-webkit-scrollbar { display: none; }
+            .am-opcao { flex: 0 0 15.5rem; scroll-snap-align: start; background: linear-gradient(160deg, #1f2433, #151922); border: 1px solid var(--borda); border-radius: 1.25rem; padding: 1.1rem; text-align: left; }
+            .am-opcao .am-tk { font-size: 1.35rem; font-weight: 700; }
+            .am-opcao .am-nome { font-size: 0.85rem; color: var(--mudo); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .am-opcao .am-grande { font-size: 2.1rem; font-weight: 700; color: var(--alta); margin-top: 0.6rem; letter-spacing: -0.02em; }
+            .am-lista { background: var(--sup); border: 1px solid var(--borda); border-radius: 1.25rem; overflow: hidden; }
+            .am-linha { display: flex; align-items: center; gap: 0.8rem; width: 100%; padding: 0.95rem 1rem; text-align: left; border-bottom: 1px solid var(--borda); }
+            .am-linha:last-child { border-bottom: 0; }
+            .am-linha:active { background: var(--sup2); }
+            .am-avatar { width: 2.6rem; height: 2.6rem; border-radius: 999px; display: grid; place-items: center; font-weight: 700; font-size: 0.85rem; flex-shrink: 0; color: #fff; }
+            .am-linha .am-meio { flex: 1; min-width: 0; }
+            .am-linha .am-tk { font-size: 1.08rem; font-weight: 700; }
+            .am-linha .am-nome { font-size: 0.82rem; color: var(--mudo); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .am-linha .am-dir { text-align: right; flex-shrink: 0; }
+            .am-preco { font-size: 1.02rem; font-weight: 600; }
+            .am-var { font-size: 0.85rem; font-weight: 600; }
+            .am-var.alta { color: var(--alta); } .am-var.baixa { color: var(--baixa); }
+            .am-chip { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; background: rgba(129,140,248,0.14); color: #c7d2fe; }
+            .am-chip.verde { background: rgba(34,197,94,0.14); color: #86efac; } .am-chip.amarelo { background: rgba(245,158,11,0.14); color: #fcd34d; } .am-chip.vermelho { background: rgba(240,82,82,0.15); color: #fca5a5; }
+            .am-spark { width: 3.6rem; height: 1.8rem; flex-shrink: 0; }
+            .am-busca { display: flex; align-items: center; gap: 0.6rem; background: var(--sup); border: 1px solid var(--borda); border-radius: 999px; padding: 0.7rem 1rem; color: var(--mudo); }
+            .am-busca input { background: transparent !important; border: 0 !important; padding: 0 !important; box-shadow: none !important; color: var(--txt); flex: 1; font-size: 1rem; }
+            .am-filtros { display: flex; gap: 0.5rem; overflow-x: auto; margin: 0.9rem -1.1rem 0.9rem; padding: 0 1.1rem; scrollbar-width: none; }
+            .am-filtros::-webkit-scrollbar { display: none; }
+            .am-pilula { flex-shrink: 0; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.95rem; border-radius: 999px; border: 1px solid var(--borda); background: var(--sup); color: var(--txt); font-size: 0.9rem; font-weight: 600; }
+            .am-pilula.ativa { background: #eef0ff; color: #111827; border-color: #eef0ff; }
+            .am-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: repeat(4, 1fr);
+                background: rgba(11,13,18,0.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--borda); padding: 0.45rem 0.5rem calc(0.45rem + env(safe-area-inset-bottom)); }
+            .am-nav button { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; padding: 0.35rem 0; color: var(--mudo); font-size: 0.75rem; font-weight: 600; }
+            .am-nav button.ativa { color: var(--txt); }
+            .am-nav button.ativa .am-ico { stroke-width: 2.3; color: var(--acento); }
+            .am-aviso { font-size: 0.78rem; color: #6b7280; margin-top: 1.4rem; text-align: center; }
+            /* Telas sobrepostas (ativo, gráfico, subpáginas) */
+            .am-tela { position: fixed; inset: 0; z-index: 50; background: var(--fundo); overflow-y: auto; display: none; padding-bottom: calc(2rem + env(safe-area-inset-bottom)); }
+            .am-tela.aberta { display: block; animation: entrar 0.22s ease-out; }
+            @keyframes entrar { from { transform: translateX(12%); opacity: 0.4; } to { transform: none; opacity: 1; } }
+            .am-tela-topo { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 0.5rem; padding: calc(0.7rem + env(safe-area-inset-top)) 0.6rem 0.7rem; background: rgba(11,13,18,0.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+            .am-voltar { width: 2.6rem; height: 2.6rem; border-radius: 999px; display: grid; place-items: center; color: var(--txt); }
+            .am-voltar:active { background: var(--sup2); }
+            .am-tela-titulo { font-size: 1.15rem; font-weight: 700; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .am-tela-corpo { padding: 0 1.1rem; }
+            .am-preco-grande { font-size: 2.4rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; }
+            .am-mini-grafico { position: relative; height: 15rem; margin: 0.8rem -1.1rem 0; }
+            .am-mini-grafico .am-toque { position: absolute; inset: 0; z-index: 3; }
+            .am-periodos { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.4rem; }
+            .am-periodos button { flex: 1; padding: 0.45rem 0; border-radius: 999px; font-size: 0.85rem; font-weight: 600; color: var(--mudo); }
+            .am-periodos button.ativa { background: var(--sup2); color: var(--txt); }
+            .am-periodos .am-cheia { flex: 0 0 auto; padding: 0.45rem 0.7rem; color: var(--acento); display: flex; align-items: center; gap: 0.3rem; }
+            .am-abas { display: flex; gap: 1.4rem; border-bottom: 1px solid var(--borda); margin: 1.3rem 0 1rem; }
+            .am-abas button { padding: 0.7rem 0; font-weight: 600; color: var(--mudo); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+            .am-abas button.ativa { color: var(--txt); border-color: var(--acento); }
+            .am-grade { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+            .am-dado { background: var(--sup); border: 1px solid var(--borda); border-radius: 1rem; padding: 0.8rem 0.9rem; }
+            .am-dado .r { font-size: 0.78rem; color: var(--mudo); } .am-dado .v { font-size: 1.12rem; font-weight: 700; margin-top: 0.15rem; }
+            .am-botao { display: flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; padding: 0.95rem; border-radius: 999px; font-weight: 700; font-size: 1rem; background: var(--acento); color: #0b0d12; }
+            .am-botao.sec { background: var(--sup2); color: var(--txt); border: 1px solid var(--borda); }
+            #am-ativo .results-table { font-size: 0.9rem; } #am-ativo .results-table th, #am-ativo .results-table td { padding: 0.55rem 0.4rem; }
+            /* Gráfico em tela cheia: aqui sim o gráfico responde ao dedo */
+            #am-grafico { overflow: hidden; }
+            #am-grafico .tab-content { display: block !important; }
+            #am-grafico #analysis-content > .card { background: transparent; border: 0; box-shadow: none; padding: 0 0.6rem; border-radius: 0; }
+            #am-grafico #chart-fundamentos, #am-grafico .grafico-modo-legenda { display: none; }
+            #am-grafico #grafico-app > div:first-child { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+            #am-grafico #analysis-chart { height: calc(100dvh - 15.5rem) !important; min-height: 16rem; }
+            #am-grafico.com-paineis #analysis-chart { height: calc(100dvh - 15.5rem - var(--paineis, 0px)) !important; }
+            #am-grafico #tv-widget { height: calc(100dvh - 11rem) !important; }
+            /* Subpáginas do "Mais" e da aba Testes: reaproveitam os quadros do app */
+            #app-movel .tab-content, .am-tela .tab-content { display: block !important; animation: none; }
+            #app-movel .card, .am-tela .card { background: var(--sup); border-color: var(--borda); border-radius: 1.25rem; box-shadow: none; }
+            .am-segmento { display: flex; background: var(--sup); border: 1px solid var(--borda); border-radius: 999px; padding: 0.25rem; margin-bottom: 1rem; }
+            .am-segmento button { flex: 1; padding: 0.6rem; border-radius: 999px; font-weight: 600; color: var(--mudo); }
+            .am-segmento button.ativa { background: var(--sup2); color: var(--txt); }
+            /* Painel que sobe de baixo (filtros) */
+            .am-folha-fundo { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,0.6); display: none; }
+            .am-folha-fundo.aberta { display: block; }
+            .am-folha { position: fixed; left: 0; right: 0; bottom: 0; z-index: 61; max-height: 88dvh; overflow-y: auto; background: #12151c; border-top-left-radius: 1.5rem; border-top-right-radius: 1.5rem;
+                border-top: 1px solid var(--borda); transform: translateY(105%); transition: transform 0.25s ease-out; padding: 0.5rem 1.1rem calc(1.2rem + env(safe-area-inset-bottom)); }
+            .am-folha.aberta { transform: none; }
+            .am-folha .am-alca { width: 2.6rem; height: 0.3rem; border-radius: 999px; background: #3a4150; margin: 0.4rem auto 0.9rem; }
+            .am-folha .card { margin-bottom: 0.8rem; }
+            body.travado { overflow: hidden; }
+            .am-chip { white-space: nowrap; }
+            .am-spark { width: 3rem; }
+            .am-mini-grafico { height: 13rem; }
+            /* Explicação dentro da tela do ativo: linhas em vez de tabela larga */
+            #am-ativo h4 { display: none; }
+            #am-ativo .tab-tec thead, #am-ativo .tab-fund thead { display: none; }
+            #am-ativo .tab-tec, #am-ativo .tab-fund { display: block; background: var(--sup); border: 1px solid var(--borda); border-radius: 1.1rem; overflow: hidden; margin-top: 0; }
+            #am-ativo .tab-tec tbody, #am-ativo .tab-fund tbody, #am-ativo .tab-tec tfoot, #am-ativo .tab-fund tfoot { display: block; }
+            #am-ativo .tab-tec tr, #am-ativo .tab-fund tr { display: grid; grid-template-columns: 1.7rem 1fr auto; column-gap: 0.5rem; align-items: center; padding: 0.8rem 0.9rem; border-bottom: 1px solid var(--borda); }
+            #am-ativo .tab-tec td, #am-ativo .tab-fund td { padding: 0 !important; border: 0 !important; font-size: 0.98rem; }
+            #am-ativo .tab-tec td:nth-child(3) { grid-column: 2 / 4; grid-row: 2; font-size: 0.82rem !important; color: var(--mudo); margin-top: 0.25rem; }
+            #am-ativo .tab-tec td:nth-child(4) { grid-column: 3; grid-row: 1; }
+            #am-ativo .tab-fund td:nth-child(3) { font-weight: 700; }
+            #am-ativo .tab-fund td:nth-child(4) { grid-column: 2 / 4; grid-row: 2; font-size: 0.8rem !important; margin-top: 0.15rem; }
+            #am-ativo tfoot tr { display: flex !important; justify-content: space-between; background: var(--sup2); border-bottom: 0 !important; }
+            #am-ativo tfoot td:first-child { display: none; }
+            #am-ativo tbody tr:hover { background: transparent; cursor: default; }
+            /* Barra de ferramentas compacta no gráfico em tela cheia */
+            #am-grafico #chart-ticker-label { display: none; }
+            #am-grafico #analysis-content > .card > div:first-child { flex-direction: row; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+            #am-grafico #analysis-content > .card > div:first-child > div:last-child { flex: 0 0 auto; }
+            #am-grafico .grafico-modo-btn { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
+            #am-grafico #prev-chart-btn, #am-grafico #next-chart-btn { padding: 0.35rem 0.8rem; border-radius: 999px; }
+            #am-grafico #grafico-app > div:first-child { gap: 0.4rem !important; padding: 0 0 0.4rem !important; background: transparent !important; margin-bottom: 0.3rem !important; }
+            #am-grafico .checkbox-label { flex-shrink: 0; padding: 0.35rem 0.7rem; font-size: 0.8rem; border-radius: 999px; white-space: nowrap; background: var(--sup2); border-color: var(--borda); }
+            #am-grafico .checkbox-label input { width: 0.9rem; height: 0.9rem; margin-right: 0.4rem; }
+            #am-grafico #grafico-app > div:first-child > span { display: none; }
+            #am-grafico #chart-legenda { font-size: 0.72rem; line-height: 1.25; min-height: 2.2rem; }
+            #am-grafico .periodo-btn { border-radius: 999px; }
+            #am-grafico #grafico-app .flex.flex-wrap.gap-2.mt-2 > span { display: none; }
+        }
         /* Tabelas largas rolam de lado dentro do cartão, sem estourar a página */
         .overflow-x-auto { -webkit-overflow-scrolling: touch; }
     </style>
 </head>
 <body class="p-4 md:p-8">
+    <!-- =================== APP DO CELULAR (casca nova) =================== -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <symbol id="i-inicio" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9v11.5h13V9"/><path d="M10 20.5v-6h4v6"/></symbol>
+        <symbol id="i-ranking" viewBox="0 0 24 24"><path d="M4 20V11"/><path d="M10 20V5"/><path d="M16 20v-6"/><path d="M22 20H2"/></symbol>
+        <symbol id="i-testes" viewBox="0 0 24 24"><path d="M9 3h6"/><path d="M10 3v6.5L4.6 18.6A1.6 1.6 0 0 0 6 21h12a1.6 1.6 0 0 0 1.4-2.4L14 9.5V3"/><path d="M7.5 15h9"/></symbol>
+        <symbol id="i-mais" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></symbol>
+        <symbol id="i-dir" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+        <symbol id="i-esq" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+        <symbol id="i-cheia" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></symbol>
+        <symbol id="i-busca" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.2-4.2"/></symbol>
+        <symbol id="i-filtro" viewBox="0 0 24 24"><path d="M4 6h9"/><path d="M17 6h3"/><circle cx="15" cy="6" r="2"/><path d="M4 12h3"/><path d="M11 12h9"/><circle cx="9" cy="12" r="2"/><path d="M4 18h11"/><path d="M19 18h1"/><circle cx="17" cy="18" r="2"/></symbol>
+        <symbol id="i-alvo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+        <symbol id="i-tabela" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M9 10v10"/></symbol>
+        <symbol id="i-rede" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8 7.5 10.8 16"/><path d="M16 7.5 13.2 16"/><path d="M8.5 6h7"/></symbol>
+        <symbol id="i-dados" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="8" ry="2.5"/><path d="M4 5.5v6c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5v-6"/><path d="M4 11.5v6c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5v-6"/></symbol>
+    </svg>
+    <div id="app-movel">
+        <header class="am-topo">
+            <div class="min-w-0">
+                <div class="am-titulo" id="am-titulo">Início</div>
+                <div class="am-sub"><span class="am-ponto" id="am-ponto"></span><span id="am-sub">Carregando dados…</span></div>
+            </div>
+            <div id="am-mercado-slot"></div>
+        </header>
+
+        <section class="am-pagina ativa" data-pagina="inicio">
+            <div id="am-avisos"></div>
+            <div class="am-card" id="am-clima"><div class="text-sm" style="color:var(--mudo)">Clima do mercado</div><div class="am-clima-num">—</div></div>
+            <div class="am-secao">Melhores opções <button type="button" data-ir-pagina="ranking">Ranking <svg class="am-ico" style="width:1.1rem;height:1.1rem"><use href="#i-dir"/></svg></button></div>
+            <div class="am-carrossel" id="am-melhores"></div>
+            <div class="am-secao">Top 10 do ranking técnico</div>
+            <div class="am-lista" id="am-top"></div>
+            <p class="am-aviso">Ferramenta de apoio à análise. Não é recomendação de investimento.</p>
+        </section>
+
+        <section class="am-pagina" data-pagina="ranking">
+            <label class="am-busca"><svg class="am-ico"><use href="#i-busca"/></svg><input id="am-busca" type="search" placeholder="Buscar ativo (ex.: PETR4, AAPL)" autocomplete="off"></label>
+            <div class="am-filtros" id="am-ordem">
+                <button type="button" class="am-pilula" id="am-abrir-filtros"><svg class="am-ico" style="width:1.1rem;height:1.1rem"><use href="#i-filtro"/></svg>Filtros</button>
+                <button type="button" class="am-pilula ativa" data-ordem="score">Score técnico</button>
+                <button type="button" class="am-pilula" data-ordem="combinado">Score combinado</button>
+                <button type="button" class="am-pilula" data-ordem="variacao">Variação do dia</button>
+                <button type="button" class="am-pilula" data-ordem="volatilidade">Volatilidade</button>
+            </div>
+            <div class="text-sm mb-2" style="color:var(--mudo)" id="am-ranking-info"></div>
+            <div class="am-lista" id="am-ranking"></div>
+            <button type="button" class="am-botao sec mt-3 hidden" id="am-ranking-mais">Mostrar mais</button>
+        </section>
+
+        <section class="am-pagina" data-pagina="testes">
+            <div class="am-card mb-3"><div class="text-sm mb-2" style="color:var(--mudo)">Ativo testado</div><div id="am-slot-ticker"></div></div>
+            <div class="am-segmento" id="am-seg-testes">
+                <button type="button" class="ativa" data-teste="backtest">Backtest</button>
+                <button type="button" data-teste="walkforward">Walk-Forward</button>
+            </div>
+            <div id="am-slot-backtest"></div>
+            <div id="am-slot-walkforward" class="hidden"></div>
+        </section>
+
+        <section class="am-pagina" data-pagina="mais">
+            <div class="am-lista">
+                <button type="button" class="am-linha" data-sub="estrategias"><span class="am-avatar" style="background:#4338ca"><svg class="am-ico"><use href="#i-alvo"/></svg></span><span class="am-meio"><span class="am-tk block">Screener de Estratégias</span><span class="am-nome block">Ativos que dispararam uma estratégia hoje</span></span><svg class="am-ico" style="color:var(--mudo)"><use href="#i-dir"/></svg></button>
+                <button type="button" class="am-linha" data-sub="fundamentos"><span class="am-avatar" style="background:#7e22ce"><svg class="am-ico"><use href="#i-tabela"/></svg></span><span class="am-meio"><span class="am-tk block">Técnica × Fundamentos</span><span class="am-nome block">Tabela completa e limites de qualidade</span></span><svg class="am-ico" style="color:var(--mudo)"><use href="#i-dir"/></svg></button>
+                <button type="button" class="am-linha" data-sub="correlacao"><span class="am-avatar" style="background:#047857"><svg class="am-ico"><use href="#i-rede"/></svg></span><span class="am-meio"><span class="am-tk block">Correlação (Pearson)</span><span class="am-nome block">Evite comprar ativos que andam juntos</span></span><svg class="am-ico" style="color:var(--mudo)"><use href="#i-dir"/></svg></button>
+                <button type="button" class="am-linha" data-sub="dados"><span class="am-avatar" style="background:#374151"><svg class="am-ico"><use href="#i-dados"/></svg></span><span class="am-meio"><span class="am-tk block">Dados e atualização</span><span class="am-nome block">Data da coleta, avisos e modo manual</span></span><svg class="am-ico" style="color:var(--mudo)"><use href="#i-dir"/></svg></button>
+            </div>
+            <p class="am-aviso">Ferramenta de apoio à análise. Não é recomendação de investimento.<br>Gráficos: <a href="https://www.tradingview.com/" target="_blank" rel="noopener" class="underline">TradingView Lightweight Charts</a>.</p>
+        </section>
+
+        <nav class="am-nav" aria-label="Navegação">
+            <button type="button" data-ir-pagina="inicio" class="ativa"><svg class="am-ico"><use href="#i-inicio"/></svg>Início</button>
+            <button type="button" data-ir-pagina="ranking"><svg class="am-ico"><use href="#i-ranking"/></svg>Ranking</button>
+            <button type="button" data-ir-pagina="testes"><svg class="am-ico"><use href="#i-testes"/></svg>Testes</button>
+            <button type="button" data-ir-pagina="mais"><svg class="am-ico"><use href="#i-mais"/></svg>Mais</button>
+        </nav>
+
+        <!-- Tela do ativo -->
+        <div class="am-tela" id="am-ativo" role="dialog" aria-modal="true">
+            <div class="am-tela-topo"><button type="button" class="am-voltar" data-fechar-tela aria-label="Voltar"><svg class="am-ico"><use href="#i-esq"/></svg></button><div class="am-tela-titulo" id="am-ativo-titulo"></div></div>
+            <div class="am-tela-corpo">
+                <div id="am-ativo-cab"></div>
+                <div class="am-mini-grafico"><div id="am-mini" style="height:100%"></div><button type="button" class="am-toque" id="am-mini-toque" aria-label="Abrir gráfico em tela cheia"></button></div>
+                <div class="am-periodos" id="am-periodos">
+                    <button type="button" data-meses="1">1M</button><button type="button" data-meses="3">3M</button><button type="button" data-meses="6" class="ativa">6M</button><button type="button" data-meses="12">1A</button><button type="button" data-meses="0">Tudo</button>
+                    <button type="button" class="am-cheia" id="am-abrir-grafico"><svg class="am-ico" style="width:1.1rem;height:1.1rem"><use href="#i-cheia"/></svg>Tela cheia</button>
+                </div>
+                <div class="am-abas" id="am-abas"><button type="button" class="ativa" data-aba="resumo">Resumo</button><button type="button" data-aba="tecnica">Técnica</button><button type="button" data-aba="fundamentos">Fundamentos</button></div>
+                <div id="am-aba-conteudo"></div>
+            </div>
+        </div>
+
+        <!-- Gráfico em tela cheia -->
+        <div class="am-tela" id="am-grafico" role="dialog" aria-modal="true">
+            <div class="am-tela-topo"><button type="button" class="am-voltar" data-fechar-tela aria-label="Fechar gráfico"><svg class="am-ico"><use href="#i-esq"/></svg></button><div class="am-tela-titulo" id="am-grafico-titulo">Gráfico</div></div>
+            <div id="am-slot-grafico"></div>
+        </div>
+
+        <!-- Subpáginas do "Mais" -->
+        <div class="am-tela" id="am-sub-tela" role="dialog" aria-modal="true">
+            <div class="am-tela-topo"><button type="button" class="am-voltar" data-fechar-tela aria-label="Voltar"><svg class="am-ico"><use href="#i-esq"/></svg></button><div class="am-tela-titulo" id="am-sub-titulo"></div></div>
+            <div class="am-tela-corpo">
+                <div data-sub-slot="estrategias" class="hidden space-y-4"></div>
+                <div data-sub-slot="fundamentos" class="hidden"></div>
+                <div data-sub-slot="correlacao" class="hidden"></div>
+                <div data-sub-slot="dados" class="hidden space-y-4"></div>
+            </div>
+        </div>
+
+        <!-- Painel de filtros que sobe de baixo -->
+        <div class="am-folha-fundo" id="am-folha-fundo"></div>
+        <div class="am-folha" id="am-folha" role="dialog" aria-modal="true" aria-label="Filtros do ranking">
+            <div class="am-alca"></div>
+            <div class="flex items-center justify-between mb-3"><div class="text-lg font-bold">Filtros do ranking</div><button type="button" class="text-sm font-semibold" style="color:var(--acento)" id="am-fechar-folha">Fechar</button></div>
+            <div id="am-slot-filtros"></div>
+            <button type="button" class="am-botao" id="am-aplicar-filtros">Aplicar e atualizar ranking</button>
+        </div>
+    </div>
     <div class="max-w-screen-2xl mx-auto">
         <div class="topo-app -mx-3 sm:-mx-4 md:-mx-8 px-3 sm:px-4 md:px-8 py-3 mb-4 flex items-center justify-between gap-3 border-b border-gray-800">
             <div class="min-w-0">
@@ -261,8 +515,8 @@
             <div id="analysis-content" class="tab-content"><div class="card">
                 <div class="flex flex-col md:flex-row md:items-center gap-3 mb-3">
                     <div class="flex rounded-lg overflow-hidden border border-gray-600 text-sm" role="tablist" aria-label="Tipo de gráfico">
-                        <button type="button" class="grafico-modo-btn px-3 py-2 bg-indigo-600 text-white font-semibold" data-modo="app" aria-selected="true">📈 Com sinais do app</button>
-                        <button type="button" class="grafico-modo-btn px-3 py-2 bg-gray-800 text-gray-300" data-modo="tv" aria-selected="false">TradingView completo</button>
+                        <button type="button" class="grafico-modo-btn px-3 py-2 bg-indigo-600 text-white font-semibold" data-modo="app" aria-selected="true">Sinais do app</button>
+                        <button type="button" class="grafico-modo-btn px-3 py-2 bg-gray-800 text-gray-300" data-modo="tv" aria-selected="false">TradingView</button>
                     </div>
                     <div class="flex items-center gap-2 flex-1">
                         <button id="prev-chart-btn" class="btn btn-secondary px-3" title="Ativo anterior do shortlist">&lt;</button>
@@ -448,12 +702,13 @@
     document.addEventListener('DOMContentLoaded', () => {
     
     // NAVEGAÇÃO DE ABAS
+    const APP_MOVEL = window.matchMedia('(max-width: 1023px)').matches; // celular/tablet: usa a casca nova (#app-movel)
     const tabs = document.getElementById('tabs');
     const tabContents = document.getElementById('tab-contents');
     tabs.addEventListener('click', (e) => {
         if (e.target.classList.contains('tab-btn')) {
             tabs.querySelector('.active').classList.remove('active'); e.target.classList.add('active');
-            tabContents.querySelector('.active').classList.remove('active');
+            const ativaAntes = tabContents.querySelector('.active'); if (ativaAntes) ativaAntes.classList.remove('active');
             document.getElementById(e.target.dataset.tab + '-content').classList.add('active');
             document.querySelectorAll('#nav-inferior button').forEach(b => b.classList.toggle('active', b.dataset.ir === e.target.dataset.tab));
         }
@@ -469,6 +724,7 @@
     // SANFONAS: o título do cartão abre/fecha o conteúdo. "celular-fechada" começa fechada em telas < 1024 px.
     // A escolha de cada seção fica lembrada no navegador.
     function prepararSanfonas() {
+        if (APP_MOVEL) return; // no celular a casca nova organiza as seções
         const celular = window.matchMedia('(max-width: 1023px)').matches;
         document.querySelectorAll('.card[data-sanfona]').forEach(card => {
             const cab = card.querySelector('h2, h3'); if (!cab) return;
@@ -719,6 +975,7 @@
         box.className = `mt-3 text-sm border-l-4 pl-3 py-1 flex items-start justify-between gap-3 ${cores[tipo] || cores.info}`;
         box.innerHTML = `<span>${texto}</span><button type="button" class="text-gray-500 hover:text-gray-300" aria-label="Fechar mensagem">✕</button>`;
         box.querySelector('button').addEventListener('click', () => box.classList.add('hidden'));
+        if (APP_MOVEL && tipo === 'sucesso') setTimeout(() => { if (box.textContent.includes(texto.replace(/<[^>]+>/g, '').slice(0, 20))) box.classList.add('hidden'); }, 5000);
     }
 
     // Ponto único de inicialização: usado tanto pelo carregamento automático (data/manifest.json) quanto pelo
@@ -929,6 +1186,7 @@
             loading.style.display = 'none';
             runStrategyScoringBtn.disabled = false;
             screenerRodando = null;
+            agendarAtualizacaoMovel();
             resolve(filteredScreenerResults);
           }
         }, 50));
@@ -1578,6 +1836,7 @@
         }).join('');
         html += '</tbody></table>';
         fundContainer.innerHTML = html;
+        agendarAtualizacaoMovel();
     }
 
 
@@ -1715,6 +1974,8 @@
         });
         mostrarLegenda();
 
+        const telaCheia = document.getElementById('am-grafico');
+        if (telaCheia && telaCheia.classList.contains('aberta')) { telaCheia.style.setProperty('--paineis', sub.offsetHeight + 'px'); telaCheia.classList.add('com-paineis'); }
         if (faixaAnterior) principal.timeScale().setVisibleLogicalRange(faixaAnterior);
         else aplicarPeriodo(6);
     }
@@ -1730,6 +1991,7 @@
     function atualizarCabecalhoGrafico(ticker) {
         const r = filteredScreenerResults.findIndex(x => x.ticker === ticker);
         currentScreenerIndex = r;
+        if (APP_MOVEL && ticker) { document.getElementById('am-grafico-titulo').textContent = ticker; ativoAberto = ativoAberto && document.getElementById('am-ativo').classList.contains('aberta') ? ativoAberto : ticker; }
         const f = fundamentalsData && fundamentalsData[ticker];
         document.getElementById('chart-ticker-label').innerHTML = ticker ? `${ticker}${f && f.longName ? ` <span class="text-sm font-normal text-gray-400">${f.longName}</span>` : ''}${r >= 0 ? `<div class="text-xs font-normal text-indigo-300">${r + 1}º de ${filteredScreenerResults.length} no shortlist · Score ${filteredScreenerResults[r].score.toFixed(2)}</div>` : '<div class="text-xs font-normal text-gray-500">fora do shortlist atual</div>'}` : '';
     }
@@ -1767,7 +2029,8 @@
     }
 
     function atualizarModuloGrafico() {
-        if (!document.getElementById('analysis-content').classList.contains('active')) return;
+        const telaCheia = document.getElementById('am-grafico') && document.getElementById('am-grafico').classList.contains('aberta');
+        if (!telaCheia && !document.getElementById('analysis-content').classList.contains('active')) return;
         if (graficoModo === 'app') desenharGrafico(); else desenharTradingView();
     }
     document.querySelectorAll('.grafico-modo-btn').forEach(b => b.addEventListener('click', () => {
@@ -1790,6 +2053,287 @@
     document.getElementById('prev-chart-btn').addEventListener('click', () => andarShortlist(-1));
     document.getElementById('next-chart-btn').addEventListener('click', () => andarShortlist(1));
 
+
+    // =================== APP DO CELULAR (casca nova) ===================
+    // Só apresentação: reaproveita os mesmos dados, funções e quadros do app; nenhum cálculo muda.
+    // Abaixo de 1024 px, os quadros existentes são MOVIDOS para as páginas novas (os ids continuam únicos).
+    const fmtPrecoM = (v) => Number.isFinite(v) ? v.toLocaleString('pt-BR', { style: 'currency', currency: MERCADO.moeda, minimumFractionDigits: v < 1 ? 4 : 2, maximumFractionDigits: v < 1 ? 4 : 2 }) : '—';
+    const fmtPctM = (v) => Number.isFinite(v) ? `${v >= 0 ? '+' : ''}${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : '—';
+    const fmtNumM = (v, c = 2) => Number.isFinite(v) ? v.toLocaleString('pt-BR', { minimumFractionDigits: c, maximumFractionDigits: c }) : '—';
+    const fmtGrandeM = (v) => !Number.isFinite(v) ? '—' : v >= 1e9 ? `${fmtNumM(v / 1e9, 1)} bi` : v >= 1e6 ? `${fmtNumM(v / 1e6, 1)} mi` : v >= 1e3 ? `${fmtNumM(v / 1e3, 1)} mil` : fmtNumM(v, 0);
+    function variacaoDia(t) { const c = allData[t] && allData[t].close; if (!c || c.length < 2) return null; return (c[c.length - 1] / c[c.length - 2] - 1) * 100; }
+    function ultimoPreco(t) { const c = allData[t] && allData[t].close; return c ? c[c.length - 1] : null; }
+    function corAvatar(t) { let h = 0; for (const ch of t) h = (h * 31 + ch.charCodeAt(0)) % 360; return `hsl(${h} 42% 34%)`; }
+    function nomeAtivo(t) { const f = fundamentalsData && fundamentalsData[t]; return (f && (f.longName || f.shortName)) || ''; }
+    function minigrafico(t) {
+        const c = allData[t] && allData[t].close; if (!c || c.length < 5) return '';
+        const v = c.slice(-60); const mn = Math.min(...v), mx = Math.max(...v), amp = (mx - mn) || 1;
+        const pts = v.map((x, k) => `${(k / (v.length - 1) * 100).toFixed(1)},${(30 - (x - mn) / amp * 28 - 1).toFixed(1)}`).join(' ');
+        return `<svg class="am-spark" viewBox="0 0 100 30" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${v[v.length - 1] >= v[0] ? '#22c55e' : '#f05252'}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
+    }
+    function notaFundamentalista(t) {
+        const f = fundamentalsData && fundamentalsData[t]; if (!f) return null;
+        const v = Object.values(checarFundamentos(f, lerLimitesFundamentos()));
+        return { ok: v.filter(x => x === true).length, comDado: v.filter(x => x !== null).length, critico: f.alertaEvento === 'critico' };
+    }
+    function chipFund(n) {
+        if (!n) return '';
+        const cor = n.critico ? 'vermelho' : n.comDado < MIN_DATA_COVERAGE_FOR_RANKING ? '' : n.ok >= 4 ? 'verde' : n.ok >= 2 ? 'amarelo' : 'vermelho';
+        return `<span class="am-chip ${cor}">${n.critico ? '⚠ ' : ''}Fund ${n.ok}/5</span>`;
+    }
+    function linhaAtivo(t, r) {
+        const vd = variacaoDia(t);
+        const chips = (r ? `<span class="am-chip">Score ${fmtNumM(r.score, 1)}</span> ` : '') + chipFund(notaFundamentalista(t));
+        return `<button type="button" class="am-linha" data-ativo="${t}">
+            <span class="am-avatar" style="background:${corAvatar(t)}">${t.slice(0, 2)}</span>
+            <span class="am-meio"><span class="am-tk block">${t}</span><span class="am-nome block">${nomeAtivo(t) || '&nbsp;'}</span><span class="flex gap-1 mt-1">${chips}</span></span>
+            ${minigrafico(t)}
+            <span class="am-dir"><span class="am-preco block">${fmtPrecoM(ultimoPreco(t))}</span><span class="am-var block ${vd >= 0 ? 'alta' : 'baixa'}">${vd === null ? '' : (vd >= 0 ? '▲ ' : '▼ ') + fmtPctM(Math.abs(vd)).replace('+', '')}</span></span>
+        </button>`;
+    }
+    function melhoresOpcoesMovel() {
+        // Mesma regra do painel "Melhores Opções" (Módulo 6): só quem tem ≥ 3/5 critérios com dado e sem evento crítico
+        return filteredScreenerResults.map(r => ({ r, n: notaFundamentalista(r.ticker) }))
+            .filter(x => x.n && x.n.comDado >= MIN_DATA_COVERAGE_FOR_RANKING && !x.n.critico)
+            .map(x => ({ ...x, comb: x.r.score + x.n.ok }))
+            .sort((a, b) => b.comb - a.comb).slice(0, 5);
+    }
+
+    const estadoRanking = { ordem: 'score', busca: '', limite: 30 };
+    function listaRanking() {
+        const termo = estadoRanking.busca.trim().toUpperCase();
+        const porTicker = Object.fromEntries(filteredScreenerResults.map(r => [r.ticker, r]));
+        let itens;
+        if (termo) {
+            itens = Object.keys(allData).filter(t => t.includes(termo) || nomeAtivo(t).toUpperCase().includes(termo))
+                .sort((a, b) => (a.startsWith(termo) ? 0 : 1) - (b.startsWith(termo) ? 0 : 1) || a.localeCompare(b))
+                .map(t => ({ t, r: porTicker[t] || null }));
+        } else {
+            itens = filteredScreenerResults.map(r => ({ t: r.ticker, r }));
+        }
+        const chave = {
+            score: x => x.r ? x.r.score : -1,
+            combinado: x => (x.r ? x.r.score : 0) + ((notaFundamentalista(x.t) || { ok: 0 }).ok),
+            variacao: x => variacaoDia(x.t) ?? -999,
+            volatilidade: x => (x.r && x.r.atrPct) || 0,
+        }[estadoRanking.ordem];
+        if (!termo || estadoRanking.ordem !== 'score') itens.sort((a, b) => chave(b) - chave(a));
+        return itens;
+    }
+    function desenharRanking() {
+        const itens = listaRanking();
+        const nomes = { score: 'Score técnico', combinado: 'Score combinado', variacao: 'Variação do dia', volatilidade: 'Volatilidade' };
+        document.getElementById('am-ranking-info').textContent = estadoRanking.busca
+            ? `${itens.length} ativo(s) encontrados`
+            : `${filteredScreenerResults.length} ativos aprovados nos filtros · ordem: ${nomes[estadoRanking.ordem]}`;
+        document.getElementById('am-ranking').innerHTML = itens.slice(0, estadoRanking.limite).map(x => linhaAtivo(x.t, x.r)).join('')
+            || '<div class="p-5 text-center" style="color:var(--mudo)">Nenhum ativo. Ajuste os filtros.</div>';
+        document.getElementById('am-ranking-mais').classList.toggle('hidden', itens.length <= estadoRanking.limite);
+    }
+
+    function atualizarAppMovel() {
+        if (!APP_MOVEL) return;
+        // Cabeçalho: data dos dados (verde/amarelo/vermelho igual ao aviso do app)
+        let ultima = null; for (const t in allData) { const d = allData[t].dates; if (d && d.length && (!ultima || d[d.length - 1] > ultima)) ultima = d[d.length - 1]; }
+        if (ultima) {
+            const dias = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(ultima + 'T00:00:00')) / 86400000);
+            const [a, m, d] = ultima.split('-');
+            document.getElementById('am-sub').textContent = `${MERCADO.nome} · dados de ${d}/${m}/${a} · ${Object.keys(allData).length.toLocaleString('pt-BR')} ativos`;
+            document.getElementById('am-ponto').className = 'am-ponto' + (dias > 10 ? ' muito-velho' : dias > 4 ? ' velho' : '');
+        }
+        // Clima do mercado (mesma leitura do "Filtro de Regime")
+        const usaveis = historicalRegimeData.filter(r => r.total >= 10); const ult = usaveis[usaveis.length - 1];
+        if (ult) {
+            const fav = ult.pct >= 50;
+            document.getElementById('am-clima').innerHTML = `<div class="flex items-center justify-between"><span class="text-sm" style="color:var(--mudo)">Clima do mercado</span><span class="am-chip ${fav ? 'verde' : 'vermelho'}">${fav ? 'Favorável' : 'Adverso'}</span></div>
+                <div class="am-clima-num">${fmtNumM(ult.pct, 1)}%</div>
+                <div class="am-barra"><div style="width:${ult.pct}%;background:${fav ? 'var(--alta)' : 'var(--baixa)'}"></div></div>
+                <div class="text-sm" style="color:var(--mudo)">dos ${ult.total.toLocaleString('pt-BR')} ativos estão acima da média de 200 dias</div>`;
+        }
+        // Melhores opções
+        const top = melhoresOpcoesMovel(); const medalhas = ['🥇', '🥈', '🥉', '4º', '5º'];
+        document.getElementById('am-melhores').innerHTML = top.length ? top.map((x, k) => {
+            const vd = variacaoDia(x.r.ticker);
+            return `<button type="button" class="am-opcao" data-ativo="${x.r.ticker}">
+                <div class="flex items-center justify-between"><span class="am-tk">${x.r.ticker}</span><span class="text-lg">${medalhas[k]}</span></div>
+                <div class="am-nome">${nomeAtivo(x.r.ticker) || '&nbsp;'}</div>
+                <div class="am-grande">${fmtNumM(x.comb, 1)}</div>
+                <div class="text-xs" style="color:var(--mudo)">Score combinado · Téc ${fmtNumM(x.r.score, 1)} + Fund ${x.n.ok}</div>
+                <div class="flex items-center justify-between mt-3"><span class="am-preco">${fmtPrecoM(ultimoPreco(x.r.ticker))}</span><span class="am-var ${vd >= 0 ? 'alta' : 'baixa'}">${vd === null ? '' : (vd >= 0 ? '▲ ' : '▼ ') + fmtPctM(Math.abs(vd)).replace('+', '')}</span></div>
+            </button>`;
+        }).join('') : `<div class="am-card w-full" style="color:var(--mudo)">Sem ativos com fundamentos suficientes no ranking atual.</div>`;
+        document.getElementById('am-top').innerHTML = filteredScreenerResults.slice(0, 10).map(r => linhaAtivo(r.ticker, r)).join('')
+            || '<div class="p-5 text-center" style="color:var(--mudo)">Nenhum ativo passou nos filtros.</div>';
+        desenharRanking();
+    }
+    function agendarAtualizacaoMovel() { if (APP_MOVEL) setTimeout(atualizarAppMovel, 0); }
+
+    // Navegação entre páginas e telas sobrepostas (com suporte ao botão "voltar" do Android)
+    const TITULOS = { inicio: 'Início', ranking: 'Ranking', testes: 'Testes', mais: 'Mais' };
+    function mostrarPagina(nome) {
+        document.querySelectorAll('#app-movel .am-pagina').forEach(p => p.classList.toggle('ativa', p.dataset.pagina === nome));
+        document.querySelectorAll('.am-nav button').forEach(b => b.classList.toggle('ativa', b.dataset.irPagina === nome));
+        document.getElementById('am-titulo').textContent = TITULOS[nome];
+        window.scrollTo(0, 0);
+    }
+    const pilhaTelas = [];
+    function abrirTela(id) {
+        const el = document.getElementById(id);
+        if (!el.classList.contains('aberta')) {
+            el.style.zIndex = 50 + pilhaTelas.length; el.classList.add('aberta'); el.scrollTop = 0;
+            pilhaTelas.push(id); history.pushState({ tela: id }, '');
+        }
+        document.body.classList.add('travado');
+    }
+    function fecharTelaVisual(id) {
+        const el = document.getElementById(id); el.classList.remove('aberta');
+        const k = pilhaTelas.lastIndexOf(id); if (k >= 0) pilhaTelas.splice(k, 1);
+        if (!pilhaTelas.length) document.body.classList.remove('travado');
+        if (id === 'am-grafico') { destruirGraficos(); graficoTicker = null; }
+    }
+    window.addEventListener('popstate', () => { if (pilhaTelas.length) fecharTelaVisual(pilhaTelas[pilhaTelas.length - 1]); });
+
+    // Tela do ativo
+    let miniGrafico = null, miniSerie = null;
+    function desenharMini(t, meses) {
+        const d = allData[t]; const alvo = document.getElementById('am-mini');
+        if (miniGrafico) { miniGrafico.remove(); miniGrafico = null; }
+        if (!d || typeof LightweightCharts === 'undefined') { alvo.innerHTML = '<p class="p-4" style="color:var(--mudo)">Gráfico indisponível.</p>'; return; }
+        const n = d.close.length; const ini = meses ? Math.max(0, n - Math.round(meses * 21)) : 0;
+        const sobe = d.close[n - 1] >= d.close[ini]; const cor = sobe ? '#22c55e' : '#f05252';
+        miniGrafico = LightweightCharts.createChart(alvo, {
+            autoSize: true, handleScroll: false, handleScale: false,
+            layout: { background: { color: 'transparent' }, textColor: '#9aa3b2', fontFamily: 'Inter, sans-serif', attributionLogo: false },
+            grid: { vertLines: { visible: false }, horzLines: { visible: false } },
+            rightPriceScale: { visible: false }, leftPriceScale: { visible: false },
+            timeScale: { visible: false, borderVisible: false }, crosshair: { vertLine: { visible: false }, horzLine: { visible: false } },
+        });
+        miniSerie = miniGrafico.addAreaSeries({ lineColor: cor, topColor: sobe ? 'rgba(34,197,94,0.28)' : 'rgba(240,82,82,0.28)', bottomColor: 'rgba(0,0,0,0)', lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+        miniSerie.setData(d.dates.map((tm, k) => ({ time: tm, value: d.close[k] })));
+        miniGrafico.timeScale().setVisibleLogicalRange({ from: ini, to: n - 1 });
+        const varPer = (d.close[n - 1] / d.close[ini] - 1) * 100;
+        const el = document.getElementById('am-var-periodo');
+        if (el) { el.textContent = `${fmtPctM(varPer)} no período`; el.className = `am-var ${varPer >= 0 ? 'alta' : 'baixa'}`; }
+    }
+    function abaAtivo(t, aba) {
+        document.querySelectorAll('#am-abas button').forEach(b => b.classList.toggle('ativa', b.dataset.aba === aba));
+        const box = document.getElementById('am-aba-conteudo');
+        const ex = montarExplicacao(t); const d = allData[t]; const n = d.close.length; const f = (fundamentalsData && fundamentalsData[t]) || null;
+        if (aba === 'tecnica') {
+            box.innerHTML = ex.secTec + `<div class="am-card mt-3">Score técnico de hoje: <b>${fmtNumM(ex.scoreTec, 2)}</b> · com fundamentos: <b class="text-green-400">${fmtNumM(ex.scoreTec + ex.notaFund, 2)}</b></div>`;
+            return;
+        }
+        if (aba === 'fundamentos') { box.innerHTML = ex.secFund || '<p style="color:var(--mudo)">Sem dados fundamentalistas.</p>'; return; }
+        const ult = d.close.slice(-252); let vol20 = 0; for (let j = n - 20; j < n; j++) vol20 += d.close[j] * d.volume[j];
+        const r = filteredScreenerResults.find(x => x.ticker === t); const pos = filteredScreenerResults.indexOf(r);
+        const dado = (rot, val) => `<div class="am-dado"><div class="r">${rot}</div><div class="v">${val}</div></div>`;
+        box.innerHTML = `<div class="am-grade">
+                ${dado('Score técnico', fmtNumM(ex.scoreTec, 2))}${dado('Fundamentos', f ? `${ex.notaFund}/5` : '—')}
+                ${dado('Abertura', fmtPrecoM(d.open[n - 1]))}${dado('Fechamento', fmtPrecoM(d.close[n - 1]))}
+                ${dado('Máxima do dia', fmtPrecoM(d.high[n - 1]))}${dado('Mínima do dia', fmtPrecoM(d.low[n - 1]))}
+                ${dado('Máx. 52 semanas', fmtPrecoM(Math.max(...ult)))}${dado('Mín. 52 semanas', fmtPrecoM(Math.min(...ult)))}
+                ${dado('Volume', fmtGrandeM(d.volume[n - 1]))}${dado('Vol. financeiro (20d)', `${MERCADO.simbolo} ${fmtGrandeM(vol20 / 20)}`)}
+                ${dado('P/L', f ? fmtNumM(Number(f.pe), 1) : '—')}${dado('ROE', f && Number.isFinite(Number(f.roe)) ? fmtNumM(f.roe * 100, 1) + '%' : '—')}
+            </div>
+            ${f ? `<div class="mt-3">${eventBadge(f)}</div>` : ''}
+            <div class="text-sm mt-3" style="color:var(--mudo)">${pos >= 0 ? `${pos + 1}º de ${filteredScreenerResults.length} no ranking técnico de hoje.` : 'Fora do ranking técnico de hoje (não passou nos filtros ou não teve sinal).'}</div>
+            <div class="space-y-2 mt-4">
+                <button type="button" class="am-botao" data-acao-ativo="porque">Por que foi selecionado?</button>
+                <button type="button" class="am-botao sec" data-acao-ativo="backtest">Testar no Backtest</button>
+                <button type="button" class="am-botao sec" data-acao-ativo="tv">Abrir no TradingView</button>
+            </div>`;
+    }
+    let ativoAberto = null;
+    function abrirAtivo(t, aba = 'resumo') {
+        if (!allData[t]) return;
+        ativoAberto = t; tickerSelect.value = t;
+        const vd = variacaoDia(t);
+        document.getElementById('am-ativo-titulo').textContent = t;
+        document.getElementById('am-ativo-cab').innerHTML = `<div class="am-nome text-sm" style="color:var(--mudo)">${nomeAtivo(t) || t}</div>
+            <div class="am-preco-grande">${fmtPrecoM(ultimoPreco(t))}</div>
+            <div class="flex items-center gap-3 mt-1"><span class="am-var ${vd >= 0 ? 'alta' : 'baixa'}">${vd === null ? '' : (vd >= 0 ? '▲ ' : '▼ ') + fmtPctM(Math.abs(vd)).replace('+', '') + ' hoje'}</span><span id="am-var-periodo" class="am-var"></span></div>`;
+        abrirTela('am-ativo');
+        document.querySelectorAll('#am-periodos [data-meses]').forEach(b => b.classList.toggle('ativa', b.dataset.meses === '6'));
+        requestAnimationFrame(() => desenharMini(t, 6));
+        abaAtivo(t, aba);
+    }
+    function abrirGraficoCheio(modo = 'app') {
+        const t = ativoAberto || tickerSelect.value; if (!t) return;
+        tickerSelect.value = t;
+        document.getElementById('am-grafico-titulo').textContent = t;
+        abrirTela('am-grafico');
+        const b = document.querySelector(`.grafico-modo-btn[data-modo="${modo}"]`);
+        requestAnimationFrame(() => { if (graficoModo !== modo) b.click(); else atualizarModuloGrafico(); });
+    }
+
+    function montarAppMovel() {
+        if (!APP_MOVEL) return;
+        const mover = (id, destino) => { const el = document.getElementById(id); const alvo = typeof destino === 'string' ? document.querySelector(destino) : destino; if (el && alvo) alvo.appendChild(el); };
+        mover('market-switch', '#am-mercado-slot');
+        mover('load-progress', '#am-avisos'); mover('app-message', '#am-avisos');
+        mover('ticker-select', '#am-slot-ticker'); tickerSelect.classList.add('w-full');
+        mover('backtest-content', '#am-slot-backtest'); mover('walkforward-content', '#am-slot-walkforward');
+        mover('analysis-content', '#am-slot-grafico');
+        mover('sec-estrategias', '[data-sub-slot="estrategias"]'); mover('estrategias-results', '[data-sub-slot="estrategias"]');
+        mover('fundamentals-content', '[data-sub-slot="fundamentos"]');
+        mover('portfolio-content', '[data-sub-slot="correlacao"]');
+        mover('sec-dados', '[data-sub-slot="dados"]'); mover('market-sentiment-module', '[data-sub-slot="dados"]');
+        ['sec-liquidez', 'sec-pesos', 'sec-fund-filtro'].forEach(id => mover(id, '#am-slot-filtros'));
+        document.body.classList.add('com-app-movel');
+
+        document.querySelectorAll('[data-ir-pagina]').forEach(b => b.addEventListener('click', () => mostrarPagina(b.dataset.irPagina)));
+        document.querySelectorAll('[data-fechar-tela]').forEach(b => b.addEventListener('click', () => history.back()));
+        document.getElementById('app-movel').addEventListener('click', e => {
+            const linha = e.target.closest('[data-ativo]'); if (linha) { abrirAtivo(linha.dataset.ativo); return; }
+            const sub = e.target.closest('[data-sub]');
+            if (sub) {
+                const titulos = { estrategias: 'Screener de Estratégias', fundamentos: 'Técnica × Fundamentos', correlacao: 'Correlação (Pearson)', dados: 'Dados e atualização' };
+                document.querySelectorAll('[data-sub-slot]').forEach(sl => sl.classList.toggle('hidden', sl.dataset.subSlot !== sub.dataset.sub));
+                document.getElementById('am-sub-titulo').textContent = titulos[sub.dataset.sub];
+                abrirTela('am-sub-tela');
+            }
+            const acao = e.target.closest('[data-acao-ativo]');
+            if (acao) {
+                if (acao.dataset.acaoAtivo === 'porque') abaAtivo(ativoAberto, 'tecnica');
+                if (acao.dataset.acaoAtivo === 'tv') abrirGraficoCheio('tv');
+                if (acao.dataset.acaoAtivo === 'backtest') { history.back(); mostrarPagina('testes'); document.querySelector('#am-seg-testes [data-teste="backtest"]').click(); }
+            }
+        });
+        document.getElementById('am-abas').addEventListener('click', e => { const b = e.target.closest('[data-aba]'); if (b && ativoAberto) abaAtivo(ativoAberto, b.dataset.aba); });
+        document.getElementById('am-periodos').addEventListener('click', e => {
+            const b = e.target.closest('[data-meses]'); if (!b || !ativoAberto) return;
+            document.querySelectorAll('#am-periodos [data-meses]').forEach(x => x.classList.toggle('ativa', x === b));
+            desenharMini(ativoAberto, parseInt(b.dataset.meses, 10));
+        });
+        document.getElementById('am-abrir-grafico').addEventListener('click', () => abrirGraficoCheio('app'));
+        document.getElementById('am-mini-toque').addEventListener('click', () => abrirGraficoCheio('app'));
+        document.getElementById('am-seg-testes').addEventListener('click', e => {
+            const b = e.target.closest('[data-teste]'); if (!b) return;
+            document.querySelectorAll('#am-seg-testes button').forEach(x => x.classList.toggle('ativa', x === b));
+            document.getElementById('am-slot-backtest').classList.toggle('hidden', b.dataset.teste !== 'backtest');
+            document.getElementById('am-slot-walkforward').classList.toggle('hidden', b.dataset.teste !== 'walkforward');
+        });
+        document.getElementById('am-busca').addEventListener('input', e => { estadoRanking.busca = e.target.value; estadoRanking.limite = 30; desenharRanking(); });
+        document.getElementById('am-ordem').addEventListener('click', e => {
+            const b = e.target.closest('[data-ordem]'); if (!b) return;
+            document.querySelectorAll('#am-ordem [data-ordem]').forEach(x => x.classList.toggle('ativa', x === b));
+            estadoRanking.ordem = b.dataset.ordem; desenharRanking();
+        });
+        document.getElementById('am-ranking-mais').addEventListener('click', () => { estadoRanking.limite += 30; desenharRanking(); });
+        const folha = document.getElementById('am-folha'), fundo = document.getElementById('am-folha-fundo');
+        const abrirFolha = (sim) => { folha.classList.toggle('aberta', sim); fundo.classList.toggle('aberta', sim); document.body.classList.toggle('travado', sim || pilhaTelas.length > 0); };
+        document.getElementById('am-abrir-filtros').addEventListener('click', () => abrirFolha(true));
+        document.getElementById('am-fechar-folha').addEventListener('click', () => abrirFolha(false));
+        fundo.addEventListener('click', () => abrirFolha(false));
+        document.getElementById('am-aplicar-filtros').addEventListener('click', async () => {
+            abrirFolha(false);
+            document.getElementById('am-ranking-info').textContent = 'Atualizando ranking…';
+            await executarScreener();
+            if (fundamentalsData && Object.keys(fundamentalsData).length) executarCruzamento();
+            atualizarAppMovel();
+        });
+    }
+
     // Resumo curto dos fundamentos para a tabela do Screener (Módulo 1).
     function resumoFundamentalista(ticker) {
         const f = fundamentalsData && fundamentalsData[ticker];
@@ -1802,9 +2346,9 @@
 
     // PAINEL "POR QUE FOI SELECIONADO": refaz, só para leitura, o mesmo cálculo do Screener no último pregão
     // (mesmas funções e pesos) e mostra cada parte do score técnico e cada critério fundamentalista.
-    function explicarSelecao(ticker) {
+    function montarExplicacao(ticker) {
         const data = allData[ticker];
-        if (!data) return;
+        if (!data) return null;
         const f = (fundamentalsData && fundamentalsData[ticker]) || null;
         const i = data.close.length - 1;
         const params = getIndicatorParameters();
@@ -1836,11 +2380,13 @@
             if (document.getElementById('filter-trend').checked && ind.EMA_200[i]) filtros.push(`${data.close[i] >= ind.EMA_200[i] ? ok : nao} Preço ${fmtMoeda(data.close[i])} ${data.close[i] >= ind.EMA_200[i] ? 'acima' : 'abaixo'} da MME 200 (${fmtMoeda(ind.EMA_200[i])})`);
             const atrPct = ind.ATR[i] ? (ind.ATR[i] / data.close[i]) * 100 : null;
             if (atrPct !== null) filtros.push(`ℹ️ Volatilidade (ATR 14): ${atrPct.toFixed(2)}% do preço por dia`);
-            tecHtml = `<table class="results-table w-full"><thead><tr><th></th><th>Tese técnica</th><th>Sinais no último pregão</th><th class="text-right">Pontos</th></tr></thead><tbody>${linhas}</tbody>
+            tecHtml = `<table class="results-table w-full tab-tec"><thead><tr><th></th><th>Tese técnica</th><th>Sinais no último pregão</th><th class="text-right">Pontos</th></tr></thead><tbody>${linhas}</tbody>
                 <tfoot><tr><td></td><td colspan="2" class="font-bold">Score técnico</td><td class="text-right font-bold text-indigo-300">${scoreTec.toFixed(2)}</td></tr></tfoot></table>
                 <div class="text-xs text-gray-300 mt-2 space-y-1">${filtros.map(x => `<div>${x}</div>`).join('')}</div>`;
         }
-        html += `<div><h4 class="font-bold text-indigo-300 mb-2">📈 Análise técnica (Módulo 1)</h4>${tecHtml}</div>`;
+        const secTec = `<div><h4 class="font-bold text-indigo-300 mb-2">📈 Análise técnica (Módulo 1)</h4>${tecHtml}</div>`;
+        html += secTec;
+        const inicioFund = html.length;
 
         // Fundamentos
         let notaFund = 0;
@@ -1860,12 +2406,18 @@
             const fora = f.alertaEvento === 'critico' ? '<p class="text-red-400 font-bold mt-2">🚫 Fica fora das Melhores Opções: evento corporativo crítico recente.</p>'
                 : (comDado < MIN_DATA_COVERAGE_FOR_RANKING ? `<p class="text-yellow-400 mt-2">⚠️ Só ${comDado} de 5 critérios têm dado: fica fora das Melhores Opções (mínimo ${MIN_DATA_COVERAGE_FOR_RANKING}).</p>` : '');
             html += `<div><h4 class="font-bold text-purple-300 mb-2">🏛️ Fundamentos (Módulo 6)</h4>
-                <table class="results-table w-full"><thead><tr><th></th><th>Critério</th><th>Valor</th><th>Limite</th></tr></thead><tbody>
+                <table class="results-table w-full tab-fund"><thead><tr><th></th><th>Critério</th><th>Valor</th><th>Limite</th></tr></thead><tbody>
                 ${crit.map(([n, v, lim, chk]) => `<tr><td>${b(chk)}</td><td>${n}</td><td>${v}</td><td class="text-gray-400">${lim}</td></tr>`).join('')}
                 </tbody><tfoot><tr><td></td><td colspan="2" class="font-bold">Nota fundamentalista</td><td class="font-bold text-purple-300">${notaFund}/5</td></tr></tfoot></table>
                 <div class="text-xs text-gray-300 mt-2 space-y-1"><div>Crescimento da receita: ${fmtPct(f.revenueGrowth)}${f.sector ? ` · Setor: ${f.sector}` : ''}</div>${marketSignalsCell(f)}</div>${eventBadge(f)}${fora}</div>`;
         }
 
+        const secFund = html.slice(inicioFund);
+        return { data, f, i, html, secTec, secFund, scoreTec, notaFund };
+    }
+    function explicarSelecao(ticker) {
+        const ex = montarExplicacao(ticker); if (!ex) return;
+        const { data, f, i, scoreTec, notaFund } = ex; let html = ex.html;
         html += `<div class="bg-gray-900 rounded-lg p-3 flex flex-wrap items-center justify-between gap-3">
             <div><span class="text-gray-400">Score combinado = técnico + fundamentos:</span> <b class="text-green-400 text-lg">${scoreTec.toFixed(2)} + ${notaFund} = ${(scoreTec + notaFund).toFixed(2)}</b></div>
             <button type="button" id="explicacao-grafico" class="btn btn-primary">Ver no gráfico</button></div>
@@ -1890,12 +2442,13 @@
         const alvo = e.target.closest('[data-explicar]');
         if (!alvo || e.target.closest('a')) return;
         e.stopPropagation();
-        explicarSelecao(alvo.dataset.explicar);
+        if (APP_MOVEL) abrirAtivo(alvo.dataset.explicar, 'tecnica'); else explicarSelecao(alvo.dataset.explicar);
     }, true);
     document.addEventListener('keydown', e => { const alvo = e.target.closest && e.target.closest('[data-explicar]'); if (alvo && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); explicarSelecao(alvo.dataset.explicar); } });
 
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
+    montarAppMovel();
     window.investDebug = { get graficos() { return graficos; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14 };
     carregarAutomaticamente();
 
