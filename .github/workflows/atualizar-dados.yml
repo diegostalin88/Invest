@@ -73,6 +73,23 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Vendidos (aluguel B3 e short interest FINRA)
+        continue-on-error: true
+        run: python coleta/vendidos.py --saida site/data
+
+      - name: Node (para o relatório)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Relatório automático (backtests do app num navegador invisível)
+        continue-on-error: true
+        timeout-minutes: 60
+        run: |
+          npm install --no-save --no-package-lock playwright@1.48.2
+          npx playwright install --with-deps chromium
+          node coleta/gerar_relatorio.js site
+
       - name: Configurar Pages
         uses: actions/configure-pages@v5
 
@@ -85,7 +102,7 @@ jobs:
     name: Republicar só o app (dados atuais)
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.somente_app)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
     permissions:
       contents: read
     steps:
@@ -102,12 +119,47 @@ jobs:
             for f in $(python3 -c "import json,sys;m=json.load(open(sys.argv[1]));print(' '.join(m['arquivosPrecos']+[m.get('arquivoFundamentos','fundamentos.json')]))" "$2/manifest.json"); do
               curl -fsSL "$1/$f" -o "$2/$f" || return 1
             done
+            # Extras opcionais (relatório e vendidos): se não vierem, some do manifesto para o app não pedir
+            python3 - "$1" "$2" <<'PY'
+          import json, sys, subprocess, os
+          base, pasta = sys.argv[1], sys.argv[2]
+          caminho = os.path.join(pasta, 'manifest.json'); m = json.load(open(caminho))
+          for chave in ('arquivoRelatorio', 'arquivoVendidos'):
+              nome = m.get(chave)
+              if nome and subprocess.run(['curl', '-fsSL', f'{base}/{nome}', '-o', os.path.join(pasta, nome)]).returncode != 0:
+                  m.pop(chave)
+          json.dump(m, open(caminho, 'w'), indent=2)
+          PY
           }
           baixar "$BASE" site/data
           # Brasil é opcional: se ainda não existir (ou falhar), publica só os EUA
           baixar "$BASE/br" site/data/br || { rm -rf site/data/br; echo "Brasil (IBOVESPA) ainda não publicado." >> "$GITHUB_STEP_SUMMARY"; }
           cp -r app/. site/
           echo "### App republicado com os dados de $(python3 -c "import json;print(json.load(open('site/data/manifest.json'))['ultimoPregao'])")" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Python (para os vendidos)
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Vendidos (aluguel B3 e short interest FINRA)
+        continue-on-error: true
+        run: |
+          pip install requests
+          python coleta/vendidos.py --saida site/data
+
+      - name: Node (para o relatório)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Relatório automático (backtests do app num navegador invisível)
+        continue-on-error: true
+        timeout-minutes: 60
+        run: |
+          npm install --no-save --no-package-lock playwright@1.48.2
+          npx playwright install --with-deps chromium
+          node coleta/gerar_relatorio.js site
 
       - name: Configurar Pages
         uses: actions/configure-pages@v5

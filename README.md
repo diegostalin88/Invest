@@ -40,7 +40,13 @@ GitHub Actions (seg–sex, 22:30 UTC, depois do fechamento)
        8. Brasil: carteira atual do IBOVESPA (site da B3; se falhar, coleta/ibovespa_reserva.txt), preços e
           fundamentos do Yahoo com sufixo .SA, gravados em site/data/br/. Sem radar de 8-K (é da SEC).
           Se o Brasil falhar, os dados do Brasil já publicados são mantidos e os EUA saem normalmente.
-  └─ copia app/ para site/ e publica no GitHub Pages
+  └─ copia app/ para site/
+  └─ coleta/vendidos.py: posições vendidas (aluguel de ações da B3 e short interest da FINRA) → vendidos.json
+  └─ coleta/gerar_relatorio.js: abre o app num Chromium invisível e roda os backtests com o MESMO motor do
+       navegador → relatorio.json (melhor regra por papel escolhida em 60% do histórico e confirmada nos 40%
+       finais; entradas do próximo pregão; operações abertas; alerta de short squeeze)
+       Vendidos e relatório são opcionais: se falharem, o site sai do mesmo jeito e o app oferece "Gerar agora".
+  └─ publica no GitHub Pages
 ```
 
 - O navegador não consegue buscar esses dados direto (Yahoo, SEC e nasdaqtrader não liberam CORS, e a SEC
