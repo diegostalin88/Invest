@@ -243,6 +243,9 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     await cel.page.click('#nav-inferior [data-ir="fundamentals"]');
     ok(await cel.page.isVisible('#fundamentals-content') && await cel.page.evaluate(() => document.querySelector('#nav-inferior [data-ir="fundamentals"]').classList.contains('active')), 'barra de baixo troca de módulo');
     await cel.page.screenshot({ path: path.join(SHOTS, 'celular_layout.png'), fullPage: false });
+    await cel.page.click('#nav-inferior [data-ir="screener"]');
+    const visual = await cel.page.evaluate(() => ({ fonte: parseFloat(getComputedStyle(document.documentElement).fontSize), thead: getComputedStyle(document.querySelector('#screener-results-container thead')).display, linha: getComputedStyle(document.querySelector('#screener-results-container tbody tr')).display, carrossel: getComputedStyle(document.querySelector('#melhores-opcoes-resumo .carrossel-opcoes')).display }));
+    ok(visual.fonte >= 17 && visual.thead === 'none' && visual.linha === 'block' && visual.carrossel === 'flex', `celular: letras maiores, lista em cartões e carrossel (${JSON.stringify(visual)})`);
     await cel.page.click('#nav-inferior [data-ir="analysis"]');
     await cel.page.waitForSelector('#analysis-chart canvas', { timeout: 30000 });
     const largG = await cel.page.evaluate(() => document.documentElement.scrollWidth);

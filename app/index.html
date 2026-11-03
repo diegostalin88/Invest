@@ -85,12 +85,34 @@
             .btn { padding: 0.6rem 1rem; }
             select, input[type="text"], input[type="number"], textarea { font-size: 16px; } /* evita zoom automático do iOS */
             .results-table th, .results-table td { padding: 0.5rem 0.45rem; font-size: 0.8rem; }
-            .results-table td.text-xs, .results-table td:last-child.text-xs { min-width: 13rem; }
             .result-metric { padding: 0.6rem; }
             .result-metric .value { font-size: 1.2rem; }
             .backtest-results-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
             #melhores-opcoes-resumo p.text-xs { font-size: 0.7rem; }
             .correlation-matrix th, .correlation-matrix td { padding: 0.3rem; font-size: 0.7rem; }
+        }
+        /* ---- Celular/tablet: letras maiores, listas em cartões e carrossel (inspirado em apps de corretora) ---- */
+        @media (max-width: 1023px) {
+            html { font-size: 17px; }
+            body { background-color: #0f1115; }
+            .card { background-color: #1a1d24; border-color: #262b35; border-radius: 1.25rem; }
+            .tabela-cartoes { margin-top: 0.5rem; }
+            .tabela-cartoes thead { display: none; }
+            .tabela-cartoes, .tabela-cartoes tbody { display: block; width: 100%; }
+            .tabela-cartoes tr { display: block; background: #222632; border: 1px solid #2e3442; border-radius: 1rem; padding: 0.85rem 1rem; margin-bottom: 0.75rem; }
+            .tabela-cartoes tbody tr:hover { background: #2a2f3c; }
+            .tabela-cartoes td { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.3rem 0 !important; border: 0 !important; font-size: 1rem !important; min-width: 0 !important; text-align: right; }
+            .tabela-cartoes td[data-label]::before { content: attr(data-label); color: #9ca3af; font-size: 0.9rem; text-align: left; font-weight: 500; }
+            .tabela-cartoes td.cel-titulo { display: block; text-align: left; font-size: 1.3rem !important; padding-bottom: 0.55rem !important; margin-bottom: 0.35rem; border-bottom: 1px solid #2e3442 !important; }
+            .tabela-cartoes td.cel-bloco { display: block; text-align: left; color: #9ca3af; font-size: 0.85rem !important; padding-top: 0.5rem !important; }
+            .tabela-cartoes td.cel-bloco[data-label]::before { display: block; margin-bottom: 0.2rem; }
+            .tabela-cartoes td.cel-ocultar, .tabela-cartoes td:empty { display: none; }
+            .carrossel-opcoes { display: flex !important; overflow-x: auto; scroll-snap-type: x mandatory; gap: 0.75rem !important; padding-bottom: 0.4rem; margin: 0 -0.25rem; }
+            .carrossel-opcoes > * { flex: 0 0 72%; scroll-snap-align: start; padding: 1rem !important; border-radius: 1rem !important; }
+            .carrossel-opcoes .text-lg { font-size: 1.35rem; }
+            .carrossel-opcoes .value { font-size: 1.9rem !important; }
+            .result-metric .value { font-size: 1.45rem; }
+            .checkbox-label { padding: 0.6rem 0.75rem; }
         }
         /* Tabelas largas rolam de lado dentro do cartão, sem estourar a página */
         .overflow-x-auto { -webkit-overflow-scrolling: touch; }
@@ -109,7 +131,7 @@
         </div>
         <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
             <div>
-                <p class="text-gray-400 text-sm">Arquitetura Fitschen/Kaufman: Walk-Forward & Paridade de Risco</p>
+                <p class="text-gray-400 text-sm hidden sm:block">Arquitetura Fitschen/Kaufman: Walk-Forward & Paridade de Risco</p>
             </div>
             <div id="market-sentiment-module" class="card w-full md:w-96 hidden">
                 <h3 class="text-base font-bold mb-2">Filtro de Regime (Ativos > MME 200)</h3>
@@ -126,7 +148,7 @@
                 <div class="flex justify-between text-sm text-gray-300 mb-1"><span id="load-progress-text">Carregando dados do último pregão…</span><span id="load-progress-pct">0%</span></div>
                 <div class="w-full bg-gray-700 rounded-full h-3"><div id="load-progress-bar" class="h-3 rounded-full bg-indigo-500" style="width: 0%; transition: width 0.2s;"></div></div>
             </div>
-            <div class="flex flex-col md:flex-row gap-4 items-end">
+            <div class="flex flex-col md:flex-row gap-4 md:items-end">
                 <div class="flex-1"><label for="ticker-select" class="block text-sm font-medium text-gray-400 mb-1">Foco Analítico</label><select id="ticker-select" class="w-full"></select></div>
             </div>
             <div id="data-freshness-banner" class="mt-3 text-sm hidden"></div>
@@ -468,6 +490,8 @@
         });
     }
     prepararSanfonas();
+    // Celular em "Site para computador": tela pequena, mas a página acha que tem ~980 px de largura (tudo minúsculo)
+    const modoComputadorNoCelular = () => window.matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600 && window.innerWidth > 900;
 
 
     // GLOBAIS
@@ -821,6 +845,7 @@
             inicializarComDados(precos, fundamentos, { manifest });
             if (!fundamentos) mostrarMensagem('Preços carregados, mas o arquivo de fundamentos não veio. O Módulo 6 fica sem dados até a próxima coleta.', 'aviso');
             esconderProgresso();
+            if (modoComputadorNoCelular()) mostrarMensagem('As letras estão pequenas porque o navegador está em <b>"Site para computador"</b>. No Chrome, toque em ⋮ e desmarque essa opção (depois, se instalou o app, reinstale o atalho).', 'aviso');
             await rodarFluxoCompleto();
             return true;
         } catch (err) {
@@ -885,7 +910,7 @@
 
             filteredScreenerResults = Object.entries(scoredAssets).map(([ticker, data]) => ({ ticker, score: data.score, details: data.strats, atrPct: data.atrPct })).sort((a, b) => b.score - a.score);
             const fmtAtr = (v) => v === null || v === undefined || isNaN(v) ? 's/dado' : v.toFixed(2) + '%';
-            screenerResultsContainer.innerHTML = filteredScreenerResults.length > 0 ? `<table class="results-table"><thead><tr><th>Ativo</th><th>Score</th><th title="Critérios fundamentalistas aprovados (limites do Módulo 6). Entre parênteses: quantos dos 5 têm dado">Fund.</th><th>P/L</th><th>ROE</th><th title="ATR de 14 períodos como % do preço — quanto maior, mais o ativo costuma se mover por dia">Volatilidade (ATR%)</th><th>Teses Confirmadas</th></tr></thead><tbody>${filteredScreenerResults.map(r => { const fz = resumoFundamentalista(r.ticker); return `<tr onclick="document.getElementById('ticker-select').value='${r.ticker}';"><td class="whitespace-nowrap"><b>${r.ticker}</b> <button type="button" class="text-xs text-indigo-300 underline ml-1" data-explicar="${r.ticker}" title="Ver por que foi selecionado">🔎</button></td><td>${r.score.toFixed(2)}</td><td class="${fz.classe}">${fz.nota}</td><td>${fz.pe}</td><td>${fz.roe}</td><td>${fmtAtr(r.atrPct)}</td><td class="text-xs text-gray-400">${r.details.join(', ')}</td></tr>`; }).join('')}</tbody></table>` : `<p class="text-gray-400">Nenhum ativo sobreviveu aos filtros atuais.</p>`;
+            screenerResultsContainer.innerHTML = filteredScreenerResults.length > 0 ? `<table class="results-table tabela-cartoes"><thead><tr><th>Ativo</th><th>Score</th><th title="Critérios fundamentalistas aprovados (limites do Módulo 6). Entre parênteses: quantos dos 5 têm dado">Fund.</th><th>P/L</th><th>ROE</th><th title="ATR de 14 períodos como % do preço — quanto maior, mais o ativo costuma se mover por dia">Volatilidade (ATR%)</th><th>Teses Confirmadas</th></tr></thead><tbody>${filteredScreenerResults.map(r => { const fz = resumoFundamentalista(r.ticker); return `<tr onclick="document.getElementById('ticker-select').value='${r.ticker}';"><td class="whitespace-nowrap cel-titulo"><b>${r.ticker}</b> <button type="button" class="text-xs text-indigo-300 underline ml-1" data-explicar="${r.ticker}" title="Ver por que foi selecionado">🔎<span class="lg:hidden"> por quê?</span></button></td><td data-label="Score técnico"><b>${r.score.toFixed(2)}</b></td><td data-label="Fundamentos" class="${fz.classe}">${fz.nota}</td><td data-label="P/L">${fz.pe}</td><td data-label="ROE">${fz.roe}</td><td data-label="Volatilidade (ATR)">${fmtAtr(r.atrPct)}</td><td class="text-xs text-gray-400 cel-bloco">${r.details.join(', ')}</td></tr>`; }).join('')}</tbody></table>` : `<p class="text-gray-400">Nenhum ativo sobreviveu aos filtros atuais.</p>`;
           } catch (err) {
             console.error('Erro no Screener:', err);
             screenerResultsContainer.innerHTML = `<p class="text-red-400">Erro ao executar o Screener: ${err && err.message ? err.message : err}</p>`;
@@ -1490,7 +1515,7 @@
             topHtml = `<div class="card border-2 border-green-500 mb-6">
                 <h4 class="text-base font-bold text-green-400 mb-1">🏆 Melhores Opções (dados fundamentalistas suficientes)</h4>
                 <p class="text-xs text-gray-400 mb-4">Ranking por Score Combinado, só entre ativos com pelo menos ${MIN_DATA_COVERAGE_FOR_RANKING}/5 critérios fundamentalistas com dado real e SEM evento corporativo crítico recente (ETFs/fundos e ativos sob risco de falência/deslistagem/restatement/fusão ficam de fora daqui, mesmo que apareçam na tabela completa abaixo).</p>
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
+                <div class="carrossel-opcoes grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
                 ${topPicks.map((r, i) => `
                     <div class="result-metric text-left cursor-pointer hover:border-green-400 border border-transparent" data-explicar="${r.ticker}" role="button" tabindex="0" title="Ver por que foi selecionado">
                         <div class="text-xs text-gray-400">${medals[i]} · Fund. ${r.fundScore}/5</div>
@@ -1513,7 +1538,7 @@
         }
 
         let html = topHtml;
-        html += `<table class="results-table"><thead><tr><th></th><th>Ativo</th><th>Score Técnico</th><th>P/L</th><th>P/VP</th><th>Dív/PL</th><th>ROE</th><th>Margem Líq.</th><th>Cresc. Receita</th><th title="Próximo resultado trimestral, % vendido a descoberto, alvo de preço médio dos analistas e posição na faixa de 52 semanas">Sinais de Mercado</th><th>Score Fund. (0-5)</th><th>Score Combinado</th><th>Fonte</th></tr></thead><tbody>`;
+        html += `<table class="results-table tabela-cartoes"><thead><tr><th></th><th>Ativo</th><th>Score Técnico</th><th>P/L</th><th>P/VP</th><th>Dív/PL</th><th>ROE</th><th>Margem Líq.</th><th>Cresc. Receita</th><th title="Próximo resultado trimestral, % vendido a descoberto, alvo de preço médio dos analistas e posição na faixa de 52 semanas">Sinais de Mercado</th><th>Score Fund. (0-5)</th><th>Score Combinado</th><th>Fonte</th></tr></thead><tbody>`;
         html += rows.map(r => {
             const rankIdx = topPicks.indexOf(r);
             const rankBadge = rankIdx >= 0 ? medals[rankIdx] : '';
@@ -1526,18 +1551,18 @@
                 : (!r.reliable ? '<div class="text-xs text-yellow-500">⚠️ poucos dados (fora do ranking)</div>' : '');
             return `<tr class="cursor-pointer" data-explicar="${r.ticker}" title="Clique para ver por que este ativo foi selecionado">
                 <td class="text-center">${rankBadge}</td>
-                <td><b>${r.ticker}</b>${f.longName ? `<div class="text-xs text-gray-500">${f.longName}</div>` : ''}${lowDataFlag}${eventBadge(f)}</td>
-                <td>${r.techScore.toFixed(2)}</td>
-                <td>${fmtNum(f.pe)} ${badge(r.checks.pe)}</td>
-                <td>${fmtNum(f.pb)} ${badge(r.checks.pb)}</td>
-                <td>${fmtNum(f.debtToEquity)} ${badge(r.checks.de)}</td>
-                <td>${fmtPct(f.roe)} ${badge(r.checks.roe)}</td>
-                <td>${fmtPct(f.netMargin)} ${badge(r.checks.margin)}</td>
-                <td>${fmtPct(f.revenueGrowth)}</td>
-                <td class="text-xs">${marketSignalsCell(f)}</td>
-                <td><b>${r.fundScore}/5</b></td>
-                <td><b>${r.combinedScore.toFixed(2)}</b></td>
-                <td class="text-xs text-gray-500">${f.fonte || '?'}</td>
+                <td class="cel-titulo">${rankBadge ? `<span class="lg:hidden">${rankBadge} </span>` : ''}<b>${r.ticker}</b>${f.longName ? `<div class="text-xs text-gray-500">${f.longName}</div>` : ''}${lowDataFlag}${eventBadge(f)}</td>
+                <td data-label="Score técnico">${r.techScore.toFixed(2)}</td>
+                <td data-label="P/L">${fmtNum(f.pe)} ${badge(r.checks.pe)}</td>
+                <td data-label="P/VP">${fmtNum(f.pb)} ${badge(r.checks.pb)}</td>
+                <td data-label="Dívida/PL">${fmtNum(f.debtToEquity)} ${badge(r.checks.de)}</td>
+                <td data-label="ROE">${fmtPct(f.roe)} ${badge(r.checks.roe)}</td>
+                <td data-label="Margem líquida">${fmtPct(f.netMargin)} ${badge(r.checks.margin)}</td>
+                <td data-label="Cresc. receita">${fmtPct(f.revenueGrowth)}</td>
+                <td class="text-xs cel-bloco">${marketSignalsCell(f)}</td>
+                <td data-label="Score fundamentalista"><b>${r.fundScore}/5</b></td>
+                <td data-label="Score combinado"><b class="text-green-400">${r.combinedScore.toFixed(2)}</b></td>
+                <td class="text-xs text-gray-500 cel-ocultar">${f.fonte || '?'}</td>
             </tr>`;
         }).join('');
         html += '</tbody></table>';
@@ -1761,7 +1786,7 @@
         const checks = Object.values(checarFundamentos(f, lerLimitesFundamentos()));
         const ok = checks.filter(v => v === true).length, comDado = checks.filter(v => v !== null).length;
         const classe = f.alertaEvento === 'critico' ? 'text-red-400 font-bold' : (comDado < MIN_DATA_COVERAGE_FOR_RANKING ? 'text-gray-500' : (ok >= 4 ? 'text-green-400 font-semibold' : ok >= 2 ? 'text-yellow-300' : 'text-red-400'));
-        return { nota: `${ok}/5 <span class="text-xs text-gray-500">(${comDado})</span>${f.alertaEvento === 'critico' ? ' 🚨' : ''}`, pe: fmtNum(f.pe, 1), roe: fmtPct(f.roe), classe };
+        return { nota: `<span>${ok}/5 <span class="text-xs text-gray-500">(${comDado})</span>${f.alertaEvento === 'critico' ? ' 🚨' : ''}</span>`, pe: fmtNum(f.pe, 1), roe: fmtPct(f.roe), classe };
     }
 
     // PAINEL "POR QUE FOI SELECIONADO": refaz, só para leitura, o mesmo cálculo do Screener no último pregão
