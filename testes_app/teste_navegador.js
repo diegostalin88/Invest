@@ -70,6 +70,23 @@ async function abrir(browser, url, bloquearManifesto = false) {
     ok(/excluído do ranking: evento corporativo crítico/.test(linhaCrit), 'Módulo 6: linha do CRIT marcada como excluída por evento crítico');
     await page.screenshot({ path: path.join(SHOTS, 'app_modulo6.png'), fullPage: false });
 
+    // B. Screener de Estratégias (motor da v14) roda sob demanda e não mexe no shortlist do Módulo 1
+    await page.click('button[data-tab="screener"]');
+    const antes = await page.$$eval('#screener-results-container tbody tr', t => t.length);
+    await page.selectOption('#confluence-select', 'all');
+    await page.click('#run-filter-btn');
+    await page.waitForFunction(() => /B\. Sinais Isolados \(Todos\): \d+ ativo/.test(document.getElementById('estrategias-results').textContent), null, { timeout: 60000 });
+    const nB = await page.$$eval('#estrategias-results tbody tr', t => t.length);
+    ok(nB > 0, `B. Screener de Estratégias ("Sinais Isolados"): ${nB} ativos`);
+    await page.selectOption('#confluence-select', 'volume_strength');
+    await page.click('#run-filter-btn');
+    await page.waitForFunction(() => /B\. Força do Volume/.test(document.getElementById('estrategias-results').textContent), null, { timeout: 60000 });
+    const volB = await page.$$eval('#estrategias-results tbody tr td:first-child', t => t.map(x => x.textContent.trim()));
+    ok(volB.includes('CRIT') && volB.includes('BOA1'), `B. "Força do Volume" pega os ativos com spike de volume: ${volB.join(', ')}`);
+    ok((await page.$$eval('#screener-results-container tbody tr', t => t.length)) === antes, 'B não altera o shortlist do motor de pontuação');
+    ok(await page.$('#param-blacklist') === null, 'Guilhotina Macro (Blacklist) removida');
+    await page.screenshot({ path: path.join(SHOTS, 'app_screener_estrategias.png'), fullPage: false });
+
     // Botões continuam funcionando: mudar filtro não roda sozinho; clicar em Executar roda de novo
     await page.click('button[data-tab="screener"]');
     await page.fill('#filter-adtv', '999999999999');

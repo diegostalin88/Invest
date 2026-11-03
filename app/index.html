@@ -116,6 +116,44 @@
                         </div>
                     </div>
 
+                    <div class="card border-l-4 border-yellow-500">
+                        <h3 class="text-lg font-bold mb-2">B. Screener de Estratégias</h3>
+                        <p class="text-xs text-gray-400 mb-3">Filtra os ativos que dispararam, no último pregão, os sinais de uma estratégia específica (motor da versão 14). Usa os mesmos filtros de liquidez, volatilidade e regime do bloco A. Não altera o shortlist do Módulo 1 usado no Módulo 6.</p>
+                        <select id="confluence-select" class="w-full">
+                            <option value="all">Sinais Isolados (Todos)</option>
+                            <option value="trend_buy">Tendência de Alta (SMA + BB + SAR)</option>
+                            <option value="trend_sell">Tendência de Baixa (SMA + BB + SAR)</option>
+                            <option value="reversal_buy">Reversão para Compra (MME + Padrões)</option>
+                            <option value="reversal_sell">Reversão para Venda (MME + Padrões)</option>
+                            <option value="keltner_reversion_buy">Reversão em Keltner (Compra)</option>
+                            <option value="vwap_reversion_buy">Reversão à VWAP (Compra)</option>
+                            <option value="dmi_crossover_buy">Cruzamento DMI (Alta)</option>
+                            <option value="dmi_crossover_sell">Cruzamento DMI (Baixa)</option>
+                            <option value="momentum_buy">Momentum de Compra (MACD + Mom + IFR)</option>
+                            <option value="momentum_sell">Momentum de Venda (MACD + Mom + IFR)</option>
+                            <option value="mean_reversion_buy">Reversão à Média (IFR + BB)</option>
+                            <option value="volatility_squeeze_buy">Compressão de Volatilidade (BB Squeeze)</option>
+                            <option value="donchian_breakout_buy">Rompimento de Canal Donchian (Alta)</option>
+                            <option value="donchian_breakout_sell">Rompimento de Canal Donchian (Baixa)</option>
+                            <option value="ichimoku_buy">Ichimoku Kumo Breakout (Alta)</option>
+                            <option value="ichimoku_sell">Ichimoku Kumo Breakout (Baixa)</option>
+                            <option value="volume_strength">Força do Volume (OBV Div. + Spike)</option>
+                            <option value="adl_strength">Força de Acumulação (ADL)</option>
+                             <option value="optimistic_buy">Otimista (ADL+Mom+IFR)</option>
+                            <option value="resistance_breakout">Rompimento de Resistência (Otimista)</option>
+                            <option value="candlestick_buy_reversal">Padrões de Reversão de Candlestick (Alta)</option>
+                            <option value="golden_cross_buy">Cruzamento Dourado (MME 50/200)</option>
+                            <option value="death_cross_sell">Cruzamento da Morte (MME 50/200)</option>
+                            <option value="support_bounce_buy">Rebote no Suporte</option>
+                            <option value="adx_trend_buy">Tendência Forte com ADX (Compra)</option>
+                            <option value="adx_trend_sell">Tendência Forte com ADX (Venda)</option>
+                            <option value="stoch_crossover_buy">Cruzamento Estocástico (Compra)</option>
+                            <option value="stoch_crossover_sell">Cruzamento Estocástico (Venda)</option>
+                            <option value="inside_bar_buy">Rompimento de Inside Bar (Alta)</option>
+                            <option value="inside_bar_sell">Rompimento de Inside Bar (Baixa)</option>
+                        </select>
+                        <div class="flex gap-4 mt-4"><button id="run-filter-btn" class="btn btn-primary flex-1" disabled>Executar Filtro</button></div>
+                    </div>
 
                     <div class="card">
                         <details open>
@@ -131,6 +169,7 @@
                         <h3 class="text-lg font-bold">Vetor de Ativos Aprovados</h3>
                         <button id="download-btn" class="btn btn-secondary text-sm" disabled>Exportar CSV</button>
                     </div>
+                    <div id="estrategias-results" class="hidden mb-6"></div>
                     <div id="screener-loading" class="text-center py-10" style="display:none;">Processando Tensores...</div>
                     <div id="screener-results-container" class="overflow-x-auto">
                         <p class="text-gray-400 mt-4">Nenhum dado carregado.</p>
@@ -703,6 +742,234 @@
         if (typeof saveAs === 'function') { saveAs(blob, `screener_shortlist_${stamp}.csv`); }
         else { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `screener_shortlist_${stamp}.csv`; a.click(); }
     });
+
+
+    // =============================================================================================
+    // B. SCREENER DE ESTRATÉGIAS (portado da versão 14 a pedido do Diego)
+    // Motor de sinais próprio, separado do motor de pontuação (C) usado por Screener/Backtest/Walk-Forward:
+    // nada aqui altera computeStrategyScore, analyzeAllSignals ou precomputeAllIndicators da v16.
+    // Diferenças em relação à v14, para não usar informação do futuro: a divergência OBV usa o detector com
+    // confirmedAt da v16, e pivôs (suporte, resistência, fundo/topo duplo) só valem depois de confirmados
+    // (PIVOT_WINDOW candles depois). No último pregão isso não muda o resultado, pois pivôs ainda não
+    // confirmados nem eram detectáveis ali.
+    // =============================================================================================
+    function v14_calculateMACD(data, fast, slow, signal) { const fastEMA = calculateEMA(data, fast); const slowEMA = calculateEMA(data, slow); const macdLine = fastEMA.map((e, i) => (e !== null && slowEMA[i] !== null) ? e - slowEMA[i] : null); const signalData = { close: macdLine.filter(v => v !== null) }; const signalEMA = signalData.close.length > signal ? calculateEMA(signalData, signal) : []; let signalLine = new Array(macdLine.length).fill(null); for (let i = 0, j = 0; i < macdLine.length; i++) { if (macdLine[i] !== null) { if (j < signalEMA.length) { signalLine[i] = signalEMA[j]; j++; } } } const histogram = macdLine.map((m, i) => (m !== null && signalLine[i] !== null) ? m - signalLine[i] : null); return { macdLine, signalLine, histogram }; }
+    function v14_calculateIFR(data, length) { if (!data || !data.close) return []; const close = data.close; let gains = [], losses = []; for (let i = 1; i < close.length; i++) { const change = close[i] - close[i - 1]; gains.push(change > 0 ? change : 0); losses.push(change < 0 ? -change : 0); } if (gains.length < length) return new Array(close.length).fill(null); let avgGain = gains.slice(0, length).reduce((a,b)=>a+b,0)/length; let avgLoss = losses.slice(0, length).reduce((a,b)=>a+b,0)/length; let ifr = [100 - (100 / (1 + (avgLoss === 0 ? Infinity : avgGain / avgLoss)))]; for (let i = length; i < gains.length; i++) { avgGain = (avgGain * (length - 1) + gains[i]) / length; avgLoss = (avgLoss * (length - 1) + losses[i]) / length; ifr.push(100 - (100 / (1 + (avgLoss === 0 ? Infinity : avgGain / avgLoss)))); } return new Array(close.length - ifr.length).fill(null).concat(ifr); }
+    function v14_calculateStoch(data, kLength, dLength) { if (!data || !data.close) return {k:[],d:[]}; const { close, high, low } = data; let k = []; for (let i = kLength - 1; i < close.length; i++) { const highSlice = high.slice(i - kLength + 1, i + 1); const lowSlice = low.slice(i - kLength + 1, i + 1); const minLow = Math.min(...lowSlice); const maxHigh = Math.max(...highSlice); k.push(maxHigh - minLow === 0 ? 0 : ((close[i] - minLow) / (maxHigh - minLow)) * 100); } const dData = { close: k }; const d = dData.close.length >= dLength ? calculateSMA(dData, dLength) : []; return { k: new Array(kLength - 1).fill(null).concat(k), d: new Array(kLength - 1 + dLength - 1).fill(null).concat(d) }; }
+    function v14_calculateMomentum(data, period) { if (!data || !data.close) return []; return data.close.map((c, i) => i < period ? null : c - data.close[i - period]); }
+    function v14_calculateParabolicSAR(data, start, inc, max) { if (!data || !data.close) return []; const { high, low } = data; let sar = [low[0]]; let ep = high[0]; let af = start; let isLong = true; for (let i = 1; i < high.length; i++) { let nextSar = sar[i-1] + af * (ep - sar[i-1]); if (isLong) { if (high[i] > ep) { ep = high[i]; af = Math.min(max, af + inc); } if (low[i] < nextSar) { isLong = false; nextSar = ep; ep = low[i]; af = start; } } else { if (low[i] < ep) { ep = low[i]; af = Math.min(max, af + inc); } if (high[i] > nextSar) { isLong = true; nextSar = ep; ep = high[i]; af = start; } } sar.push(nextSar); } return sar; }
+    function v14_calculateDonchianChannels(data, period) { if (!data || !data.high || !data.low) return { upper: [], lower: [] }; const { high, low } = data; let upper = new Array(period - 1).fill(null); let lower = new Array(period - 1).fill(null); for (let i = period - 1; i < high.length; i++) { const highSlice = high.slice(i - period + 1, i + 1); const lowSlice = low.slice(i - period + 1, i + 1); upper.push(Math.max(...highSlice)); lower.push(Math.min(...lowSlice)); } return { upper, lower }; }
+    function v14_calculateDMI(data, period) { function WilderMA(data, length) { let smoothed = new Array(data.length).fill(null); if(data.length < length) return smoothed; let sum = 0; for (let i = 0; i < length; i++) { sum += data[i] || 0; } smoothed[length-1] = sum; for (let i = length; i < data.length; i++) { smoothed[i] = smoothed[i - 1] - (smoothed[i-1] / length) + (data[i] || 0); } return smoothed; } if (!data || data.close.length < period + 1) { let empty = new Array(data.close.length).fill(null); return { pdi: empty, mdi: empty, adx: empty }; } let tr = [null]; let pdm = [null]; let mdm = [null]; for (let i = 1; i < data.high.length; i++) { tr.push(Math.max(data.high[i] - data.low[i], Math.abs(data.high[i] - data.close[i - 1]), Math.abs(data.low[i] - data.close[i - 1]))); const upMove = data.high[i] - data.high[i - 1]; const downMove = data.low[i - 1] - data.low[i]; pdm.push(upMove > downMove && upMove > 0 ? upMove : 0); mdm.push(downMove > upMove && downMove > 0 ? downMove : 0); } const trS = WilderMA(tr, period); const pdmS = WilderMA(pdm, period); const mdmS = WilderMA(mdm, period); let pdi = new Array(data.close.length).fill(null); let mdi = new Array(data.close.length).fill(null); let dx = new Array(data.close.length).fill(null); for (let i = period -1; i < data.close.length; i++) { if (trS[i] > 0) { pdi[i] = 100 * (pdmS[i] / trS[i]); mdi[i] = 100 * (mdmS[i] / trS[i]); const diSum = pdi[i] + mdi[i]; dx[i] = diSum === 0 ? 0 : Math.abs(pdi[i] - mdi[i]) / diSum * 100; } } let adx = new Array(data.close.length).fill(null); if(data.close.length >= 2 * period ) { let firstAdxSum = 0; for (let i = period; i < 2 * period; i++) { firstAdxSum += dx[i] || 0; } adx[2 * period - 1] = firstAdxSum / period; for (let i = 2 * period; i < data.close.length; i++) { adx[i] = (adx[i - 1] * (period - 1) + (dx[i] || 0)) / period; } } return { pdi, mdi, adx }; }
+    function v14_calculateIchimoku(data) { const tenkanPeriod = 9, kijunPeriod = 26, senkouBPeriod = 52; const { high, low, close } = data; let tenkanSen = [], kijunSen = [], senkouSpanA = [], senkouSpanB = [], chikouSpan = []; for (let i = 0; i < close.length; i++) { if (i >= tenkanPeriod - 1) { const slice = high.slice(i - tenkanPeriod + 1, i + 1); const lowSlice = low.slice(i - tenkanPeriod + 1, i + 1); tenkanSen[i] = (Math.max(...slice) + Math.min(...lowSlice)) / 2; } else { tenkanSen[i] = null; } if (i >= kijunPeriod - 1) { const slice = high.slice(i - kijunPeriod + 1, i + 1); const lowSlice = low.slice(i - kijunPeriod + 1, i + 1); kijunSen[i] = (Math.max(...slice) + Math.min(...lowSlice)) / 2; } else { kijunSen[i] = null; } if (i >= kijunPeriod - 1) { senkouSpanA[i] = (tenkanSen[i] + kijunSen[i]) / 2; } else { senkouSpanA[i] = null; } if (i >= senkouBPeriod - 1) { const slice = high.slice(i - senkouBPeriod + 1, i + 1); const lowSlice = low.slice(i - senkouBPeriod + 1, i + 1); senkouSpanB[i] = (Math.max(...slice) + Math.min(...lowSlice)) / 2; } else { senkouSpanB[i] = null; } chikouSpan[i] = close[i]; } return { tenkanSen, kijunSen, senkouSpanA, senkouSpanB, chikouSpan }; }
+    function v14_detectCandlestickPatterns(data) { const patterns = []; const { open, high, low, close } = data; for (let i = 2; i < close.length; i++) { const p2 = i - 2, p1 = i - 1, c = i; const isBullishEngulfing = close[p1] < open[p1] && close[c] > open[c] && open[c] < close[p1] && close[c] > open[p1]; if (isBullishEngulfing) patterns.push({ index: c, name: 'Engolfo de Alta', type: 'bullish' }); const body = Math.abs(open[c] - close[c]); const range = high[c] - low[c]; const lowerShadow = Math.min(open[c], close[c]) - low[c]; if (range > 0 && (body / range) < 0.3 && lowerShadow > body * 2) patterns.push({ index: c, name: 'Martelo', type: 'bullish' }); const isBullishHarami = close[p1] < open[p1] && close[c] > open[c] && open[c] > close[p1] && close[c] < open[p1]; if (isBullishHarami) patterns.push({ index: c, name: 'Harami de Alta', type: 'bullish' }); const isMorningStar = close[p2] < open[p2] && Math.abs(open[p1] - close[p1]) < Math.abs(open[p2] - close[p2]) && close[p1] < close[p2] && close[c] > open[c] && close[c] > (open[p2] + close[p2]) / 2; if (isMorningStar) patterns.push({ index: c, name: 'Estrela da Manhã', type: 'bullish' }); } return patterns; }
+    function v14_detectAllPatterns(pivots, data) { let patterns = { Double_Bottom: [], Double_Top: []}; const lows = pivots.filter(p => p.type === 'low'); const highs = pivots.filter(p => p.type === 'high'); for (let i = 0; i < lows.length - 1; i++) { const p1 = lows[i], p3 = lows[i+1]; const p2 = highs.find(h => h.index > p1.index && h.index < p3.index); if (p2 && Math.abs(p1.price - p3.price) / p1.price < 0.03 && p2.price > p1.price) { patterns.Double_Bottom.push({ p1, p2, p3 }); } } for (let i = 0; i < highs.length - 1; i++) { const p1 = highs[i], p3 = highs[i+1]; const p2 = lows.find(l => l.index > p1.index && l.index < p3.index); if (p2 && Math.abs(p1.price - p3.price) / p1.price < 0.03 && p2.price < p1.price) { patterns.Double_Top.push({ p1, p2, p3 }); } } return patterns; }
+
+    const estrategiasV14 = {
+        all: {buy:['Price_Above_EMA_200','MME_Cross_Up', 'Keltner_Touch_Lower', 'VWAP_Cross_Up', 'DMI_Cross_Up', 'MACD_Cross_Up', 'Mean_Reversion_Buy', 'BB_Squeeze_Breakout', 'Donchian_Breakout_High', 'Ichimoku_Kumo_Breakout_Buy', 'OBV_Divergence_Bullish', 'Volume_Spike', 'Bullish_Engulfing', 'Hammer', 'Bullish_Harami', 'Morning_Star', 'Golden_Cross', 'ADL_Rising', 'STOCH_Cross_Up_Oversold', 'SMA_Cross_Up', 'SAR_Flip_Up', 'Momentum_Cross_Up', 'Double_Bottom', 'Support_Bounce', 'Inside_Bar_Breakout_Up', 'Resistance_Breakout'], sell:['Price_Below_EMA_200', 'MME_Cross_Down', 'DMI_Cross_Down', 'MACD_Cross_Down', 'Donchian_Breakout_Low', 'Death_Cross', 'ADX_Strong_Trend_Sell', 'STOCH_Cross_Down_Overbought', 'SMA_Cross_Down', 'SAR_Flip_Down', 'Double_Top', 'Inside_Bar_Breakout_Down'], minVotes: 1},
+        trend_buy: {buy:['SMA_Cross_Up', 'BB_Touch_Lower', 'SAR_Flip_Up', 'Price_Above_EMA_200', 'MME_Cross_Up'], sell:[], minVotes: 2},
+        trend_sell: {buy:[], sell:['SMA_Cross_Down', 'BB_Touch_Upper', 'SAR_Flip_Down', 'Price_Below_EMA_200', 'MME_Cross_Down'], minVotes: 2},
+        reversal_buy: {buy:['MME_Cross_Up', 'Double_Bottom'], sell:[], minVotes: 1},
+        reversal_sell: {buy:[], sell:['MME_Cross_Down', 'Double_Top'], minVotes: 1},
+        keltner_reversion_buy: {buy:['Price_Above_EMA_200', 'Keltner_Touch_Lower'], sell:[], minVotes: 2},
+        vwap_reversion_buy: {buy:['VWAP_Cross_Up'], sell:[], minVotes: 1},
+        dmi_crossover_buy: {buy:['DMI_Cross_Up'], sell:[], minVotes: 1},
+        dmi_crossover_sell: {buy:[], sell:['DMI_Cross_Down'], minVotes: 1},
+        momentum_buy: {buy:['MACD_Cross_Up', 'RSI_Exit_Oversold', 'Momentum_Cross_Up'], sell:[], minVotes: 2},
+        momentum_sell: {buy:[], sell:['MACD_Cross_Down', 'RSI_Exit_Overbought', 'Momentum_Cross_Down'], minVotes: 2},
+        mean_reversion_buy: {buy:['Mean_Reversion_Buy'], sell:[], minVotes: 1},
+        volatility_squeeze_buy: {buy:['BB_Squeeze_Breakout'], sell:[], minVotes: 1},
+        donchian_breakout_buy: {buy:['Donchian_Breakout_High'], sell:[], minVotes: 1},
+        donchian_breakout_sell: {buy:[], sell:['Donchian_Breakout_Low'], minVotes: 1},
+        ichimoku_buy: {buy:['Ichimoku_Kumo_Breakout_Buy'], sell:[], minVotes: 1},
+        ichimoku_sell: {buy:[], sell:['Ichimoku_Kumo_Breakout_Sell'], minVotes: 1},
+        volume_strength: {buy:['OBV_Divergence_Bullish', 'Volume_Spike'], sell:[], minVotes: 1},
+        adl_strength: {buy:['ADL_Rising_Sustained'], sell:[], minVotes: 1},
+        optimistic_buy: {buy:['ADL_Rising_Sustained', 'Momentum_Rising', 'IFR_Cross_SMA_Up'], sell:[], minVotes: 3},
+        resistance_breakout: {buy:['Resistance_Breakout'], sell:[], minVotes: 1},
+        candlestick_buy_reversal: {buy:['Bullish_Engulfing', 'Hammer', 'Bullish_Harami', 'Morning_Star'], sell:[], minVotes: 1},
+        golden_cross_buy: {buy:['Golden_Cross'], sell:[], minVotes: 1},
+        death_cross_sell: {buy:[], sell:['Death_Cross'], minVotes: 1},
+        support_bounce_buy: {buy:['Support_Bounce'], sell:[], minVotes: 1},
+        adx_trend_buy: {buy:['DMI_Cross_Up', 'ADX_Strong_Trend'], sell:[], minVotes: 2},
+        adx_trend_sell: {buy:[], sell:['DMI_Cross_Down', 'ADX_Strong_Trend'], minVotes: 2},
+        stoch_crossover_buy: {buy:['STOCH_Cross_Up_Oversold'], sell:[], minVotes: 1},
+        stoch_crossover_sell: {buy:[], sell:['STOCH_Cross_Down_Overbought'], minVotes: 1},
+        inside_bar_buy: {buy:['Inside_Bar_Breakout_Up'], sell:[], minVotes: 1},
+        inside_bar_sell: {buy:[], sell:['Inside_Bar_Breakout_Down'], minVotes: 1},
+    };
+
+    function v14_analisarSinais(data, indicators, i) {
+        const prev = i - 1; if (prev < 2) return { buy: {}, sell: {} };
+        const signals = { buy: {}, sell: {} };
+        const { open, high, low, close, volume } = data;
+
+        // Sinais de Compra
+        if (indicators.SMA[i] && close[i] > indicators.SMA[i] && close[prev] <= indicators.SMA[prev]) signals.buy.SMA_Cross_Up = 'Cruzou SMA p/ Cima';
+        if (indicators.BB.bbl[i] && close[i] < indicators.BB.bbl[i]) signals.buy.BB_Touch_Lower = 'Tocou Banda Inf. BB';
+        if (indicators.EMA_200[i] && close[i] > indicators.EMA_200[i]) signals.buy.Price_Above_EMA_200 = 'Preço > MME 200';
+        if (indicators.EMA_short[i] > indicators.EMA_long[i] && indicators.EMA_short[prev] <= indicators.EMA_long[prev]) signals.buy.MME_Cross_Up = 'Cruzamento MME 9x21';
+        if (indicators.Keltner.lower[i] && close[i] < indicators.Keltner.lower[i]) signals.buy.Keltner_Touch_Lower = 'Toque Banda Inf. Keltner';
+        if (indicators.VWAP[i] && close[i] > indicators.VWAP[i] && close[prev] <= indicators.VWAP[prev]) signals.buy.VWAP_Cross_Up = 'Preço Cruzou VWAP p/ Cima';
+        if (indicators.DMI.pdi[i] > indicators.DMI.mdi[i] && indicators.DMI.pdi[prev] <= indicators.DMI.mdi[prev]) {
+            signals.buy.DMI_Cross_Up = 'Cruzamento DMI (Alta)';
+            if (indicators.DMI.adx[i] > 25) signals.buy.ADX_Strong_Trend = 'ADX > 25';
+        }
+        if (indicators.MACD.macdLine[i] > indicators.MACD.signalLine[i] && indicators.MACD.macdLine[prev] <= indicators.MACD.signalLine[prev]) signals.buy.MACD_Cross_Up = 'Cruzamento MACD Positivo';
+        if (indicators.IFR[i] > 30 && indicators.IFR[prev] <= 30) signals.buy.RSI_Exit_Oversold = 'IFR Saiu de Sobrevenda';
+        if (indicators.IFR[i] < 30 && close[i] < indicators.BB.bbl[i]) signals.buy.Mean_Reversion_Buy = 'Reversão à Média (IFR+BB)';
+        if (indicators.BB_Squeeze && indicators.BB_Squeeze[i] && close[i] > indicators.BB.bbu[i]) signals.buy.BB_Squeeze_Breakout = 'Rompimento de Squeeze BB';
+        if (indicators.Donchian && indicators.Donchian.upper[prev] && close[i] > indicators.Donchian.upper[prev] && close[prev] <= indicators.Donchian.upper[prev]) signals.buy.Donchian_Breakout_High = 'Rompimento Canal Donchian (Alta)';
+        if (indicators.Ichimoku.senkouSpanA[i] && close[i] > indicators.Ichimoku.senkouSpanA[i] && close[i] > indicators.Ichimoku.senkouSpanB[i] && (close[prev] < indicators.Ichimoku.senkouSpanA[prev] || close[prev] < indicators.Ichimoku.senkouSpanB[prev])) signals.buy.Ichimoku_Kumo_Breakout_Buy = 'Ichimoku Kumo Breakout (Alta)';
+        if (indicators.divergences.OBV.bullish.some(d => d.confirmedAt === i)) signals.buy.OBV_Divergence_Bullish = 'Divergência de Alta (OBV)';
+        if (indicators.Volume_SMA[i] && volume[i] > indicators.Volume_SMA[i] * 2.5) signals.buy.Volume_Spike = `Spike de Volume (${(volume[i]/indicators.Volume_SMA[i]).toFixed(1)}x)`;
+        if (indicators.EMA_50[i] > indicators.EMA_200[i] && indicators.EMA_50[prev] <= indicators.EMA_200[prev]) signals.buy.Golden_Cross = 'Cruzamento Dourado (MME 50/200)';
+        if (indicators.ADL[i] > indicators.ADL[prev]) signals.buy.ADL_Rising = 'ADL Ascendente';
+        if (indicators.ADL[i] > indicators.ADL_SMA[i]) signals.buy.ADL_Rising_Sustained = 'ADL Acima da Média Curta';
+        if (indicators.Stoch.k[i] > indicators.Stoch.d[i] && indicators.Stoch.k[prev] <= indicators.Stoch.d[prev] && indicators.Stoch.k[i] < 30) signals.buy.STOCH_Cross_Up_Oversold = 'Cruz. Estocástico (Sobrevenda)';
+        if (indicators.Momentum[i] > 0 && indicators.Momentum[prev] <=0) signals.buy.Momentum_Cross_Up = 'Momentum Cruzou p/ Cima';
+        if (indicators.Momentum[i] > indicators.Momentum[prev]) signals.buy.Momentum_Rising = 'Momentum Apontando para Cima';
+        if (indicators.SAR[i] && close[i] > indicators.SAR[i] && close[prev] <= indicators.SAR[prev]) signals.buy.SAR_Flip_Up = 'Reversão SAR Positiva';
+        if (indicators.patterns.Double_Bottom.some(p => p.p3.index + PIVOT_WINDOW <= i && close[i] > p.p2.price && close[prev] <= p.p2.price)) signals.buy.Double_Bottom = 'Rompimento Fundo Duplo';
+        const recentLowPivots = indicators.pivots.low.filter(p => p.index + PIVOT_WINDOW <= i);
+        if (recentLowPivots.length > 0) { const lastPivot = recentLowPivots[recentLowPivots.length - 1]; if (Math.abs(low[i] - lastPivot.price) / lastPivot.price < 0.01 && close[i] > open[i]) { signals.buy.Support_Bounce = `Rebote no Suporte (${lastPivot.price.toFixed(2)})`; } }
+        const prev2 = i-2;
+        if (prev2 > 0) { const isInsideBar = high[prev] < high[prev2] && low[prev] > low[prev2]; if (isInsideBar) { if (close[i] > high[prev]) signals.buy.Inside_Bar_Breakout_Up = 'Rompimento de Inside Bar (Alta)'; } }
+        const recentPivots = indicators.pivots.high.filter(p => p.index + PIVOT_WINDOW <= i);
+        if (recentPivots.length > 0) { const lastPivot = recentPivots[recentPivots.length - 1]; if (close[i] > lastPivot.price && close[prev] <= lastPivot.price) { signals.buy.Resistance_Breakout = `Rompimento de Resistência (${lastPivot.price.toFixed(2)})`; } }
+
+
+        // Sinais de Venda
+        if (indicators.SMA[i] && close[i] < indicators.SMA[i] && close[prev] >= indicators.SMA[prev]) signals.sell.SMA_Cross_Down = 'Cruzou SMA p/ Baixo';
+        if (indicators.BB.bbu[i] && close[i] > indicators.BB.bbu[i]) signals.sell.BB_Touch_Upper = 'Tocou Banda Sup. BB';
+        if (indicators.EMA_200[i] && close[i] < indicators.EMA_200[i]) signals.sell.Price_Below_EMA_200 = 'Preço < MME 200';
+        if (indicators.EMA_short[i] < indicators.EMA_long[i] && indicators.EMA_short[prev] >= indicators.EMA_long[prev]) signals.sell.MME_Cross_Down = 'Cruzamento MME 9x21';
+        if (indicators.DMI.mdi[i] > indicators.DMI.pdi[i] && indicators.DMI.mdi[prev] <= indicators.DMI.pdi[prev]) {
+             signals.sell.DMI_Cross_Down = 'Cruzamento DMI (Baixa)';
+             if (indicators.DMI.adx[i] > 25) signals.sell.ADX_Strong_Trend = 'ADX > 25';
+        }
+        if (indicators.MACD.macdLine[i] < indicators.MACD.signalLine[i] && indicators.MACD.macdLine[prev] >= indicators.MACD.signalLine[prev]) signals.sell.MACD_Cross_Down = 'Cruzamento MACD Negativo';
+        if (indicators.IFR[i] < 70 && indicators.IFR[prev] >= 70) signals.sell.RSI_Exit_Overbought = 'IFR Saiu de Sobrecompra';
+        if (indicators.Donchian && indicators.Donchian.lower[prev] && close[i] < indicators.Donchian.lower[prev] && close[prev] >= indicators.Donchian.lower[prev]) signals.sell.Donchian_Breakout_Low = 'Rompimento Canal Donchian (Baixa)';
+        if (indicators.EMA_50[i] < indicators.EMA_200[i] && indicators.EMA_50[prev] >= indicators.EMA_200[prev]) signals.sell.Death_Cross = 'Cruzamento da Morte (MME 50/200)';
+        if (indicators.Stoch.k[i] < indicators.Stoch.d[i] && indicators.Stoch.k[prev] >= indicators.Stoch.d[prev] && indicators.Stoch.k[i] > 70) signals.sell.STOCH_Cross_Down_Overbought = 'Cruz. Estocástico (Sobrecompra)';
+        if (indicators.SAR[i] && close[i] < indicators.SAR[i] && close[prev] >= indicators.SAR[prev]) signals.sell.SAR_Flip_Down = 'Reversão SAR Negativa';
+        if (indicators.patterns.Double_Top.some(p => p.p3.index + PIVOT_WINDOW <= i && close[i] < p.p2.price && close[prev] >= p.p2.price)) signals.sell.Double_Top = 'Rompimento Topo Duplo';
+        if (prev2 > 0) { const isInsideBar = high[prev] < high[prev2] && low[prev] > low[prev2]; if (isInsideBar) { if (close[i] < low[prev]) signals.sell.Inside_Bar_Breakout_Down = 'Rompimento de Inside Bar (Baixa)'; } }
+        
+        // Sinais de Candlestick
+        const lastCandlePatterns = indicators.candlesticks.filter(p => p.index === i);
+        lastCandlePatterns.forEach(p => {
+             if(p.name === 'Engolfo de Alta') signals.buy.Bullish_Engulfing = p.name;
+             if(p.name === 'Martelo') signals.buy.Hammer = p.name;
+             if(p.name === 'Harami de Alta') signals.buy.Bullish_Harami = p.name;
+             if(p.name === 'Estrela da Manhã') signals.buy.Morning_Star = p.name;
+        });
+
+        return signals;
+    }
+
+    function v14_precomputarIndicadores(data, params) {
+        const bb = calculateBB(data, params.bb.period, params.bb.stdDev);
+        const bbw = bb.sma.map((val, i) => val > 0 ? (bb.bbu[i] - bb.bbl[i]) / val : null);
+        const bbSqueeze = bbw.map((val, i) => { if (i < 50 || val === null) return false; const slice = bbw.slice(i - 50, i + 1).filter(v => v !== null); return slice.length > 0 && val === Math.min(...slice); });
+        const ifrData = v14_calculateIFR(data, params.ifr.period);
+        const obvData = calculateOBV(data);
+        const adlData = calculateADL(data);
+        const allPivots = findPivotPoints(data, PIVOT_WINDOW);
+        const atrData = calculateATR(data, 14);
+        return {
+            SMA: calculateSMA(data, params.sma.period),
+            EMA_short: calculateEMA(data, params.ema.short), EMA_long: calculateEMA(data, params.ema.long),
+            EMA_200: calculateEMA(data, params.ema.ema200), EMA_50: calculateEMA(data, 50),
+            BB: bb, BB_Squeeze: bbSqueeze,
+            Keltner: calculateKeltnerChannels(data, params.keltner.ema, params.keltner.atr, 2),
+            VWAP: calculateVWAP(data, 20),
+            SAR: v14_calculateParabolicSAR(data, 0.02, 0.02, 0.2),
+            IFR: ifrData,
+            MACD: v14_calculateMACD(data, params.macd.fast, params.macd.slow, params.macd.signal),
+            Stoch: v14_calculateStoch(data, 14, 3),
+            Momentum: v14_calculateMomentum(data, params.momentum.period),
+            ADL: adlData, ADL_SMA: calculateSMA({close: adlData}, 5),
+            DMI: v14_calculateDMI(data, 14),
+            Ichimoku: v14_calculateIchimoku(data),
+            Donchian: v14_calculateDonchianChannels(data, 20),
+            Volume_SMA: calculateSMA({close: data.volume}, 20),
+            divergences: { OBV: detectDivergences(data, obvData, 'OBV') },
+            patterns: v14_detectAllPatterns(allPivots, data),
+            pivots: { high: allPivots.filter(p => p.type === 'high'), low: allPivots.filter(p => p.type === 'low') },
+            candlesticks: v14_detectCandlestickPatterns(data),
+            ATR: atrData, ATR_SMA: calculateSMA({close: atrData}, 100)
+        };
+    }
+
+    const runFilterBtn = document.getElementById('run-filter-btn');
+    const confluenceSelect = document.getElementById('confluence-select');
+    allButtons.push(runFilterBtn);
+    let estrategiaRodando = false;
+
+    // Mesmos filtros do bloco A (liquidez, anomalia de volatilidade, regime > MME200) e mesma regra da v14:
+    // com o filtro de regime ligado, sinais de VENDA não aparecem.
+    async function executarScreenerEstrategias() {
+        if (estrategiaRodando) return;
+        estrategiaRodando = true; runFilterBtn.disabled = true;
+        const box = document.getElementById('estrategias-results');
+        const chave = confluenceSelect.value;
+        const nome = confluenceSelect.options[confluenceSelect.selectedIndex].text;
+        const strategyInfo = estrategiasV14[chave];
+        box.classList.remove('hidden');
+        box.innerHTML = `<p class="text-sm text-gray-400">Rodando "${nome}"…</p>`;
+        await new Promise(r => setTimeout(r, 20));
+        try {
+            const minAdtv = parseFloat(document.getElementById('filter-adtv').value) || 0;
+            const useVolatilityFilter = document.getElementById('filter-volatility').checked;
+            const useTrendFilter = document.getElementById('filter-trend').checked;
+            const params = getIndicatorParameters();
+            const tickers = Object.keys(allData); const results = [];
+            let ultimaPausa = performance.now();
+            for (let k = 0; k < tickers.length; k++) {
+                if (performance.now() - ultimaPausa > 40) {
+                    box.innerHTML = `<p class="text-sm text-gray-400">Rodando "${nome}"… ${k.toLocaleString('pt-BR')}/${tickers.length.toLocaleString('pt-BR')} ativos (${Math.round(100 * k / tickers.length)}%)</p>`;
+                    await new Promise(r => setTimeout(r, 0)); ultimaPausa = performance.now();
+                }
+                const ticker = tickers[k];
+                const data = allData[ticker]; if (!data || !data.close || data.close.length < 201) continue;
+                const i = data.close.length - 1; const prev_i = i - 1;
+                let sumVolFin = 0; for (let j = i - 19; j <= i; j++) { sumVolFin += data.close[j] * data.volume[j]; }
+                if ((sumVolFin / 20) < minAdtv) continue;
+                const indicators = v14_precomputarIndicadores(data, params);
+                if (useVolatilityFilter) {
+                    if (!indicators.ATR_SMA[i]) continue;
+                    const lastTR = Math.max(data.high[i] - data.low[i], Math.abs(data.high[i] - data.close[prev_i]), Math.abs(data.low[i] - data.close[prev_i]));
+                    if (lastTR > indicators.ATR_SMA[i] * 3.0) continue;
+                }
+                if (useTrendFilter && (!indicators.EMA_200[i] || data.close[i] < indicators.EMA_200[i])) continue;
+                const signals = v14_analisarSinais(data, indicators, i);
+                const buySignals = Object.keys(signals.buy).filter(key => strategyInfo.buy.includes(key));
+                const sellSignals = Object.keys(signals.sell).filter(key => strategyInfo.sell.includes(key));
+                const atrPct = indicators.ATR[i] ? (indicators.ATR[i] / data.close[i]) * 100 : null;
+                if (buySignals.length >= (strategyInfo.minVotes || 1)) {
+                    results.push({ ticker, overall: 'buy', details: buySignals.map(k2 => signals.buy[k2]), atrPct });
+                } else if (sellSignals.length >= (strategyInfo.minVotes || 1)) {
+                    if (useTrendFilter) continue;
+                    results.push({ ticker, overall: 'sell', details: sellSignals.map(k2 => signals.sell[k2]), atrPct });
+                }
+            }
+            results.sort((a, b) => b.details.length - a.details.length || a.ticker.localeCompare(b.ticker));
+            const fmtAtr = (v) => v === null || v === undefined || isNaN(v) ? 's/dado' : v.toFixed(2) + '%';
+            const rows = results.map(r => `<tr onclick="document.getElementById('ticker-select').value='${r.ticker}';"><td><b>${r.ticker}</b></td><td class="${r.overall === 'buy' ? 'signal-buy' : 'signal-sell'} font-semibold">${r.overall === 'buy' ? 'Compra' : 'Venda'}</td><td>${fmtAtr(r.atrPct)}</td><td class="text-xs text-gray-400">${r.details.join(', ')}</td></tr>`).join('');
+            box.innerHTML = `<div class="flex justify-between items-center"><h4 class="font-bold text-yellow-300">B. ${nome}: ${results.length} ativo(s)</h4><button type="button" id="estrategias-fechar" class="text-xs text-gray-400 underline">fechar</button></div>`
+                + (results.length ? `<table class="results-table"><thead><tr><th>Ativo</th><th>Sinal</th><th>Volatilidade (ATR%)</th><th>Sinais Disparados</th></tr></thead><tbody>${rows}</tbody></table>`
+                                  : `<p class="text-gray-400 text-sm mt-2">Nenhum sinal encontrado com os filtros atuais${useTrendFilter && strategyInfo.buy.length === 0 ? ' (estratégias de venda não aparecem com o "Filtro de Regime" ligado)' : ''}.</p>`)
+                + '<hr class="border-gray-600 mt-6">';
+            document.getElementById('estrategias-fechar').addEventListener('click', () => box.classList.add('hidden'));
+        } catch (err) {
+            console.error('Erro no Screener de Estratégias:', err);
+            box.innerHTML = `<p class="text-red-400 text-sm">Erro ao executar o Screener de Estratégias: ${err && err.message ? err.message : err}</p>`;
+        } finally {
+            estrategiaRodando = false; runFilterBtn.disabled = Object.keys(allData).length === 0;
+        }
+    }
+    runFilterBtn.addEventListener('click', () => executarScreenerEstrategias());
 
     // Lê os parâmetros de risco/config UMA vez do Módulo 3, para que Backtest E Walk-Forward validem
     // exatamente a MESMA estratégia (mesmos pesos, score mínimo, custos e filtro de regime).
