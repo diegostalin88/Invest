@@ -1,10 +1,13 @@
 # Invest — Dashboard Quantitativo que se atualiza sozinho
 
-App web de análise de ações americanas (Nasdaq + NYSE/AMEX/ARCA): Screener técnico com score ponderado,
+App web de análise de ações americanas (Nasdaq + NYSE/AMEX/ARCA) e brasileiras (carteira do IBOVESPA): Screener técnico com score ponderado,
 gráficos, Backtest, Walk-Forward, matriz de correlação e cruzamento com fundamentos (P/L, P/VP, ROE,
 Dívida/PL, margem, crescimento), radar de eventos corporativos (8-K da SEC) e sinais de mercado.
 
 **Endereço:** https://diegostalin88.github.io/Invest/
+
+No topo há um seletor **🇺🇸 EUA / 🇧🇷 Brasil (IBOVESPA)**. A escolha fica lembrada no navegador e também pode ir no
+link (`?mercado=br`). No Brasil, valores em R$ e volume mínimo padrão de R$ 10 mi/dia (EUA: US$ 50 mi).
 
 Ao abrir, o app já está com os dados do último pregão carregados, roda o Screener com os parâmetros padrão
 e mostra as "Melhores Opções" do cruzamento com fundamentos. Ninguém precisa rodar script nem carregar arquivo.
@@ -26,6 +29,9 @@ GitHub Actions (seg–sex, 22:30 UTC, depois do fechamento)
        5. radar de 8-K (SEC) para esse mesmo grupo, todo dia
        6. grava site/data/: manifest.json, precos_000.json, precos_001.json…, fundamentos.json
        7. portão de qualidade: se os dados parecerem quebrados, o job falha e NADA é publicado
+       8. Brasil: carteira atual do IBOVESPA (site da B3; se falhar, coleta/ibovespa_reserva.txt), preços e
+          fundamentos do Yahoo com sufixo .SA, gravados em site/data/br/. Sem radar de 8-K (é da SEC).
+          Se o Brasil falhar, os dados do Brasil já publicados são mantidos e os EUA saem normalmente.
   └─ copia app/ para site/ e publica no GitHub Pages
 ```
 
@@ -129,6 +135,7 @@ Os testes da coleta também rodam no workflow, antes de cada coleta.
 ```
 app/                         o app (index.html, PWA: manifest, ícones, service worker)
 coleta/fetch_all.py          coleta única (preços, fundamentos, radar de 8-K, manifesto, portão)
+coleta/brasil.py             coleta do IBOVESPA (chamada no fim do fetch_all.py; --sem-brasil desliga)
 coleta/requirements.txt      dependências com versões fixadas
 coleta/tests/                testes da coleta, sem rede
 testes_app/                  site de exemplo sintético + teste em navegador (Playwright)
