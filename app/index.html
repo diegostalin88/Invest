@@ -12,6 +12,7 @@
     <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #111827; color: #e5e7eb; }
@@ -202,29 +203,57 @@
             
             <!-- Módulo 2 -->
             <div id="analysis-content" class="tab-content"><div class="card">
-                <div id="chart-header" class="hidden items-center justify-between p-2 mb-2 bg-gray-900 rounded-md">
-                    <button id="prev-chart-btn" class="btn btn-secondary">&lt; Anterior</button>
-                    <div id="signal-details-box" class="text-center"></div>
-                    <button id="next-chart-btn" class="btn btn-secondary">Próximo &gt;</button>
-                </div>
-                <div class="flex items-center justify-between mb-4 p-2 rounded-md bg-gray-800">
-                    <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-10 gap-2 flex-1">
-                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="SMA"> SMA</label>
-                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="MME_cruz" checked> MME</label>
-                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="MME_200" checked> MME 200</label>
-                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="BB"> BB</label>
-                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="Keltner" checked> Keltner</label>
-                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="VWAP" checked> VWAP</label>
-                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="SAR"> SAR</label>
-                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="Volume" checked> Vol</label>
-                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="IFR" checked> IFR</label>
-                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="MACD"> MACD</label>
-                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="ATR" checked> ATR</label>
-                         <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="ADL"> ADL</label>
-                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="DMI"> DMI</label>
+                <div class="flex flex-col md:flex-row md:items-center gap-3 mb-3">
+                    <div class="flex rounded-lg overflow-hidden border border-gray-600 text-sm" role="tablist" aria-label="Tipo de gráfico">
+                        <button type="button" class="grafico-modo-btn px-3 py-2 bg-indigo-600 text-white font-semibold" data-modo="app" aria-selected="true">📈 Com sinais do app</button>
+                        <button type="button" class="grafico-modo-btn px-3 py-2 bg-gray-800 text-gray-300" data-modo="tv" aria-selected="false">TradingView completo</button>
+                    </div>
+                    <div class="flex items-center gap-2 flex-1">
+                        <button id="prev-chart-btn" class="btn btn-secondary px-3" title="Ativo anterior do shortlist">&lt;</button>
+                        <div id="chart-ticker-label" class="flex-1 text-center font-bold text-lg"></div>
+                        <button id="next-chart-btn" class="btn btn-secondary px-3" title="Próximo ativo do shortlist">&gt;</button>
                     </div>
                 </div>
-                <div id="analysis-chart" class="min-h-[420px] md:min-h-[650px]"></div>
+
+                <div id="grafico-app">
+                    <div class="flex flex-wrap gap-x-4 gap-y-2 mb-3 p-2 rounded-md bg-gray-800 text-sm">
+                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="SMA"> SMA 20</label>
+                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="MME_cruz" checked> MME 9/21</label>
+                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="MME_200" checked> MME 200</label>
+                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="BB"> Bollinger</label>
+                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="Keltner"> Keltner</label>
+                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="VWAP"> VWAP 20</label>
+                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="SAR"> SAR</label>
+                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="Volume" checked> Volume</label>
+                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="Sinais" checked> Sinais de compra</label>
+                        <span class="text-gray-600">|</span>
+                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="IFR" checked> IFR</label>
+                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="MACD"> MACD</label>
+                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="ATR"> ATR</label>
+                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="ADL"> ADL</label>
+                        <label class="checkbox-label"><input type="checkbox" class="indicator-cb" value="DMI"> DMI</label>
+                    </div>
+                    <div class="grid grid-cols-1 xl:grid-cols-4 gap-4">
+                        <div class="xl:col-span-3 min-w-0">
+                            <div id="chart-legenda" class="text-xs text-gray-300 mb-1 min-h-[1.25rem]"></div>
+                            <div id="analysis-chart" class="h-[380px] md:h-[520px]"></div>
+                            <div id="analysis-subcharts"></div>
+                            <div class="flex flex-wrap gap-2 mt-2 text-xs">
+                                <button type="button" class="btn btn-secondary py-1 px-2 periodo-btn" data-meses="3">3M</button>
+                                <button type="button" class="btn btn-secondary py-1 px-2 periodo-btn" data-meses="6">6M</button>
+                                <button type="button" class="btn btn-secondary py-1 px-2 periodo-btn" data-meses="12">1A</button>
+                                <button type="button" class="btn btn-secondary py-1 px-2 periodo-btn" data-meses="0">Tudo</button>
+                                <span class="text-gray-500 self-center">Arraste para mover, use a roda do mouse ou o gesto de pinça para dar zoom.</span>
+                            </div>
+                        </div>
+                        <div id="chart-fundamentos" class="xl:col-span-1 bg-gray-900 rounded-lg p-3 text-sm"></div>
+                    </div>
+                </div>
+
+                <div id="grafico-tv" class="hidden">
+                    <p class="text-xs text-gray-400 mb-2">Gráfico completo do TradingView, com ferramentas de desenho e todos os indicadores. Os dados aqui vêm do próprio TradingView (podem diferir um pouco dos do app) e os sinais do app não aparecem.</p>
+                    <div id="tv-widget" class="h-[520px] md:h-[680px]"></div>
+                </div>
             </div>
             
             <!-- Hidden inputs to keep calculations working -->
@@ -1448,6 +1477,216 @@
         fundContainer.innerHTML = html;
     }
 
+
+    // MÓDULO 2: GRÁFICO
+    // Aba "Com sinais do app": Lightweight Charts (biblioteca gratuita do TradingView) desenhando os NOSSOS dados,
+    // os indicadores já calculados pelo app e os dias em que o motor de pontuação (o mesmo do Screener/Backtest)
+    // passou do "Score Mínimo de Confluência". Aba "TradingView completo": o widget oficial, com dados deles.
+    let graficoModo = 'app';
+    let graficos = [];           // [principal, ...painéis de baixo]
+    let graficoTicker = null;
+    const CORES = { alta: '#10b981', baixa: '#ef4444', mmeCurta: '#fbbf24', mmeLonga: '#60a5fa', mme200: '#e879f9', sma: '#a3e635', bb: '#94a3b8', keltner: '#f97316', vwap: '#22d3ee', sar: '#f472b6', sinal: '#22c55e' };
+
+    function serieLinha(datas, valores) {
+        return datas.map((t, i) => { const v = valores ? valores[i] : null; return (v === null || v === undefined || !Number.isFinite(v)) ? { time: t } : { time: t, value: v }; });
+    }
+    function indicadoresMarcados() { return new Set([...document.querySelectorAll('.indicator-cb:checked')].map(c => c.value)); }
+    function opcoesGrafico(altura) {
+        return {
+            autoSize: true,
+            layout: { background: { color: '#111827' }, textColor: '#d1d5db', fontFamily: 'Inter, sans-serif' },
+            grid: { vertLines: { color: '#1f2937' }, horzLines: { color: '#1f2937' } },
+            rightPriceScale: { borderColor: '#374151' },
+            timeScale: { borderColor: '#374151', rightOffset: 5 },
+            crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+            localization: { locale: 'pt-BR' },
+            height: altura,
+        };
+    }
+    function destruirGraficos() { graficos.forEach(g => g.remove()); graficos = []; document.getElementById('analysis-subcharts').innerHTML = ''; }
+
+    // Dias em que o score do motor (mesmo do Screener e do Backtest) cruzou o mínimo: só leitura, nada muda no cálculo.
+    function calcularSinaisDoMotor(data, ind) {
+        const pesos = getCurrentWeights();
+        const minimo = parseFloat(document.getElementById('param-min-score').value) || 0;
+        const porData = {}; const marcadores = []; let anterior = 0;
+        for (let i = 201; i < data.close.length; i++) {
+            const { totalScore, activated } = computeStrategyScore(analyzeAllSignals(data, ind, i), pesos);
+            porData[data.dates[i]] = { score: totalScore, teses: activated };
+            if (totalScore >= minimo && totalScore > 0 && anterior < minimo) {
+                marcadores.push({ time: data.dates[i], position: 'belowBar', color: CORES.sinal, shape: 'arrowUp', text: totalScore.toFixed(1) });
+            }
+            anterior = totalScore;
+        }
+        return { porData, marcadores, minimo };
+    }
+
+    function desenharGrafico() {
+        if (graficoModo !== 'app') return;
+        const ticker = tickerSelect.value; const data = allData[ticker];
+        const alvo = document.getElementById('analysis-chart');
+        atualizarCabecalhoGrafico(ticker);
+        desenharQuadroFundamentos(ticker);
+        if (!data || typeof LightweightCharts === 'undefined') {
+            destruirGraficos();
+            alvo.innerHTML = `<p class="text-gray-400 p-4">${typeof LightweightCharts === 'undefined' ? 'Não consegui carregar a biblioteca de gráficos (sem internet?).' : 'Escolha um ativo.'}</p>`;
+            return;
+        }
+        alvo.innerHTML = '';
+        // Mantém o zoom ao trocar só os indicadores do mesmo ativo
+        const faixaAnterior = (graficoTicker === ticker && graficos[0]) ? graficos[0].timeScale().getVisibleLogicalRange() : null;
+        destruirGraficos();
+        graficoTicker = ticker;
+        const marcados = indicadoresMarcados();
+        const params = getIndicatorParameters();
+        const ind14 = v14_precomputarIndicadores(data, params);
+        const datas = data.dates;
+        const casas = data.close[data.close.length - 1] < 1 ? 4 : 2;
+        const formatoPreco = { type: 'price', precision: casas, minMove: casas === 4 ? 0.0001 : 0.01 };
+
+        const principal = LightweightCharts.createChart(alvo, opcoesGrafico(alvo.clientHeight || 450));
+        graficos.push(principal);
+        const velas = principal.addCandlestickSeries({ upColor: CORES.alta, downColor: CORES.baixa, borderVisible: false, wickUpColor: CORES.alta, wickDownColor: CORES.baixa, priceFormat: formatoPreco });
+        velas.setData(datas.map((t, i) => ({ time: t, open: data.open[i], high: data.high[i], low: data.low[i], close: data.close[i] })));
+        const linha = (valores, cor, titulo, extra = {}) => { const sr = principal.addLineSeries({ color: cor, lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, title: titulo, priceFormat: formatoPreco, ...extra }); sr.setData(serieLinha(datas, valores)); return sr; };
+        if (marcados.has('SMA')) linha(ind14.SMA, CORES.sma, 'SMA 20');
+        if (marcados.has('MME_cruz')) { linha(ind14.EMA_short, CORES.mmeCurta, 'MME 9'); linha(ind14.EMA_long, CORES.mmeLonga, 'MME 21'); }
+        if (marcados.has('MME_200')) linha(ind14.EMA_200, CORES.mme200, 'MME 200', { lineWidth: 2 });
+        if (marcados.has('BB')) { linha(ind14.BB.bbu, CORES.bb, 'BB sup', { lineStyle: 2 }); linha(ind14.BB.bbl, CORES.bb, 'BB inf', { lineStyle: 2 }); }
+        if (marcados.has('Keltner')) { linha(ind14.Keltner.upper, CORES.keltner, 'Keltner sup', { lineStyle: 1 }); linha(ind14.Keltner.lower, CORES.keltner, 'Keltner inf', { lineStyle: 1 }); }
+        if (marcados.has('VWAP')) linha(ind14.VWAP, CORES.vwap, 'VWAP');
+        if (marcados.has('SAR')) linha(ind14.SAR, CORES.sar, 'SAR', { lineVisible: false, pointMarkersVisible: true, pointMarkersRadius: 1.5 });
+        if (marcados.has('Volume')) {
+            const vol = principal.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: 'vol', lastValueVisible: false, priceLineVisible: false });
+            principal.priceScale('vol').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+            vol.setData(datas.map((t, i) => ({ time: t, value: data.volume[i], color: data.close[i] >= data.open[i] ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.35)' })));
+        }
+        let sinais = { porData: {}, marcadores: [], minimo: 0 };
+        if (marcados.has('Sinais') && data.close.length > 201) {
+            sinais = calcularSinaisDoMotor(data, precomputeAllIndicators(data, params));
+            velas.setMarkers(sinais.marcadores);
+        }
+
+        // Painéis de baixo (IFR, MACD, ATR, ADL, DMI), com o eixo do tempo sincronizado com o principal
+        const sub = document.getElementById('analysis-subcharts');
+        const painel = (titulo) => { const d = document.createElement('div'); d.className = 'mt-1'; d.innerHTML = `<div class="text-xs text-gray-400">${titulo}</div><div style="height:120px"></div>`; sub.appendChild(d); const g = LightweightCharts.createChart(d.lastChild, { ...opcoesGrafico(120), rightPriceScale: { borderColor: '#374151', minimumWidth: 70 } }); graficos.push(g); return g; };
+        const linhaEm = (g, valores, cor, titulo, extra = {}) => { const sr = g.addLineSeries({ color: cor, lineWidth: 1.5, priceLineVisible: false, lastValueVisible: true, title: titulo, ...extra }); sr.setData(serieLinha(datas, valores)); return sr; };
+        if (marcados.has('IFR')) {
+            const g = painel(`IFR (${params.ifr.period}) e média de 9`);
+            const sr = linhaEm(g, ind14.IFR, '#a78bfa', 'IFR');
+            linhaEm(g, ind14.IFR_SMA, '#fbbf24', 'Média', { lastValueVisible: false });
+            sr.createPriceLine({ price: 70, color: '#ef4444', lineStyle: 2, lineWidth: 1, axisLabelVisible: false });
+            sr.createPriceLine({ price: 30, color: '#10b981', lineStyle: 2, lineWidth: 1, axisLabelVisible: false });
+        }
+        if (marcados.has('MACD')) {
+            const g = painel('MACD (12, 26, 9)');
+            const h = g.addHistogramSeries({ priceLineVisible: false, lastValueVisible: false });
+            h.setData(datas.map((t, i) => { const v = ind14.MACD.histogram[i]; return Number.isFinite(v) ? { time: t, value: v, color: v >= 0 ? 'rgba(16,185,129,0.6)' : 'rgba(239,68,68,0.6)' } : { time: t }; }));
+            linhaEm(g, ind14.MACD.macdLine, '#60a5fa', 'MACD'); linhaEm(g, ind14.MACD.signalLine, '#f97316', 'Sinal');
+        }
+        if (marcados.has('ATR')) linhaEm(painel('ATR (14)'), ind14.ATR, '#facc15', 'ATR');
+        if (marcados.has('ADL')) { const g = painel('ADL (acumulação/distribuição) e média de 5'); linhaEm(g, ind14.ADL, '#22d3ee', 'ADL', { priceFormat: { type: 'volume' } }); linhaEm(g, ind14.ADL_SMA, '#fbbf24', 'Média', { priceFormat: { type: 'volume' }, lastValueVisible: false }); }
+        if (marcados.has('DMI')) { const g = painel('DMI (14): +DI, −DI e ADX'); linhaEm(g, ind14.DMI.pdi, '#10b981', '+DI'); linhaEm(g, ind14.DMI.mdi, '#ef4444', '−DI'); linhaEm(g, ind14.DMI.adx, '#e5e7eb', 'ADX'); }
+
+        // Sincroniza zoom/rolagem entre o principal e os painéis
+        let sincronizando = false;
+        graficos.forEach(g => g.timeScale().subscribeVisibleLogicalRangeChange(faixa => {
+            if (sincronizando || !faixa) return; sincronizando = true;
+            graficos.forEach(o => { if (o !== g) o.timeScale().setVisibleLogicalRange(faixa); });
+            sincronizando = false;
+        }));
+
+        // Legenda que acompanha o cursor
+        const legenda = document.getElementById('chart-legenda');
+        const mostrarLegenda = (idx) => {
+            if (idx === undefined || idx < 0 || idx >= datas.length) idx = datas.length - 1;
+            const var_ = idx > 0 ? (data.close[idx] / data.close[idx - 1] - 1) * 100 : 0;
+            const sd = sinais.porData[datas[idx]];
+            const p = datas[idx].split('-');
+            legenda.innerHTML = `<b>${p[2]}/${p[1]}/${p[0]}</b> · A ${fmtNum(data.open[idx], casas)} · Máx ${fmtNum(data.high[idx], casas)} · Mín ${fmtNum(data.low[idx], casas)} · F <b>${fmtNum(data.close[idx], casas)}</b> <span class="${var_ >= 0 ? 'text-green-400' : 'text-red-400'}">(${var_ >= 0 ? '+' : ''}${var_.toFixed(2)}%)</span> · Vol ${Number(data.volume[idx]).toLocaleString('pt-BR')}`
+                + (sd ? ` · <span class="${sd.score >= sinais.minimo && sd.score > 0 ? 'text-green-400 font-semibold' : 'text-gray-400'}">Score ${sd.score.toFixed(1)}</span>${sd.teses.length ? ` <span class="text-gray-400">(${sd.teses.join(', ')})</span>` : ''}` : '');
+        };
+        principal.subscribeCrosshairMove(param => {
+            if (!param || param.time === undefined) { mostrarLegenda(); return; }
+            mostrarLegenda(datas.indexOf(typeof param.time === 'string' ? param.time : `${param.time.year}-${String(param.time.month).padStart(2, '0')}-${String(param.time.day).padStart(2, '0')}`));
+        });
+        mostrarLegenda();
+
+        if (faixaAnterior) principal.timeScale().setVisibleLogicalRange(faixaAnterior);
+        else aplicarPeriodo(6);
+    }
+
+    function aplicarPeriodo(meses) {
+        const g = graficos[0]; const data = allData[graficoTicker]; if (!g || !data) return;
+        if (!meses) { g.timeScale().fitContent(); return; }
+        const fim = data.dates.length - 1;
+        g.timeScale().setVisibleLogicalRange({ from: Math.max(0, fim - Math.round(meses * 21)), to: fim + 5 });
+    }
+    document.querySelectorAll('.periodo-btn').forEach(b => b.addEventListener('click', () => aplicarPeriodo(parseInt(b.dataset.meses, 10))));
+
+    function atualizarCabecalhoGrafico(ticker) {
+        const r = filteredScreenerResults.findIndex(x => x.ticker === ticker);
+        currentScreenerIndex = r;
+        const f = fundamentalsData && fundamentalsData[ticker];
+        document.getElementById('chart-ticker-label').innerHTML = ticker ? `${ticker}${f && f.longName ? ` <span class="text-sm font-normal text-gray-400">${f.longName}</span>` : ''}${r >= 0 ? `<div class="text-xs font-normal text-indigo-300">${r + 1}º de ${filteredScreenerResults.length} no shortlist · Score ${filteredScreenerResults[r].score.toFixed(2)}</div>` : '<div class="text-xs font-normal text-gray-500">fora do shortlist atual</div>'}` : '';
+    }
+
+    function desenharQuadroFundamentos(ticker) {
+        const box = document.getElementById('chart-fundamentos');
+        const f = fundamentalsData && fundamentalsData[ticker];
+        if (!ticker) { box.innerHTML = ''; return; }
+        if (!f) { box.innerHTML = `<h4 class="font-bold text-purple-300 mb-2">🏛️ Fundamentos</h4><p class="text-gray-400 text-xs">Sem dados fundamentalistas para ${ticker}.</p>`; return; }
+        const L = lerLimitesFundamentos(); const c = checarFundamentos(f, L);
+        const nota = Object.values(c).filter(v => v === true).length;
+        const b = (v) => v === null ? '<span class="text-gray-500">–</span>' : (v ? '✅' : '❌');
+        const lin = (nome, valor, chk) => `<div class="flex justify-between gap-2 py-1 border-b border-gray-800"><span class="text-gray-400">${nome}</span><span>${valor} ${chk === undefined ? '' : b(chk)}</span></div>`;
+        box.innerHTML = `<div class="flex items-center justify-between mb-2"><h4 class="font-bold text-purple-300">🏛️ Fundamentos</h4><span class="font-bold ${nota >= 4 ? 'text-green-400' : nota >= 2 ? 'text-yellow-300' : 'text-red-400'}">${nota}/5</span></div>
+            ${f.sector ? `<div class="text-xs text-gray-500 mb-2">${f.sector}${f.industry ? ' · ' + f.industry : ''}</div>` : ''}
+            ${lin('P/L', fmtNum(f.pe), c.pe)}${lin('P/VP', fmtNum(f.pb), c.pb)}${lin('Dívida/PL', fmtNum(f.debtToEquity), c.de)}${lin('ROE', fmtPct(f.roe), c.roe)}${lin('Margem líq.', fmtPct(f.netMargin), c.margin)}${lin('Cresc. receita', fmtPct(f.revenueGrowth))}
+            <div class="text-xs text-gray-300 mt-2 space-y-1">${marketSignalsCell(f)}</div>${eventBadge(f)}
+            <button type="button" class="btn btn-secondary w-full mt-3 text-sm" data-explicar="${ticker}">🔎 Por que foi selecionado?</button>`;
+    }
+
+    // Widget oficial do TradingView (carregado só quando a aba é aberta)
+    let tvCarregando = null;
+    function simboloTradingView(ticker) { return mercadoAtual === 'br' ? `BMFBOVESPA:${ticker}` : ticker.replace('-', '.'); }
+    function desenharTradingView() {
+        const ticker = tickerSelect.value; if (!ticker) return;
+        atualizarCabecalhoGrafico(ticker);
+        const box = document.getElementById('tv-widget');
+        if (box.dataset.ticker === ticker) return;
+        box.dataset.ticker = ticker;
+        if (!tvCarregando) tvCarregando = new Promise((ok, falha) => { const sc = document.createElement('script'); sc.src = 'https://s3.tradingview.com/tv.js'; sc.onload = ok; sc.onerror = falha; document.head.appendChild(sc); });
+        tvCarregando.then(() => {
+            box.innerHTML = '<div id="tv-widget-alvo" style="height:100%"></div>';
+            new TradingView.widget({ container_id: 'tv-widget-alvo', autosize: true, symbol: simboloTradingView(ticker), interval: 'D', timezone: mercadoAtual === 'br' ? 'America/Sao_Paulo' : 'America/New_York', theme: 'dark', style: '1', locale: 'br', allow_symbol_change: true, withdateranges: true, details: true, studies: ['Volume@tv-basicstudies'] });
+        }).catch(() => { tvCarregando = null; box.dataset.ticker = ''; box.innerHTML = '<p class="text-yellow-300 p-4">Não consegui carregar o TradingView (sem internet ou bloqueado pela rede).</p>'; });
+    }
+
+    function atualizarModuloGrafico() {
+        if (!document.getElementById('analysis-content').classList.contains('active')) return;
+        if (graficoModo === 'app') desenharGrafico(); else desenharTradingView();
+    }
+    document.querySelectorAll('.grafico-modo-btn').forEach(b => b.addEventListener('click', () => {
+        graficoModo = b.dataset.modo;
+        document.querySelectorAll('.grafico-modo-btn').forEach(x => { const on = x === b; x.className = 'grafico-modo-btn px-3 py-2 ' + (on ? 'bg-indigo-600 text-white font-semibold' : 'bg-gray-800 text-gray-300'); x.setAttribute('aria-selected', on ? 'true' : 'false'); });
+        document.getElementById('grafico-app').classList.toggle('hidden', graficoModo !== 'app');
+        document.getElementById('grafico-tv').classList.toggle('hidden', graficoModo !== 'tv');
+        atualizarModuloGrafico();
+    }));
+    document.querySelectorAll('.indicator-cb').forEach(cb => cb.addEventListener('change', () => atualizarModuloGrafico()));
+    tickerSelect.addEventListener('change', () => atualizarModuloGrafico());
+    tabs.addEventListener('click', (e) => { if (e.target.dataset && e.target.dataset.tab === 'analysis') setTimeout(atualizarModuloGrafico, 0); });
+    const andarShortlist = (passo) => {
+        if (!filteredScreenerResults.length) return;
+        let idx = filteredScreenerResults.findIndex(x => x.ticker === tickerSelect.value);
+        idx = idx < 0 ? 0 : (idx + passo + filteredScreenerResults.length) % filteredScreenerResults.length;
+        tickerSelect.value = filteredScreenerResults[idx].ticker;
+        atualizarModuloGrafico();
+    };
+    document.getElementById('prev-chart-btn').addEventListener('click', () => andarShortlist(-1));
+    document.getElementById('next-chart-btn').addEventListener('click', () => andarShortlist(1));
+
     // Resumo curto dos fundamentos para a tabela do Screener (Módulo 1).
     function resumoFundamentalista(ticker) {
         const f = fundamentalsData && fundamentalsData[ticker];
@@ -1554,7 +1793,7 @@
 
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
-    window.investDebug = { get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14 };
+    window.investDebug = { get graficos() { return graficos; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14 };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).

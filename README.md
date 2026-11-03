@@ -6,6 +6,14 @@ Dívida/PL, margem, crescimento), radar de eventos corporativos (8-K da SEC) e s
 
 **Endereço:** https://diegostalin88.github.io/Invest/
 
+**Gráfico (Módulo 2):** duas abas. "Com sinais do app" usa a biblioteca gratuita Lightweight Charts (do TradingView)
+com os dados do app, os indicadores do app, setas nos dias em que o motor de pontuação passou do score mínimo e um
+quadro com os fundamentos. "TradingView completo" abre o widget oficial (dados do próprio TradingView, com desenho e
+todos os indicadores, mas sem os sinais do app).
+
+**Por que foi selecionado:** clicar num card das Melhores Opções, numa linha do Módulo 6 ou no 🔎 do Screener mostra
+cada tese técnica que pontuou, cada critério fundamentalista com valor e limite, e a conta do Score Combinado.
+
 No topo há um seletor **🇺🇸 EUA / 🇧🇷 Brasil (IBOVESPA)**. A escolha fica lembrada no navegador e também pode ir no
 link (`?mercado=br`). No Brasil, valores em R$ e volume mínimo padrão de R$ 10 mi/dia (EUA: US$ 50 mi).
 

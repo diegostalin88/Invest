@@ -13,7 +13,10 @@ const CDN_LOCAL = {
     'cdn.plot.ly': 'plotly.min.js',
     'xlsx.full.min.js': 'xlsx.full.min.js',
     'FileSaver.min.js': 'FileSaver.min.js',
+    'lightweight-charts': 'lightweight-charts.standalone.production.js',
 };
+// O widget do TradingView é substituído por um dublê que só registra o símbolo pedido.
+const TV_FALSO = 'window.TradingView={widget:function(o){window.__tvSimbolo=o.symbol;document.getElementById(o.container_id).textContent="TV:"+o.symbol;}};';
 
 const BASE = (process.argv[2] || 'http://127.0.0.1:8765/').replace(/\/?$/, '/');
 const SHOTS = process.argv[3] || '.';
@@ -30,11 +33,12 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     page.on('pageerror', e => erros.push(`pageerror: ${e.message}`));
     page.on('dialog', d => { erros.push(`dialog inesperado: ${d.message()}`); d.dismiss(); });
     if (LIBS) {
-        await page.route(/^https:\/\/(cdn\.tailwindcss\.com|cdn\.plot\.ly|cdnjs\.cloudflare\.com)\//, r => {
+        await page.route(/^https:\/\/(cdn\.tailwindcss\.com|cdn\.plot\.ly|cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net)\//, r => {
             const chave = Object.keys(CDN_LOCAL).find(k => r.request().url().includes(k));
             if (!chave) return r.abort();
             r.fulfill({ status: 200, contentType: 'application/javascript', body: fs.readFileSync(path.join(LIBS, CDN_LOCAL[chave])) });
         });
+        await page.route('https://s3.tradingview.com/tv.js', r => r.fulfill({ status: 200, contentType: 'application/javascript', body: TV_FALSO }));
         await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
     }
     if (bloquearManifesto) await page.route(bloquearManifesto === true ? '**/data/manifest.json' : bloquearManifesto, r => r.fulfill({ status: 404, body: 'not found' }));
@@ -146,6 +150,37 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     await page.waitForSelector('#walkforward-summary .result-metric', { timeout: 30000 });
     ok(true, 'Walk-Forward roda');
 
+    // Módulo 2: gráfico interativo com sinais do app + aba TradingView
+    await page.click('button[data-tab="screener"]');
+    await page.fill('#filter-adtv', '50000000');
+    await page.click('#run-strategy-scoring-btn');
+    await page.waitForSelector('#screener-results-container table', { timeout: 60000 });
+    await page.click('button[data-tab="analysis"]');
+    await page.selectOption('#ticker-select', 'BOA1');
+    await page.waitForSelector('#analysis-chart canvas', { timeout: 30000 });
+    const nGraf = await page.evaluate(() => window.investDebug.graficos.length);
+    ok(nGraf === 2, `gráfico desenhado: preço + painel do IFR (${nGraf} gráficos)`);
+    const leg = await page.textContent('#chart-legenda');
+    ok(/F \d/.test(leg) && /Score \d/.test(leg), `legenda com preço e score do motor: "${leg.trim().slice(0, 120)}…"`);
+    ok(/Fundamentos/.test(await page.textContent('#chart-fundamentos')) && /\d\/5/.test(await page.textContent('#chart-fundamentos')), 'quadro de fundamentos ao lado do gráfico');
+    await page.check('.indicator-cb[value="MACD"]');
+    ok(await page.evaluate(() => window.investDebug.graficos.length) === 3, 'ligar MACD adiciona um painel');
+    await page.click('.periodo-btn[data-meses="0"]');
+    await page.screenshot({ path: path.join(SHOTS, 'app_grafico.png'), fullPage: false });
+    const antesNav = await page.inputValue('#ticker-select');
+    await page.click('#next-chart-btn');
+    ok(await page.inputValue('#ticker-select') !== antesNav && /no shortlist/.test(await page.textContent('#chart-ticker-label')), 'botão > anda pelo shortlist');
+    await page.click('#chart-fundamentos [data-explicar]');
+    ok(await page.isVisible('#explicacao-modal'), 'quadro de fundamentos abre o "por quê"');
+    await page.click('#explicacao-fechar');
+    await page.selectOption('#ticker-select', 'BOA1');
+    await page.click('.grafico-modo-btn[data-modo="tv"]');
+    await page.waitForFunction(() => /TV:BOA1/.test(document.getElementById('tv-widget').textContent), null, { timeout: 15000 });
+    ok(true, 'aba TradingView abre o widget com o ativo escolhido');
+    await page.click('.grafico-modo-btn[data-modo="app"]');
+    await page.waitForSelector('#analysis-chart canvas', { timeout: 30000 });
+    ok(await page.isHidden('#grafico-tv'), 'volta para o gráfico com sinais do app');
+
     // PWA: service worker registrado e sem nenhum arquivo de dados no cache
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.reload();
@@ -180,6 +215,10 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     await br.page.click('#run-backtest-btn');
     await br.page.waitForSelector('#backtest-results-container .result-metric', { timeout: 30000 });
     ok(/R\$/.test(await br.page.textContent('#backtest-results-container')), 'Brasil: Backtest em reais');
+    await br.page.click('button[data-tab="analysis"]');
+    await br.page.click('.grafico-modo-btn[data-modo="tv"]');
+    await br.page.waitForFunction(() => /TV:BMFBOVESPA:PETR4/.test(document.getElementById('tv-widget').textContent), null, { timeout: 15000 });
+    ok(true, 'Brasil: TradingView com BMFBOVESPA:PETR4');
     await br.page.goto(BASE);   // sem ?mercado: lembra a última escolha
     await br.page.waitForFunction(() => /Brasil \(IBOVESPA\)/.test(document.getElementById('data-freshness-banner').textContent), null, { timeout: 120000 });
     ok(/Brasil \(IBOVESPA\)/.test(await br.page.textContent('#data-freshness-banner')), 'lembra o mercado escolhido ao reabrir');
@@ -196,6 +235,11 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     const larg = await cel.page.evaluate(() => ({ doc: document.documentElement.scrollWidth, sw: document.getElementById('market-switch').getBoundingClientRect().right }));
     ok(larg.doc <= 390 && larg.sw <= 390, `celular: seletor de mercado sem rolagem lateral (${JSON.stringify(larg)})`);
     await cel.page.screenshot({ path: path.join(SHOTS, 'celular_brasil.png'), fullPage: false });
+    await cel.page.click('button[data-tab="analysis"]');
+    await cel.page.waitForSelector('#analysis-chart canvas', { timeout: 30000 });
+    const largG = await cel.page.evaluate(() => document.documentElement.scrollWidth);
+    ok(largG <= 390, `celular: gráfico sem rolagem lateral (${largG}px)`);
+    await cel.page.locator('#analysis-content').screenshot({ path: path.join(SHOTS, 'celular_grafico.png') });
     await cel.page.close();
 
     // Brasil ainda não publicado: aviso claro e atalho para os EUA (sem abrir o modo manual)
