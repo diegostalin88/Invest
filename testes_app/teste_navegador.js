@@ -317,6 +317,10 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     const ganhoOk = await cel.page.evaluate(() => { const R = window.investDebug.relatorio; const c = R.ativos.filter(a => a.confirmada);
         return c.length > 0 && c.every(a => a.teste.mediaOp !== undefined && (a.teste.mediaGanho === null || a.teste.mediaGanho > 0) && (a.teste.mediaPerda === null || a.teste.mediaPerda <= 0)) && document.querySelectorAll('#am-relatorio .rel-ganho').length > 0; });
     ok(/🏢 Fundamentos \d\/\d/.test(relTxt) && /não entra no veredito/.test(relTxt), 'celular: cartões do Relatório mostram a nota fundamentalista só como contexto');
+    const mme = await cel.page.evaluate(() => { const cards = [...document.querySelectorAll('#am-relatorio .rel-card[data-ativo]')].filter(c => /Confirmado fora da amostra/.test(c.textContent));
+        const esperado = cards.filter(c => { const v = window.investDebug.vsMme200(c.dataset.ativo); return v !== null && v < 0; }).length;
+        const achados = cards.filter(c => /Abaixo da média de 200 dias/.test(c.textContent)).length; return { esperado, achados, total: cards.length }; });
+    ok(mme.total > 0 && mme.esperado === mme.achados, `celular: cartões abaixo da MME 200 mostram o aviso só como contexto (${mme.achados} de ${mme.total})`);
     ok(ganhoOk && /Ganho possível/.test(relTxt), 'celular: cartões do Relatório destacam o ganho possível (alvo ou média medida no teste) e o risco até o stop');
     {
         const [dl] = await Promise.all([cel.page.waitForEvent('download', { timeout: 15000 }), cel.page.click('#am-relatorio button[data-baixar-relatorio]')]);

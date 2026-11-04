@@ -2169,6 +2169,19 @@
         if (num(f.debtToEquity) !== null) it.push(`Dívida/PL ${fmtNumM(num(f.debtToEquity), 2)}`);
         return `<div class="mt-2 text-xs"><span class="rel-chip ${cor}">🏢 Fundamentos ${n.ok}/${n.comDado || 5}: ${leitura}</span>${it.length ? ` <span class="rel-mudo">${it.join(' · ')}</span>` : ''}<div class="rel-mudo mt-1">Só contexto: não entra no veredito (a coleta tem só os dados de hoje, não dá para testar no histórico).</div></div>`;
     }
+    // Posição do preço em relação à MME 200 do próprio papel: só contexto (medido em 04/11/2026: os sinais abaixo da
+    // média renderam igual ou melhor fora da amostra, então não vira trava; ver coleta/analise_entradas.js).
+    const cacheMme200 = {};
+    function vsMme200(t) {
+        const d = allData && allData[t]; if (!d || !d.close || !d.close.length) return null;
+        const n = d.close.length, chave = t + ':' + n + ':' + d.close[n - 1];
+        if (!(chave in cacheMme200)) { const e = calculateEMA(d, getIndicatorParameters().ema.ema200)[n - 1]; cacheMme200[chave] = e ? (d.close[n - 1] / e - 1) * 100 : null; }
+        return cacheMme200[chave];
+    }
+    function htmlTendenciaRelatorio(t) {
+        const v = vsMme200(t); if (v === null || v >= 0) return '';
+        return `<div class="mt-2 text-xs"><span class="rel-chip amarelo">📉 Abaixo da média de 200 dias (${fmtPctM(v)})</span><div class="rel-mudo mt-1">Só contexto: o papel está em tendência de baixa. No teste fora da amostra, os sinais abaixo da média renderam até mais, mas num mercado de baixa prolongado isso pode se inverter.</div></div>`;
+    }
     function cartaoRelatorio(a) {
         const d = (r, v, cor) => `<div class="rel-dado"><div class="r">${r}</div><div class="v"${cor ? ` style="color:${cor}"` : ''}>${v}</div></div>`;
         const res = a.situacao === 'posicao' && a.entrada ? (a.preco / a.entrada - 1) * 100 : null;
@@ -2180,6 +2193,7 @@
             ${htmlVeredito(vereditoEntrada(a))}
             ${htmlGanhoPossivel(a)}
             ${htmlFundRelatorio(a.t)}
+            ${htmlTendenciaRelatorio(a.t)}
             <div class="rel-grade">
                 ${a.situacao === 'entrada' ? d('Entrada (abertura)', '≈ ' + fmtPrecoM(a.entrada)) : d(`Entrada em ${fmtDataBR(a.desde)}`, fmtPrecoM(a.entrada))}
                 ${d('Stop', fmtPrecoM(a.stop), '#f87171')}
@@ -2367,6 +2381,7 @@
                     if (a.restam) partes.push(`Saída por tempo: ${a.restam} pregões`);
                     if (Number.isFinite(a.preco)) partes.push(`Preço: ${fmtPrecoM(a.preco)}`);
                     linha(partes.join(' · '), 9);
+                    { const m = vsMme200(a.t); if (m !== null && m < 0) linha(`Abaixo da média de 200 dias (${fmtPctM(m)}): só contexto, não entra no veredito.`, 8, 'normal', [150, 110, 20]); }
                     linha(`Fora da amostra: fator de lucro ${fmtNumM(a.teste.pf, 2)} · acerto ${fmtNumM(a.teste.acerto * 100, 0)}% · ${a.teste.n} operações${a.vendido && a.vendido.dias !== null && a.vendido.dias !== undefined ? ` · vendidos: ${fmtNumM(a.vendido.dias, 1)} dias para zerar` : ''}`, 8, 'normal', [100, 100, 100]);
                     y += 2.5;
                 });
@@ -3822,7 +3837,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte };
+    window.investDebug = { get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200 };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).
