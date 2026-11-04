@@ -1571,12 +1571,10 @@
                 if (curEq > peak) peak = curEq;
                 const dd = (peak - curEq) / peak; if (dd > maxDD) maxDD = dd;
 
-                // ATR Trailing Stop
-                if (indicators.ATR[i]) stopPrice = Math.max(stopPrice, dataSubset.close[i] - (indicators.ATR[i] * riskParams.atrMult));
-
                 // Ordem conservadora: se no mesmo candle tocou stop e alvo, assume o stop.
+                // O stop vale desde a abertura: se o papel abriu abaixo dele (gap), a venda sai na abertura.
                 let exitPrice = null;
-                if (dataSubset.low[i] <= stopPrice) { exitPrice = stopPrice; saidas.stop++; }
+                if (dataSubset.low[i] <= stopPrice) { exitPrice = Math.min(stopPrice, dataSubset.open[i]); saidas.stop++; }
                 else if (modoRecuo && sma5[i] !== null && dataSubset.close[i] > sma5[i]) { exitPrice = dataSubset.close[i]; saidas.sinal++; }
                 else if (targetPrice !== null && dataSubset.high[i] >= targetPrice) { exitPrice = Math.max(targetPrice, dataSubset.open[i]); saidas.alvo++; }
                 else if (riskParams.saidaDias > 0 && i - entryIdx + 1 >= riskParams.saidaDias) { exitPrice = dataSubset.close[i]; saidas.tempo++; }
@@ -1585,6 +1583,8 @@
                     const pnl = (exitPrice - entryPrice) * positionSize; trades.push({ pnl, pct: pnl/capital, ent: entryIdx });
                     capital += pnl; position = 'out'; curEq = capital;
                 }
+                // ATR Trailing Stop: sobe só DEPOIS do fechamento de hoje, valendo a partir de amanhã (sem look-ahead)
+                if (position !== 'out' && indicators.ATR[i]) stopPrice = Math.max(stopPrice, dataSubset.close[i] - (indicators.ATR[i] * riskParams.atrMult));
             }
 
             if (position === 'out' && !pendingEntry) {
