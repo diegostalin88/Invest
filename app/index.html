@@ -2142,6 +2142,13 @@
             ${temMedia ? `<div class="r mt-1">No teste fora da amostra (${T.n} op., acerto ${fmtNumM(T.acerto * 100, 0)}%): vencedoras ${fmtPctM(T.mediaGanho * 100)} · perdedoras ${T.mediaPerda !== null ? fmtPctM(T.mediaPerda * 100) : '—'} · média ${fmtPctM(T.mediaOp * 100)} por operação</div>` : ''}
         </div>`;
     }
+    // Ordem das listas do Relatório (só tela). "Ganho possível" = % até o alvo ou média das vencedoras no teste.
+    const ORDENS_REL = { ganho: 'Ganho possível', media: 'Média por operação', pf: 'Fator de lucro' };
+    function ordemRelatorio() { try { const v = localStorage.getItem('invest-rel-ordem'); if (ORDENS_REL[v]) return v; } catch (e) {} return 'ganho'; }
+    function chaveGanho(a) {
+        const base = a.preco || a.entrada; if (a.alvo && base && a.alvo > base) return (a.alvo / base - 1) * 100;
+        return a.teste && a.teste.mediaGanho !== undefined && a.teste.mediaGanho !== null ? a.teste.mediaGanho * 100 : -Infinity;
+    }
     function cartaoRelatorio(a) {
         const d = (r, v, cor) => `<div class="rel-dado"><div class="r">${r}</div><div class="v"${cor ? ` style="color:${cor}"` : ''}>${v}</div></div>`;
         const res = a.situacao === 'posicao' && a.entrada ? (a.preco / a.entrada - 1) * 100 : null;
@@ -2186,7 +2193,9 @@
             const R = relatorioDados; const A = R.ativos;
             const velho = ultimo && R.ultimoPregao && R.ultimoPregao < ultimo;
             const comV = A.map(a => ({ a, v: vereditoEntrada(a) }));
-            const porPf = (x, y) => y.a.teste.pf - x.a.teste.pf;
+            const ordem = ordemRelatorio();
+            const chave = a => ordem === 'ganho' ? chaveGanho(a) : ordem === 'media' ? (a.teste.mediaOp ?? -Infinity) : a.teste.pf;
+            const porPf = (x, y) => chave(y.a) - chave(x.a);
             const entrar = comV.filter(x => x.v.estado === 'entrar').sort(porPf).map(x => x.a);
             const esperar = comV.filter(x => x.v.estado === 'esperar').sort(porPf).map(x => x.a);
             const abertas = comV.filter(x => x.v.estado === 'ja').sort(porPf).map(x => x.a);
@@ -2207,6 +2216,7 @@
                 ${R.vendidos ? `<div class="text-xs rel-mudo mt-2">Vendidos: ${R.vendidos.fonte}, posição de ${fmtDataBR(R.vendidos.data)}.</div>` : ''}
                 ${htmlCalibracao(R)}
             </div>
+            <div class="flex gap-2 flex-wrap items-center mt-4 text-sm"><span class="rel-mudo">Ordenar por:</span>${Object.entries(ORDENS_REL).map(([k, n]) => `<button type="button" class="rel-chip${k === ordem ? ' verde' : ''}" data-rel-ordem="${k}" style="padding:0.35rem 0.75rem">${n}</button>`).join('')}</div>
             ${secaoRel('entrar', 'verde', '🟢 Entrar na próxima abertura', `<span class="rel-chip verde">${entrar.length}</span>`,
                 `<div class="rel-lista">${entrar.length ? entrar.map(cartaoRelatorio).join('') : '<p class="text-sm rel-mudo">Nenhum papel passou em todas as travas hoje. Não entrar também é uma decisão.</p>'}</div>`)}
             ${atrasadas.length ? secaoRel('atrasado', 'verde', '🟢 Ainda dá para entrar (atrasado)', `<span class="rel-chip verde">${atrasadas.length}</span>`,
@@ -2248,6 +2258,8 @@
     }
     document.addEventListener('click', e => {
         if (e.target.closest('[data-gerar-relatorio]')) { gerarRelatorioNoAparelho(); return; }
+        const ord = e.target.closest('[data-rel-ordem]');
+        if (ord) { try { localStorage.setItem('invest-rel-ordem', ord.dataset.relOrdem); } catch (e2) {} desenharRelatorio(); return; }
         const el = e.target.closest('#relatorio-desktop [data-ativo]');
         if (el && !APP_MOVEL) { tickerSelect.value = el.dataset.ativo; document.querySelector('button[data-tab="analysis"]').click(); }
     });

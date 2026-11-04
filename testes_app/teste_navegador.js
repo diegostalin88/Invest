@@ -316,6 +316,15 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     const ganhoOk = await cel.page.evaluate(() => { const R = window.investDebug.relatorio; const c = R.ativos.filter(a => a.confirmada);
         return c.length > 0 && c.every(a => a.teste.mediaOp !== undefined && (a.teste.mediaGanho === null || a.teste.mediaGanho > 0) && (a.teste.mediaPerda === null || a.teste.mediaPerda <= 0)) && document.querySelectorAll('#am-relatorio .rel-ganho').length > 0; });
     ok(ganhoOk && /Ganho possível/.test(relTxt), 'celular: cartões do Relatório destacam o ganho possível (alvo ou média medida no teste) e o risco até o stop');
+    // Ordem: padrão por ganho possível (decrescente); tocar em outra ordem reorganiza
+    const ordemOk = await cel.page.evaluate(() => {
+        const lerG = () => [...document.querySelectorAll('#am-relatorio details[data-secao="operacao"] .rel-ganho .g')].map(x => parseFloat(x.textContent.replace('+', '').replace(',', '.')));
+        const g = lerG(); return { n: g.length, desc: g.every((v, i) => i === 0 || g[i - 1] >= v) };
+    });
+    await cel.page.click('[data-rel-ordem="pf"]');
+    const ordemPf = await cel.page.evaluate(() => document.querySelector('[data-rel-ordem="pf"]').classList.contains('verde') && localStorage.getItem('invest-rel-ordem') === 'pf');
+    await cel.page.click('[data-rel-ordem="ganho"]');
+    ok(ordemOk.n > 1 && ordemOk.desc && ordemPf, `celular: Relatório ordenado pelo ganho possível, do maior para o menor (${ordemOk.n} cartões), com opção de outra ordem`);
     // Vereditos: travas aplicadas em todos os papéis do relatório
     const vered = await cel.page.evaluate(() => {
         const I = window.investDebug, R = I.relatorio; const erros = []; const cont = {};
