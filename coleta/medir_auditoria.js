@@ -3,8 +3,10 @@
 //     (os 60% iniciais; usar o período de teste para filtrar seria olhar o futuro);
 //  2) stop móvel mais curto: distância nunca maior que a do stop inicial, ou 1,5 ATR em vez de 2,5; e stop no
 //     preço de entrada (zero a zero) depois de andar 1 ou 1,5 ATR a favor;
-//  3) carteira com limite de papéis abertos por setor (grupo SIC da SEC), medindo a queda máxima.
-// Roda nos papéis confirmados e em todos os que têm regra (os confirmados passaram no teste, o que infla os números).
+//  3) carteira com limite de papéis abertos por setor (grupo SIC da SEC), medindo a queda máxima;
+//  4) trava de espaço até a resistência (≥ 1 × o risco até o stop) do veredito do Relatório, que o motor não usa.
+// Roda nos papéis confirmados, nos que só passaram no TREINO (fator de lucro ≥ 1, sem olhar o teste) e em todos
+// os que têm regra. Os confirmados passaram no teste, o que infla os números; "treinoOk" é a estimativa sem esse viés.
 //
 // Uso: node coleta/medir_auditoria.js site setores.json [saida.json]
 const http = require('http');
@@ -52,8 +54,10 @@ function servir() {
                 somaCapital: +(lista.reduce((a, x) => a + x.pct, 0) * 100).toFixed(1) }; };
         const pfDe = l => { let g = 0, p = 0; l.forEach(x => { if (x.pct > 0) g += x.pct; else p -= x.pct; }); return p > 0 ? g / p : (g > 0 ? 99 : 0); };
         const saida = {};
-        for (const universo of ['confirmadas', 'todas']) {
-            const papeis = R.ativos.filter(a => a.regra && (universo === 'todas' || a.confirmada));
+        const pivosAltos = (d, w) => { const r = []; for (let i = w; i < d.high.length - w; i++) { let m = -Infinity; for (let j = i - w; j <= i + w; j++) m = Math.max(m, d.high[j]); if (d.high[i] === m) r.push({ index: i, price: d.high[i] }); } return r; };
+        for (const universo of ['confirmadas', 'treinoOk', 'todas']) {
+            const papeis = R.ativos.filter(a => a.regra && (universo === 'todas' || (universo === 'confirmadas' ? a.confirmada : a.treino && a.treino.pf >= 1)));
+            const t4 = { todas: [], semResistencia: [], espacoOk: [], espacoCurto: [], comTrava: [] };
             const t1 = { todas: [], estrito: [], brando: [] }, t2 = { atual: { todas: [], volateis: [] }, inicial: { todas: [], volateis: [] }, atr15: { todas: [], volateis: [] }, empate1: { todas: [], volateis: [] }, empate15: { todas: [], volateis: [] } };
             const ops = [];  // para a carteira (teste 3)
             for (const a of papeis) {
@@ -70,6 +74,17 @@ function servir() {
                     const tr = treino[l], bom = tr.length >= 3 && pfDe(tr) >= 1.5;
                     if (bom) t1.estrito.push(x);
                     if (bom || tr.length < 3) t1.brando.push(x);
+                });
+                // Teste 4: no dia do sinal (ent − 1), resistência = topo (pivô já confirmado, último ano) mais próximo acima do fechamento
+                const pivos = pivosAltos(d, 5);
+                teste.forEach(x => {
+                    const s = x.ent - 1, c = d.close[s], atr = ind.ATR[s]; if (!atr) return;
+                    const stop = Math.max(c - atr * base.atrMult, c * (1 - base.stopLossPct / 100)), risco = c - stop;
+                    const res4 = pivos.filter(p => p.index >= s - 252 && p.index + 5 <= s && p.price > c).reduce((m, p) => Math.min(m, p.price), Infinity);
+                    t4.todas.push(x);
+                    if (!isFinite(res4)) { t4.semResistencia.push(x); t4.comTrava.push(x); }
+                    else if (res4 - c >= risco) { t4.espacoOk.push(x); t4.comTrava.push(x); }
+                    else t4.espacoCurto.push(x);
                 });
                 // Teste 3: operações de teste com datas, setor e prioridade (fator de lucro do TREINO)
                 const setor = (SET[a.t] && SET[a.t].grupo) || (F[a.t] && F[a.t].sector) || ('?' + a.t);
@@ -106,6 +121,7 @@ function servir() {
                 papeis: papeis.length, comSetor,
                 teste1: Object.fromEntries(Object.entries(t1).map(([k, l]) => [k, est(l)])),
                 teste2: Object.fromEntries(Object.entries(t2).map(([k, x]) => [k, { todas: est(x.todas), volateis: est(x.volateis) }])),
+                teste4: Object.fromEntries(Object.entries(t4).map(([k, l]) => [k, est(l)])),
                 teste3: { semLimite: carteira(0, 0), tres: carteira(3, 0), dois: carteira(2, 0), doisSeis: carteira(2, 6), seis: carteira(0, 6) }
             };
         }
@@ -113,7 +129,7 @@ function servir() {
     }, SETORES);
     fs.writeFileSync(SAIDA, JSON.stringify(r, null, 1));
     const L = [`## Testes da auditoria · ${r.mercado} · dados de ${r.ultimoPregao}`, ''];
-    for (const u of ['confirmadas', 'todas']) {
+    for (const u of ['confirmadas', 'treinoOk', 'todas']) {
         const x = r[u]; L.push(`### Papéis: ${u} (${x.papeis}; ${x.comSetor} com setor da SEC)`, '');
         L.push('| teste 1: regime | operações | fator de lucro | acerto | soma |', '|---|---|---|---|---|',
             ...Object.entries(x.teste1).map(([k, v]) => `| ${k} | ${v.n} | ${v.pf} | ${(v.acerto * 100).toFixed(1)}% | ${v.somaCapital}% |`), '');
@@ -121,6 +137,8 @@ function servir() {
             ...Object.entries(x.teste2).map(([k, v]) => `| ${k} | ${v.todas.n} | ${v.todas.pf} | ${v.todas.somaCapital}% | ${v.volateis.n} / ${v.volateis.pf} / ${v.volateis.somaCapital}% |`), '');
         L.push('| teste 3: carteira | operações | fator de lucro | soma | queda máxima | soma ÷ queda | pior dia | máx. no mesmo setor |', '|---|---|---|---|---|---|---|---|',
             ...Object.entries(x.teste3).map(([k, v]) => `| ${k} | ${v.n} | ${v.pf} | ${v.somaCapital}% | ${v.quedaMaxima}% | ${v.somaPorQueda} | ${v.piorDia}% | ${v.maxMesmoSetor} |`), '');
+        L.push('| teste 4: resistência | operações | fator de lucro | acerto | soma |', '|---|---|---|---|---|',
+            ...Object.entries(x.teste4).map(([k, v]) => `| ${k} | ${v.n} | ${v.pf} | ${(v.acerto * 100).toFixed(1)}% | ${v.somaCapital}% |`), '');
     }
     console.log(L.join('\n'));
     if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, L.join('\n') + '\n');
