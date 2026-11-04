@@ -312,7 +312,23 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     await cel.page.click('#am-relatorio [data-gerar-relatorio]');
     await cel.page.waitForFunction(() => /Último teste/.test(document.getElementById('am-relatorio').textContent), null, { timeout: 120000 });
     const relTxt = await cel.page.textContent('#am-relatorio');
-    ok(/Entradas para o próximo pregão/.test(relTxt) && /Em operação/.test(relTxt) && /Saída que ganhou/.test(relTxt), 'celular: Relatório com entradas, operações abertas e saída vencedora');
+    ok(/Entrar na próxima abertura/.test(relTxt) && /Em operação: não entrar agora/.test(relTxt) && /Saída que ganhou/.test(relTxt) && /Confiabilidade/.test(relTxt), 'celular: Relatório com vereditos (entrar, em operação), confiabilidade e saída vencedora');
+    // Vereditos: travas aplicadas em todos os papéis do relatório
+    const vered = await cel.page.evaluate(() => {
+        const I = window.investDebug, R = I.relatorio; const erros = []; const cont = {};
+        for (const a of R.ativos) {
+            const v = I.vereditoEntrada(a); cont[v.estado] = (cont[v.estado] || 0) + 1;
+            const n = a.nTotal || 0;
+            if (v.estado === 'entrar' && !(a.confirmada && n >= 15 && a.situacao === 'entrada' && (!a.resistencia || a.resistencia - a.entrada >= a.entrada - a.stop))) erros.push('entrar indevido ' + a.t);
+            if ((!a.confirmada || n < 15) && a.regra && v.estado !== 'nao') erros.push('deveria ser não operar ' + a.t);
+            if (a.confirmada && n >= 15 && a.situacao === 'posicao' && v.estado !== 'ja') erros.push('deveria ser já em operação ' + a.t);
+        }
+        // sinal velho vira "esperar": simula uma consulta 3 dias úteis depois
+        const e = R.ativos.find(a => a.situacao === 'entrada' && a.confirmada && (a.nTotal || 0) >= 15);
+        let velho = null; if (e) { const x = new Date(e.dataSinal + 'T12:00:00'); x.setDate(x.getDate() + 5); velho = I.vereditoEntrada(e, x).estado; }
+        return { erros, cont, velho };
+    });
+    ok(vered.erros.length === 0 && (vered.velho === null || vered.velho === 'esperar'), `celular: vereditos seguem as travas ${JSON.stringify(vered.cont)}${vered.erros.length ? ' ' + vered.erros.slice(0, 3).join('; ') : ''} · sinal velho → ${vered.velho}`);
     const relInfo = await cel.page.evaluate(() => { const R = window.investDebug.relatorio; return { n: R.ativos.length, sq: R.ativos.filter(a => a.squeeze).length, vend: !!R.vendidos }; });
     ok(relInfo.n > 0 && relInfo.vend && relInfo.sq > 0 && /short squeeze/.test(relTxt), `celular: alerta de short squeeze com os vendidos da B3 ${JSON.stringify(relInfo)}`);
     await cel.page.waitForTimeout(300);

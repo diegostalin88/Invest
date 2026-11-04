@@ -124,6 +124,13 @@
         .rel-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.5rem; margin-top: 0.6rem; }
         .rel-dado .r { font-size: 0.75rem; color: #9aa3b2; } .rel-dado .v { font-weight: 700; font-size: 1.05rem; }
         .rel-chip { display: inline-flex; align-items: center; padding: 0.12rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; background: rgba(129,140,248,0.14); color: #c7d2fe; white-space: nowrap; }
+        .rel-veredito { margin-top: 0.6rem; padding: 0.6rem 0.75rem; border-radius: 0.8rem; font-size: 0.9rem; line-height: 1.35; border: 1px solid transparent; text-align: left; }
+        .rel-veredito ul { list-style: disc; padding-left: 1.1rem; color: #cbd5e1; }
+        .rel-veredito.verde { background: rgba(34,197,94,0.10); border-color: rgba(34,197,94,0.35); }
+        .rel-veredito.amarelo { background: rgba(245,158,11,0.10); border-color: rgba(245,158,11,0.35); }
+        .rel-veredito.azul { background: rgba(59,130,246,0.10); border-color: rgba(59,130,246,0.35); }
+        .rel-veredito.cinza { background: rgba(148,163,184,0.08); border-color: rgba(148,163,184,0.25); }
+        .rel-veredito.compacto { font-size: 0.82rem; }
         .rel-chip.verde { background: rgba(34,197,94,0.14); color: #86efac; } .rel-chip.amarelo { background: rgba(245,158,11,0.14); color: #fcd34d; } .rel-chip.vermelho { background: rgba(240,82,82,0.15); color: #fca5a5; }
         .rel-tk { font-weight: 800; font-size: 1.15rem; }
         .rel-botao { display: block; width: 100%; padding: 0.85rem; border-radius: 0.9rem; background: #4f46e5; color: #fff; font-weight: 700; text-align: center; }
@@ -1832,7 +1839,11 @@
             niveis = { entrada: fech, stop: Math.max(fech - atr * rp.atrMult, fech * (1 - rp.stopLossPct / 100)), alvo: rp.alvoAtr > 0 ? fech + atr * rp.alvoAtr : null, restam: rp.saidaDias > 0 ? rp.saidaDias : null };
         }
         const arred = v => (v === null || v === undefined) ? null : +(+v).toFixed(4);
-        Object.keys(niveis).forEach(k => { if (typeof niveis[k] === 'number' && k !== 'restam') niveis[k] = arred(niveis[k]); });
+        if (situacao === 'entrada') niveis.dataSinal = d.dates[n - 1];
+        const sr = suporteResistencia(d);
+        niveis.suporte = isFinite(sr.sup) ? sr.sup : null; niveis.resistencia = isFinite(sr.resis) ? sr.resis : null;
+        niveis.nTotal = melhor.treino.n + melhor.teste.n;
+        Object.keys(niveis).forEach(k => { if (typeof niveis[k] === 'number' && !['restam', 'nTotal'].includes(k)) niveis[k] = arred(niveis[k]); });
         return { ...base, regra: melhor.r.id, confirmada, treino: { pf: +melhor.treino.pf.toFixed(2), n: melhor.treino.n, acerto: +melhor.treino.acerto.toFixed(3) },
                  teste: { pf: +melhor.teste.pf.toFixed(2), n: melhor.teste.n, acerto: +melhor.teste.acerto.toFixed(3), ret: +melhor.teste.ret.toFixed(4) },
                  situacao, ...niveis, preco: arred(fech) };
@@ -1878,6 +1889,64 @@
         p.push(`stop ${fmtPrecoM(a.stop)}`);
         return p.join(' · ');
     }
+    // ===== Veredito de entrada: deixa explícito QUANDO NÃO agir (só usa regras já existentes) =====
+    // Travas fixas (não se ajustam): confiabilidade mínima de 15 operações (alta a partir de 30), regra
+    // confirmada fora da amostra, dados do último pregão, abertura ainda por vir e risco até o stop
+    // não maior que o espaço até a resistência (gestão de risco; não faz parte do backtest).
+    const CONF_MIN = 15, CONF_ALTA = 30;
+    function confiabilidade(n) {
+        n = n || 0;
+        return n >= CONF_ALTA ? { nivel: 'Alta', cor: 'verde', n } : n >= CONF_MIN ? { nivel: 'Média', cor: 'amarelo', n } : { nivel: 'Baixa', cor: 'vermelho', n };
+    }
+    function diasUteisEntre(isoA, dataB) {   // dias úteis depois de isoA até dataB (inclusive)
+        const a = new Date(isoA + 'T12:00:00'), b = new Date(dataB.getFullYear(), dataB.getMonth(), dataB.getDate(), 12);
+        let k = 0; for (const x = new Date(a); x < b;) { x.setDate(x.getDate() + 1); if (x <= b && x.getDay() % 6) k++; }
+        return k;
+    }
+    function somarPregoes(iso, k) { const x = new Date(iso + 'T12:00:00'); while (k > 0) { x.setDate(x.getDate() + 1); if (x.getDay() % 6) k--; } return x.toISOString().slice(0, 10); }
+    function horaNoMercado(agoraRef = new Date()) {   // hora local da bolsa (Brasil: São Paulo; EUA: Nova York), em minutos
+        const tz = mercadoAtual === 'br' ? 'America/Sao_Paulo' : 'America/New_York';
+        const p = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', weekday: 'short' }).formatToParts(agoraRef);
+        const v = k => (p.find(x => x.type === k) || {}).value;
+        return { min: (+v('hour')) * 60 + (+v('minute')), util: !['Sat', 'Sun'].includes(v('weekday')), data: new Date(+v('year'), +v('month') - 1, +v('day'), 12) };
+    }
+    function vereditoEntrada(a, agora = new Date()) {
+        const ultimo = ultimoPregaoDados(); const conf = confiabilidade(a && (a.nTotal ?? ((a.treino ? a.treino.n : 0) + (a.teste ? a.teste.n : 0))));
+        const V = (estado, titulo, motivos, extra = {}) => ({ estado, titulo, motivos, conf, ...extra });
+        if (!a || !a.regra) return V('nao', 'Não operar', ['nenhuma regra teve operações suficientes neste papel']);
+        if (a.desligada) return V('nao', 'Não operar', [`regra desligada pelo diário de sinais: ${a.desligada}`]);
+        if (!a.confirmada) return V('nao', 'Não operar', ['a melhor regra não se confirmou no período final do teste (pode ter sido sorte)']);
+        if (conf.n < CONF_MIN) return V('nao', 'Não operar', [`só ${conf.n} operações no histórico (mínimo ${CONF_MIN}): pouco para confiar`]);
+        const saidas = [];
+        if (a.alvo) saidas.push(`alvo ${fmtPrecoM(a.alvo)}`);
+        if (a.restam) { const base = a.situacao === 'entrada' ? (a.dataSinal || ultimo) : ultimo; saidas.push(`por tempo por volta de ${fmtDataBR(somarPregoes(base, a.restam))}`); }
+        if ((a.regra || '').startsWith('recuo')) saidas.push('quando fechar acima da média de 5 dias');
+        if (a.stop) saidas.push(`stop ${fmtPrecoM(a.stop)}`);
+        if (a.situacao === 'posicao') {
+            const d = allData[a.t]; const idx = d ? d.dates.indexOf(a.desde) : -1; const preg = idx >= 0 ? d.close.length - idx : null;
+            const r = a.entrada ? (a.preco / a.entrada - 1) * 100 : null;
+            return V('ja', 'Já em operação: não entrar agora', [`o sistema comprou em ${fmtDataBR(a.desde)} a ${fmtPrecoM(a.entrada)}${preg ? `, há ${preg} pregão(ões)` : ''}${r !== null ? ` (${fmtPctM(r)})` : ''}`, 'entrar agora é pegar o bonde andando: não foi o que o teste mediu. Quem já está dentro segue o plano de saída.'], { saidas });
+        }
+        if (a.situacao !== 'entrada') return V('sem', 'Sem sinal', ['a regra não deu sinal no último pregão'], { saidas: [] });
+        const motivos = [];
+        const hm = horaNoMercado(agora); const abertura = mercadoAtual === 'br' ? 600 : 570;   // 10:00 em SP; 9:30 em NY
+        const idade = ultimo ? diasUteisEntre(a.dataSinal || ultimo, hm.data) : 0;   // pregões desde o sinal, no relógio da bolsa
+        if (idade >= 2) motivos.push(`o sinal é de ${fmtDataBR(a.dataSinal || ultimo)}, ${idade} pregões atrás (se teve feriado, confira): a entrada testada já passou`);
+        else if (idade === 1 && hm.util && hm.min >= abertura) motivos.push(`a abertura de hoje (quando a regra compra) já passou; o preço testado não existe mais`);
+        const risco = a.entrada - a.stop; const espaco = a.resistencia ? a.resistencia - a.entrada : null;
+        if (espaco !== null && risco > 0 && espaco < risco) motivos.push(`resistência a ${fmtPctM(espaco / a.entrada * 100)} e stop a ${fmtPctM(-risco / a.entrada * 100)}: o risco é ${fmtNumM(risco / espaco, 1)} vezes o ganho até a resistência`);
+        if (motivos.length) return V('esperar', 'Esperar', motivos, { saidas });
+        return V('entrar', 'Entrar na próxima abertura', [`sinal de ${fmtDataBR(a.dataSinal || ultimo)}, regra confirmada, confiabilidade ${conf.nivel.toLowerCase()} (${conf.n} operações)`, espaco !== null ? `espaço até a resistência (${fmtPctM(espaco / a.entrada * 100)}) maior que o risco até o stop (${fmtPctM(-risco / a.entrada * 100)})` : 'preço acima das máximas do ano: sem resistência próxima'], { saidas });
+    }
+    const COR_VEREDITO = { entrar: ['verde', '🟢'], esperar: ['amarelo', '🟡'], ja: ['azul', '🔵'], nao: ['cinza', '⚪'], sem: ['cinza', '⚪'] };
+    function htmlVeredito(v, compacto = false) {
+        const [cor, ico] = COR_VEREDITO[v.estado];
+        return `<div class="rel-veredito ${cor}${compacto ? ' compacto' : ''}">
+            <div class="flex items-center justify-between gap-2 flex-wrap"><b>${ico} ${v.titulo}</b><span class="rel-chip ${v.conf.cor}">Confiabilidade ${v.conf.nivel.toLowerCase()} · ${v.conf.n} op.</span></div>
+            <ul class="mt-1">${v.motivos.map(m => `<li>${m}</li>`).join('')}</ul>
+            ${v.saidas && v.saidas.length && v.estado !== 'nao' ? `<div class="mt-1"><b>Saída:</b> ${v.saidas.join(' · ')}</div>` : ''}
+        </div>`;
+    }
     function cartaoRelatorio(a) {
         const d = (r, v, cor) => `<div class="rel-dado"><div class="r">${r}</div><div class="v"${cor ? ` style="color:${cor}"` : ''}>${v}</div></div>`;
         const res = a.situacao === 'posicao' && a.entrada ? (a.preco / a.entrada - 1) * 100 : null;
@@ -1886,6 +1955,7 @@
             <div class="flex items-center justify-between gap-2"><span class="rel-tk">${a.t}</span><span class="rel-chip">${nomeRegra(a.regra)}</span></div>
             <div class="text-sm rel-mudo">${nomeAtivo(a.t) || ''}</div>
             ${a.squeeze ? `<div class="mt-2"><span class="rel-chip amarelo">⚡ Possível short squeeze: ${fmtNumM(a.vendido.dias, 1)} dias para zerar + sinal ${a.squeeze.estrategia}</span></div>` : ''}
+            ${htmlVeredito(vereditoEntrada(a))}
             <div class="rel-grade">
                 ${a.situacao === 'entrada' ? d('Entrada (abertura)', '≈ ' + fmtPrecoM(a.entrada)) : d(`Entrada em ${fmtDataBR(a.desde)}`, fmtPrecoM(a.entrada))}
                 ${d('Stop', fmtPrecoM(a.stop), '#f87171')}
@@ -1908,8 +1978,12 @@
         } else {
             const R = relatorioDados; const A = R.ativos;
             const velho = ultimo && R.ultimoPregao && R.ultimoPregao < ultimo;
-            const entradas = A.filter(a => a.situacao === 'entrada' && a.confirmada).sort((x, y) => y.teste.pf - x.teste.pf);
-            const abertas = A.filter(a => a.situacao === 'posicao' && a.confirmada).sort((x, y) => y.teste.pf - x.teste.pf);
+            const comV = A.map(a => ({ a, v: vereditoEntrada(a) }));
+            const porPf = (x, y) => y.a.teste.pf - x.a.teste.pf;
+            const entrar = comV.filter(x => x.v.estado === 'entrar').sort(porPf).map(x => x.a);
+            const esperar = comV.filter(x => x.v.estado === 'esperar').sort(porPf).map(x => x.a);
+            const abertas = comV.filter(x => x.v.estado === 'ja').sort(porPf).map(x => x.a);
+            const barrados = A.filter(a => (a.situacao === 'entrada' || a.situacao === 'posicao') && ['nao'].includes(vereditoEntrada(a).estado)).length;
             const squeeze = A.filter(a => a.squeeze).sort((x, y) => (y.vendido.dias || 0) - (x.vendido.dias || 0));
             const confirmados = A.filter(a => a.confirmada);
             const porTipo = { preço: 0, tempo: 0, 'preço ou tempo': 0 };
@@ -1924,13 +1998,17 @@
                 ${velho ? '<button type="button" class="rel-botao mt-3" data-gerar-relatorio>Atualizar agora</button>' : ''}
                 ${R.vendidos ? `<div class="text-xs rel-mudo mt-2">Vendidos: ${R.vendidos.fonte}, posição de ${fmtDataBR(R.vendidos.data)}.</div>` : ''}
             </div>
-            <div class="rel-titulo">▲ Entradas para o próximo pregão <span class="rel-chip">${entradas.length}</span></div>
-            <div class="rel-lista">${entradas.length ? entradas.map(cartaoRelatorio).join('') : '<p class="text-sm rel-mudo">Nenhum papel com sinal hoje numa regra confirmada.</p>'}</div>
+            <div class="rel-titulo">🟢 Entrar na próxima abertura <span class="rel-chip verde">${entrar.length}</span></div>
+            <div class="rel-lista">${entrar.length ? entrar.map(cartaoRelatorio).join('') : '<p class="text-sm rel-mudo">Nenhum papel passou em todas as travas hoje. Não entrar também é uma decisão.</p>'}</div>
+            ${esperar.length ? `<div class="rel-titulo">🟡 Sinal hoje, mas esperar <span class="rel-chip amarelo">${esperar.length}</span></div>
+            <div class="rel-lista">${esperar.map(cartaoRelatorio).join('')}</div>` : ''}
+            ${barrados ? `<p class="text-xs rel-mudo mt-2">${barrados} papel(éis) com sinal ou operação ficaram de fora por regra não confirmada ou pouca confiabilidade (menos de ${CONF_MIN} operações).</p>` : ''}
             ${squeeze.length ? `<div class="rel-titulo">⚡ Possível short squeeze <span class="rel-chip amarelo">${squeeze.length}</span></div>
-            <p class="text-sm rel-mudo mb-2">Muita gente vendida (5 dias ou mais de volume para zerar) e um sinal de reversão nos últimos 5 pregões. Se o preço sobe, os vendidos precisam recomprar e isso pode acelerar a alta.</p>
+            <p class="text-sm rel-mudo mb-2">Muita gente vendida (5 dias ou mais de volume para zerar) e um sinal de reversão nos últimos 5 pregões. Se o preço sobe, os vendidos precisam recomprar e isso pode acelerar a alta. É um reforço, nunca motivo de compra sozinho: siga o veredito de cada papel.${R.vendidos ? ` Posição vendida de ${fmtDataBR(R.vendidos.data)} (${diasUteisEntre(R.vendidos.data, new Date())} pregões atrás).` : ''}</p>
             <div class="rel-lista">${squeeze.map(a => `<button type="button" class="rel-card" data-ativo="${a.t}"><div class="flex items-center justify-between"><span class="rel-tk">${a.t}</span><span class="rel-chip amarelo">${fmtNumM(a.vendido.dias, 1)} dias p/ zerar</span></div>
-                <div class="text-sm rel-mudo">${nomeAtivo(a.t) || ''}</div><div class="text-sm mt-1">Sinal <b>${a.squeeze.estrategia}</b> em ${fmtDataBR(a.squeeze.data)} · ${fmtGrandeM(a.vendido.qtd)} ações vendidas${a.vendido.variacaoPct !== null && a.vendido.variacaoPct !== undefined ? ` (${fmtPctM(a.vendido.variacaoPct)} no período)` : ''}${a.regra ? ` · melhor regra: ${nomeRegra(a.regra)}${a.confirmada ? '' : ' (não confirmada)'}` : ''}</div></button>`).join('')}</div>` : ''}
-            <div class="rel-titulo">● Em operação <span class="rel-chip">${abertas.length}</span></div>
+                <div class="text-sm rel-mudo">${nomeAtivo(a.t) || ''}</div><div class="text-sm mt-1">Sinal <b>${a.squeeze.estrategia}</b> em ${fmtDataBR(a.squeeze.data)} · ${fmtGrandeM(a.vendido.qtd)} ações vendidas${a.vendido.variacaoPct !== null && a.vendido.variacaoPct !== undefined ? ` (${fmtPctM(a.vendido.variacaoPct)} no período)` : ''}${a.regra ? ` · melhor regra: ${nomeRegra(a.regra)}${a.confirmada ? '' : ' (não confirmada)'}` : ''}</div>${htmlVeredito(vereditoEntrada(a), true)}</button>`).join('')}</div>` : ''}
+            <div class="rel-titulo">🔵 Em operação: não entrar agora <span class="rel-chip">${abertas.length}</span></div>
+            <p class="text-sm rel-mudo mb-2">O sistema já comprou esses papéis. Serve para quem entrou junto acompanhar a saída.</p>
             <div class="rel-lista">${abertas.length ? abertas.map(cartaoRelatorio).join('') : '<p class="text-sm rel-mudo">Nenhuma operação aberta nas regras confirmadas.</p>'}</div>
             <details class="rel-detalhes mt-5"><summary>Melhor regra de cada papel (${A.length})</summary>
                 <table class="rel-tabela mt-2"><thead><tr class="rel-mudo"><th>Papel</th><th>Melhor regra</th><th>Fator de lucro fora da amostra</th><th></th></tr></thead><tbody>
@@ -1940,6 +2018,7 @@
                 <div class="text-sm rel-mudo space-y-2 mt-1">
                     <p>Para cada papel, o app testa ${R.regras.length} regras: ${R.regras.map(r => r.nome).join('; ')}.</p>
                     <p>A melhor é escolhida olhando só os primeiros ${Math.round(R.parametros.fracaoEscolha * 100)}% do histórico, pelo fator de lucro pesado pelo número de operações (mínimo de ${R.parametros.minTradesEscolha}). Ela só aparece nas listas se também tiver dado lucro nos ${100 - Math.round(R.parametros.fracaoEscolha * 100)}% finais, que ela "não viu" (mínimo de ${R.parametros.minTradesConfirma} operações). É o walk-forward de Fitschen e Kaufman, que evita escolher a regra que só deu certo por acaso.</p>
+                    <p><b>Veredito de cada papel</b> (travas fixas, que não se ajustam sozinhas): 🟢 entrar só se a regra foi confirmada, tem pelo menos ${CONF_MIN} operações (confiabilidade alta a partir de ${CONF_ALTA}), o sinal é do último pregão, a abertura em que a regra compra ainda não passou e o risco até o stop não é maior que o espaço até a resistência. Faltou uma condição: 🟡 esperar. Já comprado pelo sistema: 🔵 não entrar agora. A trava de resistência é gestão de risco e não faz parte do backtest.</p>
                     <p>Entrada na abertura do pregão seguinte ao sinal; stop inicial = o mais protetor entre ${fmtNumM(R.parametros.atrMult, 1)}×ATR e ${fmtNumM(R.parametros.stopLossPct, 1)}%; custo de ${fmtNumM(R.parametros.custoPct, 2)}% por perna. ${avisoSobrevivencia().replace(/<\/?b>/g, '')}</p>
                 </div></details>`;
         }
@@ -2663,6 +2742,13 @@
     }
     // PLANO DE OPERAÇÃO: só mostra, em preço, as regras que o Backtest já usa (entrada por score,
     // stop inicial = o mais protetor entre ATR e Stop Fixo, trailing stop por ATR). Nada aqui decide trade novo.
+    // Suporte e resistência: pivôs já confirmados no último ano (mesma janela usada pelo motor)
+    function suporteResistencia(d) {
+        const n = d.close.length, fech = d.close[n - 1], ini = Math.max(0, n - 252);
+        const pivos = findPivotPoints(d, PIVOT_WINDOW).filter(p => p.index >= ini && p.index + PIVOT_WINDOW <= n - 1);
+        return { sup: pivos.filter(p => p.type === 'low' && p.price < fech).reduce((m, p) => Math.max(m, p.price), -Infinity),
+                 resis: pivos.filter(p => p.type === 'high' && p.price > fech).reduce((m, p) => Math.min(m, p.price), Infinity) };
+    }
     function planoOperacao(t, ex) {
         const d = allData[t]; const n = d.close.length; const rp = getBacktestRiskParams();
         const res = runCoreBacktest(d, rp);
@@ -2699,11 +2785,7 @@
             const atr = (ind.ATR || [])[n - 1];
             if (atr) grade = dado('Se entrasse hoje, stop em', fmtPrecoM(Math.max(fech - atr * rp.atrMult, fech * (1 - rp.stopLossPct / 100))), '#ef4444') + dado('Oscilação diária (ATR)', fmtPrecoM(atr));
         }
-        // Suporte e resistência: pivôs já confirmados no último ano (mesma janela usada pelo motor)
-        const ini = Math.max(0, n - 252);
-        const pivos = findPivotPoints(d, PIVOT_WINDOW).filter(p => p.index >= ini && p.index + PIVOT_WINDOW <= n - 1);
-        const sup = pivos.filter(p => p.type === 'low' && p.price < fech).reduce((m, p) => Math.max(m, p.price), -Infinity);
-        const resis = pivos.filter(p => p.type === 'high' && p.price > fech).reduce((m, p) => Math.min(m, p.price), Infinity);
+        const { sup, resis } = suporteResistencia(d);
         grade += dado('Suporte mais próximo', isFinite(sup) ? `${fmtPrecoM(sup)} <span class="text-sm" style="color:var(--mudo)">${dist(sup)}</span>` : '—')
             + dado('Resistência mais próxima', isFinite(resis) ? `${fmtPrecoM(resis)} <span class="text-sm" style="color:var(--mudo)">${dist(resis)}</span>` : 'Acima das máximas do ano');
         const pf = res.profitFactor === Infinity ? '∞' : fmtNumM(res.profitFactor, 2);
@@ -2722,7 +2804,7 @@
         if (rp.saidaDias > 0) regrasSaida.push(`a saída por tempo vende após ${rp.saidaDias} pregões`);
         const relA = relatorioValido() && relatorioDados.ativos.find(x => x.t === t);
         const vend = dadosVendido(t);
-        const relCard = relA ? `<div class="am-card mb-3 text-sm">📋 <b>Relatório de ${fmtDataBR(relatorioDados.ultimoPregao)}</b>: ${relA.regra ? `a melhor regra para ${t} é <b>${nomeRegra(relA.regra)}</b> ${relA.confirmada ? `(confirmada fora da amostra: fator de lucro ${fmtNumM(relA.teste.pf, 2)} em ${relA.teste.n} operações)` : '(<b>não</b> confirmada fora da amostra: use com cautela)'}.` : 'nenhuma regra teve operações suficientes neste papel.'} O plano abaixo usa os parâmetros do Backtest.</div>` : '';
+        const relCard = relA ? `<div class="am-card mb-3 text-sm">📋 <b>Relatório de ${fmtDataBR(relatorioDados.ultimoPregao)}</b>: ${relA.regra ? `a melhor regra para ${t} é <b>${nomeRegra(relA.regra)}</b> ${relA.confirmada ? `(confirmada fora da amostra: fator de lucro ${fmtNumM(relA.teste.pf, 2)} em ${relA.teste.n} operações)` : '(<b>não</b> confirmada fora da amostra: use com cautela)'}.` : 'nenhuma regra teve operações suficientes neste papel.'} O plano abaixo usa os parâmetros do Backtest.${relA.regra ? htmlVeredito(vereditoEntrada(relA)) : ''}</div>` : '';
         const vendCard = vend ? `<div class="am-card mt-4 text-sm">Vendidos: <b>${fmtGrandeM(vend.qtd)}</b> ações (${vend.fonte}, ${fmtDataBR(vend.data)}) = <b>${vend.dias === null ? '—' : fmtNumM(vend.dias, 1)} dias</b> de volume para zerar.${relA && relA.squeeze ? ` ⚡ <b>Possível short squeeze</b>: sinal ${relA.squeeze.estrategia} em ${fmtDataBR(relA.squeeze.data)}.` : ''}</div>` : '';
         return `${relCard}${cab}<div class="am-grade mt-3">${grade}</div>${hist}${perfil}${vendCard}${fund}
             <p class="text-xs mt-4" style="color:var(--mudo)">Saída: ${regrasSaida.join('; ')}.${rp.alvoAtr > 0 || rp.saidaDias > 0 ? '' : ' Não há alvo de venda (dá para ligar em Testes → Backtest → Opções dos livros).'} ${avisoSobrevivencia().replace(/<\/?b>/g, '')} Não é recomendação de investimento.</p>`;
@@ -2867,7 +2949,7 @@
         const naCarteira = new Set(itens.map(x => x.t));
         const candidatos = filteredScreenerResults.filter(r => !naCarteira.has(r.ticker)).slice(0, CANDIDATOS_AVALIADOS)
             .map(r => ({ t: r.ticker, score: r.score, v: viesDoPapel(r.ticker), rel: relDe(r.ticker) }))
-            .map(c => ({ ...c, entrada: !!(c.rel && c.rel.confirmada && c.rel.situacao === 'entrada') }))
+            .map(c => ({ ...c, entrada: !!(c.rel && vereditoEntrada(c.rel).estado === 'entrar') }))
             .filter(c => c.v && c.v.vies === 'alta' && c.entrada)   // só troca por papel com entrada validada hoje
             .sort((a, b) => (b.v.pts - a.v.pts) || (b.score - a.score)).slice(0, 3);
         const fortes = posicoes.filter(p => p.acao === 'manter' && !p.concentrada && p.peso < PESO_ALVO)
@@ -2882,7 +2964,7 @@
         let ultima = null; for (const t in allData) { const d = allData[t].dates; if (d && d.length && (!ultima || d[d.length - 1] > ultima)) ultima = d[d.length - 1]; }
         const quando = `${A.quando.toLocaleDateString('pt-BR')} ${A.quando.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
         const rot = { manter: ['verde', 'Manter'], neutro: ['amarelo', 'Neutro'], trocar: ['vermelho', 'Trocar ou reduzir'], reduzir: ['amarelo', 'Reduzir peso'] };
-        const nomeCand = c => `<button type="button" class="underline font-semibold" data-ativo="${c.t}">${c.t}</button> (score ${fmtNumM(c.score, 1)}, entrada validada no Relatório)`;
+        const nomeCand = c => `<button type="button" class="underline font-semibold" data-ativo="${c.t}">${c.t}</button> (score ${fmtNumM(c.score, 1)}, veredito 🟢 entrar no Relatório)`;
         const sugestao = p => {
             if (p.acao === 'manter') return 'Os indicadores sustentam a posição.';
             if (p.acao === 'neutro') return 'Os indicadores não são suficientes para justificar mudança agora.';
@@ -3139,7 +3221,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { get graficos() { return graficos; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; } };
+    window.investDebug = { get graficos() { return graficos; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; } };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).
