@@ -2234,7 +2234,7 @@
                 <div class="text-sm mt-2"><b>${confirmados.length}</b> papéis têm uma regra confirmada fora da amostra.${regraTop ? ` A que mais venceu: <b>${nomeRegra(regraTop[0])}</b> (${regraTop[1]}).` : ''}</div>
                 <div class="text-sm mt-1">Saída que ganhou: por preço <b>${porTipo['preço']}</b> · por tempo <b>${porTipo.tempo}</b> · preço ou tempo <b>${porTipo['preço ou tempo']}</b>.</div>
                 ${velho ? '<button type="button" class="rel-botao mt-3" data-gerar-relatorio>Atualizar agora</button>' : ''}
-                <button type="button" class="rel-botao mt-3" data-baixar-relatorio>⬇️ Baixar relatório</button>
+                <div class="flex gap-3 items-center flex-wrap mt-3"><button type="button" class="rel-botao" data-baixar-relatorio-pdf>⬇️ Baixar relatório (PDF)</button><button type="button" class="text-xs rel-mudo underline" data-baixar-relatorio>dados (.json)</button></div>
                 ${R.vendidos ? `<div class="text-xs rel-mudo mt-2">Vendidos: ${R.vendidos.fonte}, posição de ${fmtDataBR(R.vendidos.data)}.</div>` : ''}
                 ${htmlCalibracao(R)}
             </div>
@@ -2299,18 +2299,91 @@
         const nome = `relatorio-${R.mercado || mercadoAtual}-${R.ultimoPregao || 'sem-data'}.json`;
         return { nome, texto: JSON.stringify(conteudo, null, 1) };
     }
+    // No celular abre "Compartilhar" (dá para mandar direto por mensagem); no computador baixa o arquivo.
+    const toqueNaTela = () => window.matchMedia('(pointer: coarse)').matches;
     async function baixarRelatorio() {
         if (!relatorioValido()) return;
         const { nome, texto } = arquivoDoRelatorio();
         const arq = typeof File === 'function' ? new File([texto], nome, { type: 'application/json' }) : null;
-        if (arq && navigator.canShare && navigator.canShare({ files: [arq] })) {
+        if (arq && toqueNaTela() && navigator.canShare && navigator.canShare({ files: [arq] })) {
             try { await navigator.share({ files: [arq], title: nome }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
         }
         const url = URL.createObjectURL(new Blob([texto], { type: 'application/json' }));
         const a = document.createElement('a'); a.href = url; a.download = nome; document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 5000);
     }
+    // PDF do relatório: texto simples (jsPDF, carregado só quando pedido), na mesma ordem e com os mesmos vereditos da tela.
+    const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    function carregarJsPdf() {
+        if (window.jspdf) return Promise.resolve(window.jspdf);
+        return new Promise((ok, falha) => {
+            const sc = document.createElement('script'); sc.src = JSPDF_URL;
+            sc.onload = () => window.jspdf ? ok(window.jspdf) : falha(new Error('jsPDF não carregou'));
+            sc.onerror = () => falha(new Error('sem internet para montar o PDF')); document.head.appendChild(sc);
+        });
+    }
+    // A fonte padrão do PDF só tem letras latinas: troca símbolos e tira emojis.
+    const textoPdf = t => String(t ?? '').replace(/×/g, 'x').replace(/[–—]/g, '-').replace(/[→]/g, '->').replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/…/g, '...')
+        .replace(/[^\u0000-\u00FF]/g, '').replace(/\s+/g, ' ').trim();
+    function secoesDoRelatorio() {
+        const R = relatorioDados, ordem = ordemRelatorio();
+        const chave = a => ordem === 'ganho' ? chaveGanho(a) : ordem === 'media' ? (a.teste.mediaOp ?? -Infinity) : a.teste.pf;
+        const comV = R.ativos.map(a => ({ a, v: vereditoEntrada(a) }));
+        const de = est => comV.filter(x => x.v.estado === est).sort((x, y) => chave(y.a) - chave(x.a));
+        return [['Entrar na próxima abertura', de('entrar')], ['Ainda dá para entrar (atrasado)', de('atrasado')],
+                ['Sinal hoje, mas esperar', de('esperar')], ['Em operação: não entrar agora', de('ja')]];
+    }
+    async function baixarRelatorioPdf(botao) {
+        if (!relatorioValido()) return;
+        const textoOriginal = botao ? botao.textContent : '';
+        if (botao) { botao.disabled = true; botao.textContent = 'Montando o PDF…'; }
+        try {
+            const { jsPDF } = await carregarJsPdf();
+            const R = relatorioDados, doc = new jsPDF({ unit: 'mm', format: 'a4' });
+            const M = 14, L = 210 - 2 * M, ALT = 297 - M; let y = M;
+            const linha = (txt, tam = 10, estilo = 'normal', cor = [30, 30, 30], recuo = 0) => {
+                doc.setFont('helvetica', estilo); doc.setFontSize(tam); doc.setTextColor(...cor);
+                doc.splitTextToSize(textoPdf(txt), L - recuo).forEach(l => {
+                    if (y + tam * 0.45 > ALT) { doc.addPage(); y = M; }
+                    doc.text(l, M + recuo, y + tam * 0.35); y += tam * 0.45;
+                });
+            };
+            linha(`Relatório Invest - ${MERCADO.nome}`, 16, 'bold');
+            linha(`Dados de ${fmtDataBR(R.ultimoPregao)} · teste rodado em ${new Date(R.geradoEm).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} · ${R.universo} papéis em ${R.regras.length} regras`, 9, 'normal', [90, 90, 90]);
+            if (R.vendidos) linha(`Vendidos: ${R.vendidos.fonte}, posição de ${fmtDataBR(R.vendidos.data)}.`, 9, 'normal', [90, 90, 90]);
+            linha('Material técnico gerado pelas regras do app (backtest fora da amostra). Não é recomendação de investimento.', 8, 'italic', [120, 120, 120]);
+            y += 3;
+            secoesDoRelatorio().forEach(([titulo, itens]) => {
+                if (y + 20 > ALT) { doc.addPage(); y = M; }
+                linha(`${titulo} (${itens.length})`, 13, 'bold', [40, 60, 140]); y += 1;
+                if (!itens.length) { linha('Nenhum papel nesta situação.', 9, 'italic', [120, 120, 120]); y += 3; return; }
+                itens.forEach(({ a, v }) => {
+                    if (y + 30 > ALT) { doc.addPage(); y = M; }
+                    linha(`${a.t}${nomeAtivo(a.t) ? ' - ' + nomeAtivo(a.t) : ''}`, 11, 'bold');
+                    linha(`Regra: ${nomeRegra(a.regra)} · Veredito: ${v.titulo}${v.conf ? ` · confiabilidade ${v.conf.nivel} (${v.conf.n} operações)` : ''}`, 9);
+                    (v.motivos || []).forEach(m => linha('- ' + m, 9, 'normal', [60, 60, 60], 3));
+                    const partes = [`Entrada${a.desde && a.situacao !== 'entrada' ? ' em ' + fmtDataBR(a.desde) : ' (abertura)'}: ${fmtPrecoM(a.entrada)}`, `Stop: ${fmtPrecoM(a.stop)}`];
+                    if (a.alvo) partes.push(`Alvo: ${fmtPrecoM(a.alvo)}`);
+                    if (a.restam) partes.push(`Saída por tempo: ${a.restam} pregões`);
+                    if (Number.isFinite(a.preco)) partes.push(`Preço: ${fmtPrecoM(a.preco)}`);
+                    linha(partes.join(' · '), 9);
+                    linha(`Fora da amostra: fator de lucro ${fmtNumM(a.teste.pf, 2)} · acerto ${fmtNumM(a.teste.acerto * 100, 0)}% · ${a.teste.n} operações${a.vendido && a.vendido.dias !== null && a.vendido.dias !== undefined ? ` · vendidos: ${fmtNumM(a.vendido.dias, 1)} dias para zerar` : ''}`, 8, 'normal', [100, 100, 100]);
+                    y += 2.5;
+                });
+                y += 2;
+            });
+            const nome = `relatorio-${R.mercado || mercadoAtual}-${R.ultimoPregao || 'sem-data'}.pdf`;
+            const blob = doc.output('blob');
+            const arq = typeof File === 'function' ? new File([blob], nome, { type: 'application/pdf' }) : null;
+            if (arq && toqueNaTela() && navigator.canShare && navigator.canShare({ files: [arq] })) {
+                try { await navigator.share({ files: [arq], title: nome }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+            }
+            doc.save(nome);
+        } catch (e) { console.error('Erro ao montar o PDF:', e); mostrarMensagem('Não consegui montar o PDF: ' + (e && e.message ? e.message : e), 'erro'); }
+        finally { if (botao) { botao.disabled = false; botao.textContent = textoOriginal; } }
+    }
     document.addEventListener('click', e => {
+        const bPdf = e.target.closest('[data-baixar-relatorio-pdf]'); if (bPdf) { baixarRelatorioPdf(bPdf); return; }
         if (e.target.closest('[data-baixar-relatorio]')) { baixarRelatorio(); return; }
         if (e.target.closest('[data-gerar-relatorio]')) { gerarRelatorioNoAparelho(); return; }
         if (e.target.closest('[data-testar-b3]')) { testarAcessoB3(); return; }

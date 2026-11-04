@@ -14,6 +14,7 @@ const CDN_LOCAL = {
     'xlsx.full.min.js': 'xlsx.full.min.js',
     'FileSaver.min.js': 'FileSaver.min.js',
     'lightweight-charts': 'lightweight-charts.standalone.production.js',
+    'jspdf': 'jspdf.umd.min.js',
 };
 // O widget do TradingView é substituído por um dublê que só registra o símbolo pedido.
 const TV_FALSO = 'window.TradingView={widget:function(o){window.__tvSimbolo=o.symbol;document.getElementById(o.container_id).textContent="TV:"+o.symbol;}};';
@@ -318,11 +319,19 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     ok(/🏢 Fundamentos \d\/\d/.test(relTxt) && /não entra no veredito/.test(relTxt), 'celular: cartões do Relatório mostram a nota fundamentalista só como contexto');
     ok(ganhoOk && /Ganho possível/.test(relTxt), 'celular: cartões do Relatório destacam o ganho possível (alvo ou média medida no teste) e o risco até o stop');
     {
-        const [dl] = await Promise.all([cel.page.waitForEvent('download', { timeout: 15000 }), cel.page.click('#am-relatorio [data-baixar-relatorio]')]);
+        const [dl] = await Promise.all([cel.page.waitForEvent('download', { timeout: 15000 }), cel.page.click('#am-relatorio button[data-baixar-relatorio]')]);
         const conteudo = JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
         const nAtivos = await cel.page.evaluate(() => window.investDebug.relatorio.ativos.length);
         ok(/^relatorio-(us|br)-.+\.json$/.test(dl.suggestedFilename()) && conteudo.ativos.length === nAtivos && conteudo.vereditos.length === nAtivos && conteudo.vereditos.every(v => v.t && v.estado),
             `celular: botão "Baixar relatório" entrega o .json com os ${nAtivos} papéis e o veredito de cada um (${dl.suggestedFilename()})`);
+    }
+    {
+        const [dl] = await Promise.all([cel.page.waitForEvent('download', { timeout: 30000 }), cel.page.click('#am-relatorio [data-baixar-relatorio-pdf]')]);
+        const bytes = fs.readFileSync(await dl.path());
+        const esperado = await cel.page.evaluate(() => { const I = window.investDebug; return I.relatorio.ativos.filter(a => ['entrar', 'atrasado', 'esperar', 'ja'].includes(I.vereditoEntrada(a).estado)).length; });
+        ok(/^relatorio-(us|br)-.+\.pdf$/.test(dl.suggestedFilename()) && bytes.slice(0, 5).toString() === '%PDF-' && bytes.length > 3000,
+            `celular: botão "Baixar relatório (PDF)" entrega um PDF de verdade (${dl.suggestedFilename()}, ${Math.round(bytes.length / 1024)} KB, ${esperado} papéis com veredito)`);
+        if (process.env.PDF_SAIDA) fs.copyFileSync(await dl.path(), process.env.PDF_SAIDA);
     }
     // Ordem: padrão por ganho possível (decrescente); tocar em outra ordem reorganiza
     const ordemOk = await cel.page.evaluate(() => {
