@@ -116,12 +116,18 @@ jobs:
           npx playwright install --with-deps chromium
           node coleta/gerar_relatorio.js site
 
+      - name: Histórico diário de vendidos e da recalibração (só guarda; não muda a estratégia)
+        continue-on-error: true
+        env:
+          BASE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data
+        run: python3 coleta/historico.py site/data "$BASE" diario-cache b3-cache/aluguel_b3.json
+
       - name: Guardar o diário (cópia de segurança)
         if: always()
         continue-on-error: true
         run: |
           mkdir -p diario-cache/br
-          for f in diario.json calibracao.json; do
+          for f in diario.json calibracao.json historico.json; do
             cp "site/data/$f" diario-cache/ 2>/dev/null || true
             cp "site/data/br/$f" diario-cache/br/ 2>/dev/null || true
           done
@@ -231,12 +237,18 @@ jobs:
           npx playwright install --with-deps chromium
           node coleta/gerar_relatorio.js site
 
+      - name: Histórico diário de vendidos e da recalibração (só guarda; não muda a estratégia)
+        continue-on-error: true
+        env:
+          BASE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data
+        run: python3 coleta/historico.py site/data "$BASE" diario-cache b3-cache/aluguel_b3.json
+
       - name: Guardar o diário (cópia de segurança)
         if: always()
         continue-on-error: true
         run: |
           mkdir -p diario-cache/br
-          for f in diario.json calibracao.json; do
+          for f in diario.json calibracao.json historico.json; do
             cp "site/data/$f" diario-cache/ 2>/dev/null || true
             cp "site/data/br/$f" diario-cache/br/ 2>/dev/null || true
           done
