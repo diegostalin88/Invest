@@ -22,4 +22,18 @@ for n in LendingOpenPosition InstrumentsConsolidated; do
 echo "### 4. Outras APIs da página"
 mostra "$B/apinegocios/"
 mostra "$B/api/"
+
+echo "### 5. Endereços que o site da tabela usa (lidos do código da página)"
+T=$(mktemp -d)
+curl -s -m 30 -A "$UA" "$B/tabelas/table/LendingOpenPosition/$d/$d" -o "$T/index.html"
+grep -oE '(src|href)="[^"]+\.js"' "$T/index.html" | sed -E 's/.*="([^"]+)"/\1/' | sort -u | while read -r js; do
+  case "$js" in http*) u="$js" ;; /*) u="$B$js" ;; *) u="$B/tabelas/$js" ;; esac
+  echo "-- $u"
+  curl -s -m 30 -A "$UA" "$u" -o "$T/a.js"
+  if ! grep -q 'function' "$T/a.js" 2>/dev/null; then u="$B/$js"; echo "   (tentando $u)"; curl -s -m 30 -A "$UA" "$u" -o "$T/a.js"; fi
+  echo "   $(wc -c < "$T/a.js") bytes"
+  grep -oE '"[^"]{0,60}(table|Table|api|download|Lending|requestname)[^"]{0,80}"' "$T/a.js" | sort -u | head -40
+  grep -oE '.{0,120}(\.get|fetch)\(.{0,160}' "$T/a.js" | head -15
+done
+rm -rf "$T"
 echo "fim"
