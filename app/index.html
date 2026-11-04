@@ -136,6 +136,15 @@
         .rel-botao { display: block; width: 100%; padding: 0.85rem; border-radius: 0.9rem; background: #4f46e5; color: #fff; font-weight: 700; text-align: center; }
         .rel-botao:disabled { opacity: 0.6; }
         .rel-detalhes summary { cursor: pointer; font-weight: 700; padding: 0.4rem 0; }
+        /* Seções do relatório que abrem e fecham (setinha), com o título em destaque */
+        .rel-secao { margin-top: 1rem; }
+        .rel-secao > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; padding: 0.85rem 1rem; border-radius: 0.9rem; background: #1b2130; border: 1px solid #2c3446; font-weight: 700; font-size: 1.08rem; color: #f3f4f6; -webkit-tap-highlight-color: transparent; }
+        .rel-secao > summary::-webkit-details-marker { display: none; }
+        .rel-secao > summary .rel-chip, .rel-secao > summary .rel-esp { margin-left: auto; }
+        .rel-secao > summary::after { content: ''; margin-left: 0.6rem; width: 0.6rem; height: 0.6rem; border-right: 2.5px solid #a5b4fc; border-bottom: 2.5px solid #a5b4fc; transform: rotate(45deg); transition: transform 0.2s; flex-shrink: 0; }
+        .rel-secao[open] > summary::after { transform: rotate(-135deg); }
+        .rel-secao[open] > summary { border-color: #4f46e5; margin-bottom: 0.6rem; }
+        .rel-secao.verde > summary { border-left: 4px solid #22c55e; } .rel-secao.amarelo > summary { border-left: 4px solid #f59e0b; } .rel-secao.azul > summary { border-left: 4px solid #3b82f6; } .rel-secao.cinza > summary { border-left: 4px solid #64748b; }
         .rel-tabela { width: 100%; font-size: 0.85rem; border-collapse: collapse; } .rel-tabela td, .rel-tabela th { padding: 0.45rem 0.3rem; border-top: 1px solid #252b38; text-align: left; }
 
         /* =================== APP DO CELULAR (casca nova, < 1024 px) =================== */
@@ -1994,12 +2003,12 @@
     function htmlDiario() {
         if (!relatorioValido()) return '';
         const D = diarioDados && diarioDados.mercado === relatorioDados.mercado ? diarioDados : null;
-        if (!D) return `<details class="rel-detalhes mt-3"><summary>📒 Diário de sinais (resultado real)</summary><p class="text-sm rel-mudo mt-1">Começa a ser preenchido na próxima coleta: cada sinal de entrada confirmado é anotado e acompanhado nos pregões seguintes, para comparar o resultado real com o teste.</p></details>`;
+        if (!D) return `<details class="rel-secao cinza" data-secao="diario"${secaoAberta('diario') ? ' open' : ''}><summary>📒 Diário de sinais (resultado real)<span class="rel-esp"></span></summary><p class="text-sm rel-mudo mt-1">Começa a ser preenchido na próxima coleta: cada sinal de entrada confirmado é anotado e acompanhado nos pregões seguintes, para comparar o resultado real com o teste.</p></details>`;
         const fech = D.sinais.filter(x => x.estado === 'fechado'), abert = D.sinais.filter(x => x.estado === 'aberto'), aguard = D.sinais.filter(x => x.estado === 'aguardando');
         const linhasRegra = Object.entries(D.regras || {}).filter(([, r]) => r.n || r.abertos).map(([id, r]) => `<tr><td>${nomeRegra(id)}</td><td>${r.n}${r.abertos ? ` + ${r.abertos} abertos` : ''}</td><td>${r.media === null ? '—' : fmtPctM(r.media * 100)}</td><td>${r.acerto === null ? '—' : fmtNumM(r.acerto * 100, 0) + '%'}</td><td>${r.desligada ? '⛔ desligada' : r.n >= DIARIO_MIN_FECHADOS ? '✅ dentro do esperado' : `⏳ ${r.n}/${DIARIO_MIN_FECHADOS}`}</td></tr>`).join('');
         const pv = D.porVeredito || {};
         const ult = fech.slice(-8).reverse().map(x => `<tr data-ativo="${x.t}" style="cursor:pointer"><td><b>${x.t}</b></td><td>${fmtDataBR(x.dataEntrada)} → ${fmtDataBR(x.dataSaida)}</td><td style="color:${x.ret >= 0 ? '#4ade80' : '#f87171'}">${fmtPctM(x.ret * 100)}</td><td>${x.veredito === 'entrar' ? '🟢' : '🟡'}</td></tr>`).join('');
-        return `<details class="rel-detalhes mt-3" open><summary>📒 Diário de sinais: resultado real desde ${fmtDataBR(D.inicio)}</summary>
+        return `<details class="rel-secao cinza" data-secao="diario"${secaoAberta('diario') ? ' open' : ''}><summary>📒 Diário de sinais desde ${fmtDataBR(D.inicio)}<span class="rel-esp"></span></summary>
             <p class="text-sm rel-mudo mt-1">${fech.length} sinais encerrados, ${abert.length} em andamento e ${aguard.length} aguardando a abertura. São resultados de depois do sinal, que o teste não conhecia. Uma regra é desligada sozinha se a média real ficar abaixo do pior cenário do teste (com ${DIARIO_MIN_FECHADOS}+ sinais) e volta quando se recupera.</p>
             ${linhasRegra ? `<table class="rel-tabela mt-2"><thead><tr class="rel-mudo"><th>Regra</th><th>Sinais</th><th>Média real</th><th>Acerto</th><th>Situação</th></tr></thead><tbody>${linhasRegra}</tbody></table>` : ''}
             ${(pv.entrar && pv.entrar.n) || (pv.esperar && pv.esperar.n) ? `<p class="text-sm mt-2">Veredito na prática: 🟢 entrar ${pv.entrar.n ? `${fmtPctM(pv.entrar.media * 100)} em ${pv.entrar.n}` : '—'} · 🟡 esperar ${pv.esperar.n ? `${fmtPctM(pv.esperar.media * 100)} em ${pv.esperar.n}` : '—'} (média por operação).</p>` : ''}
@@ -2085,6 +2094,14 @@
         if (motivos.length) return V('esperar', 'Esperar', motivos, { saidas });
         return V('entrar', 'Entrar na próxima abertura', [`sinal de ${fmtDataBR(a.dataSinal || ultimo)}, regra confirmada, confiabilidade ${conf.nivel.toLowerCase()} (${conf.n} operações)`, espaco !== null ? `risco até o stop ${fmtPctM(-risco / a.entrada * 100)}, espaço até a resistência ${fmtPctM(espaco / a.entrada * 100)} (${fmtNumM(espaco / risco, 1)} para 1)` : 'preço acima das máximas do ano: sem resistência próxima'], { saidas });
     }
+    // Estado aberto/fechado de cada seção do relatório (só conveniência deste aparelho)
+    const SECOES_PADRAO = { entrar: true, atrasado: true, esperar: false, squeeze: false, operacao: false, diario: false };
+    function secaoAberta(id) { try { const v = JSON.parse(localStorage.getItem('invest-rel-secoes') || '{}'); if (id in v) return v[id]; } catch (e) {} return !!SECOES_PADRAO[id]; }
+    function guardarSecao(id, aberta) { try { const v = JSON.parse(localStorage.getItem('invest-rel-secoes') || '{}'); v[id] = aberta; localStorage.setItem('invest-rel-secoes', JSON.stringify(v)); } catch (e) {} }
+    document.addEventListener('toggle', e => { const d = e.target; if (d && d.classList && d.classList.contains('rel-secao') && d.dataset.secao) guardarSecao(d.dataset.secao, d.open); }, true);
+    function secaoRel(id, cor, titulo, chip, corpo) {
+        return `<details class="rel-secao ${cor}" data-secao="${id}"${secaoAberta(id) ? ' open' : ''}><summary>${titulo} ${chip}</summary>${corpo}</details>`;
+    }
     const COR_VEREDITO = { entrar: ['verde', '🟢'], atrasado: ['verde', '🟢'], esperar: ['amarelo', '🟡'], ja: ['azul', '🔵'], nao: ['cinza', '⚪'], sem: ['cinza', '⚪'] };
     function htmlVeredito(v, compacto = false) {
         const [cor, ico] = COR_VEREDITO[v.estado];
@@ -2157,27 +2174,26 @@
                 ${R.vendidos ? `<div class="text-xs rel-mudo mt-2">Vendidos: ${R.vendidos.fonte}, posição de ${fmtDataBR(R.vendidos.data)}.</div>` : ''}
                 ${htmlCalibracao(R)}
             </div>
-            <div class="rel-titulo">🟢 Entrar na próxima abertura <span class="rel-chip verde">${entrar.length}</span></div>
-            <div class="rel-lista">${entrar.length ? entrar.map(cartaoRelatorio).join('') : '<p class="text-sm rel-mudo">Nenhum papel passou em todas as travas hoje. Não entrar também é uma decisão.</p>'}</div>
-            ${atrasadas.length ? `<div class="rel-titulo">🟢 Ainda dá para entrar (atrasado) <span class="rel-chip verde">${atrasadas.length}</span></div>
-            <p class="text-sm rel-mudo mb-2">O sistema já comprou, mas há no máximo ${ATRASO_MAX_PREGOES} pregões e o preço ainda está perto da entrada (até ${fmtNumM(ATRASO_MAX_ATR, 1)} ATR). No teste, entrar assim rendeu o mesmo que no dia certo.</p>
-            <div class="rel-lista">${atrasadas.map(cartaoRelatorio).join('')}</div>` : ''}
-            ${esperar.length ? `<div class="rel-titulo">🟡 Sinal hoje, mas esperar <span class="rel-chip amarelo">${esperar.length}</span></div>
-            <div class="rel-lista">${esperar.map(cartaoRelatorio).join('')}</div>` : ''}
+            ${secaoRel('entrar', 'verde', '🟢 Entrar na próxima abertura', `<span class="rel-chip verde">${entrar.length}</span>`,
+                `<div class="rel-lista">${entrar.length ? entrar.map(cartaoRelatorio).join('') : '<p class="text-sm rel-mudo">Nenhum papel passou em todas as travas hoje. Não entrar também é uma decisão.</p>'}</div>`)}
+            ${atrasadas.length ? secaoRel('atrasado', 'verde', '🟢 Ainda dá para entrar (atrasado)', `<span class="rel-chip verde">${atrasadas.length}</span>`,
+                `<p class="text-sm rel-mudo mb-2">O sistema já comprou, mas há no máximo ${ATRASO_MAX_PREGOES} pregões e o preço ainda está perto da entrada (até ${fmtNumM(ATRASO_MAX_ATR, 1)} ATR). No teste, entrar assim rendeu o mesmo que no dia certo.</p>
+            <div class="rel-lista">${atrasadas.map(cartaoRelatorio).join('')}</div>`) : ''}
+            ${esperar.length ? secaoRel('esperar', 'amarelo', '🟡 Sinal hoje, mas esperar', `<span class="rel-chip amarelo">${esperar.length}</span>`,
+                `<div class="rel-lista">${esperar.map(cartaoRelatorio).join('')}</div>`) : ''}
             ${barrados ? `<p class="text-xs rel-mudo mt-2">${barrados} papel(éis) com sinal ou operação ficaram de fora por regra não confirmada ou pouca confiabilidade (menos de ${CONF_MIN} operações).</p>` : ''}
-            ${squeeze.length ? `<div class="rel-titulo">⚡ Possível short squeeze <span class="rel-chip amarelo">${squeeze.length}</span></div>
-            <p class="text-sm rel-mudo mb-2">Muita gente vendida (5 dias ou mais de volume para zerar) e um sinal de reversão nos últimos 5 pregões. Se o preço sobe, os vendidos precisam recomprar e isso pode acelerar a alta. É um reforço, nunca motivo de compra sozinho: siga o veredito de cada papel.${R.vendidos ? ` Posição vendida de ${fmtDataBR(R.vendidos.data)} (${diasUteisEntre(R.vendidos.data, new Date())} pregões atrás).` : ''}</p>
+            ${squeeze.length ? secaoRel('squeeze', 'amarelo', '⚡ Possível short squeeze', `<span class="rel-chip amarelo">${squeeze.length}</span>`, `<p class="text-sm rel-mudo mb-2">Muita gente vendida (5 dias ou mais de volume para zerar) e um sinal de reversão nos últimos 5 pregões. Se o preço sobe, os vendidos precisam recomprar e isso pode acelerar a alta. É um reforço, nunca motivo de compra sozinho: siga o veredito de cada papel.${R.vendidos ? ` Posição vendida de ${fmtDataBR(R.vendidos.data)} (${diasUteisEntre(R.vendidos.data, new Date())} pregões atrás).` : ''}</p>
             <div class="rel-lista">${squeeze.map(a => `<button type="button" class="rel-card" data-ativo="${a.t}"><div class="flex items-center justify-between"><span class="rel-tk">${a.t}</span><span class="rel-chip amarelo">${fmtNumM(a.vendido.dias, 1)} dias p/ zerar</span></div>
-                <div class="text-sm rel-mudo">${nomeAtivo(a.t) || ''}</div><div class="text-sm mt-1">Sinal <b>${a.squeeze.estrategia}</b> em ${fmtDataBR(a.squeeze.data)} · ${fmtGrandeM(a.vendido.qtd)} ações vendidas${a.vendido.variacaoPct !== null && a.vendido.variacaoPct !== undefined ? ` (${fmtPctM(a.vendido.variacaoPct)} no período)` : ''}${a.regra ? ` · melhor regra: ${nomeRegra(a.regra)}${a.confirmada ? '' : ' (não confirmada)'}` : ''}</div>${htmlVeredito(vereditoEntrada(a), true)}</button>`).join('')}</div>` : ''}
-            <div class="rel-titulo">🔵 Em operação: não entrar agora <span class="rel-chip">${abertas.length}</span></div>
-            <p class="text-sm rel-mudo mb-2">O sistema já comprou esses papéis. Serve para quem entrou junto acompanhar a saída.</p>
-            <div class="rel-lista">${abertas.length ? abertas.map(cartaoRelatorio).join('') : '<p class="text-sm rel-mudo">Nenhuma operação aberta nas regras confirmadas.</p>'}</div>
+                <div class="text-sm rel-mudo">${nomeAtivo(a.t) || ''}</div><div class="text-sm mt-1">Sinal <b>${a.squeeze.estrategia}</b> em ${fmtDataBR(a.squeeze.data)} · ${fmtGrandeM(a.vendido.qtd)} ações vendidas${a.vendido.variacaoPct !== null && a.vendido.variacaoPct !== undefined ? ` (${fmtPctM(a.vendido.variacaoPct)} no período)` : ''}${a.regra ? ` · melhor regra: ${nomeRegra(a.regra)}${a.confirmada ? '' : ' (não confirmada)'}` : ''}</div>${htmlVeredito(vereditoEntrada(a), true)}</button>`).join('')}</div>`) : ''}
+            ${secaoRel('operacao', 'azul', '🔵 Em operação: não entrar agora', `<span class="rel-chip">${abertas.length}</span>`,
+                `<p class="text-sm rel-mudo mb-2">O sistema já comprou esses papéis. Serve para quem entrou junto acompanhar a saída.</p>
+            <div class="rel-lista">${abertas.length ? abertas.map(cartaoRelatorio).join('') : '<p class="text-sm rel-mudo">Nenhuma operação aberta nas regras confirmadas.</p>'}</div>`)}
             ${htmlDiario()}
-            <details class="rel-detalhes mt-5"><summary>Melhor regra de cada papel (${A.length})</summary>
+            <details class="rel-secao cinza" data-secao="regras"${secaoAberta('regras') ? ' open' : ''}><summary>📊 Melhor regra de cada papel <span class="rel-chip">${A.length}</span></summary>
                 <table class="rel-tabela mt-2"><thead><tr class="rel-mudo"><th>Papel</th><th>Melhor regra</th><th>Fator de lucro fora da amostra</th><th></th></tr></thead><tbody>
                 ${A.slice().sort((x, y) => (y.confirmada - x.confirmada) || ((y.teste ? y.teste.pf : 0) - (x.teste ? x.teste.pf : 0))).map(a => `<tr data-ativo="${a.t}" style="cursor:pointer"><td><b>${a.t}</b></td><td>${a.regra ? nomeRegra(a.regra) : `<span class="rel-mudo">${a.motivo || '—'}</span>`}</td><td>${a.teste ? `${fmtNumM(a.teste.pf, 2)} (${a.teste.n} op.)` : '—'}</td><td>${a.confirmada ? '✅' : '⚠️'}</td></tr>`).join('')}
                 </tbody></table></details>
-            <details class="rel-detalhes mt-3"><summary>Como o relatório é feito</summary>
+            <details class="rel-secao cinza" data-secao="como"${secaoAberta('como') ? ' open' : ''}><summary>ℹ️ Como o relatório é feito<span class="rel-esp"></span></summary>
                 <div class="text-sm rel-mudo space-y-2 mt-1">
                     <p>Para cada papel, o app testa ${R.regras.length} regras: ${R.regras.map(r => r.nome).join('; ')}.</p>
                     <p>A melhor é escolhida olhando só os primeiros ${Math.round(R.parametros.fracaoEscolha * 100)}% do histórico, pelo fator de lucro pesado pelo número de operações (mínimo de ${R.parametros.minTradesEscolha}). Ela só aparece nas listas se também tiver dado lucro nos ${100 - Math.round(R.parametros.fracaoEscolha * 100)}% finais, que ela "não viu" (mínimo de ${R.parametros.minTradesConfirma} operações). É o walk-forward de Fitschen e Kaufman, que evita escolher a regra que só deu certo por acaso.</p>

@@ -378,7 +378,13 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     ok(relInfo.n > 0 && relInfo.vend && relInfo.sq > 0 && /short squeeze/.test(relTxt), `celular: alerta de short squeeze com os vendidos da B3 ${JSON.stringify(relInfo)}`);
     await cel.page.waitForTimeout(300);
     await cel.page.screenshot({ path: path.join(SHOTS, 'celular_relatorio.png'), fullPage: false });
-    const cartao = await cel.page.$('#am-relatorio .rel-card[data-ativo]');
+    // Seções com setinha: abre e fecha ao tocar no título e lembra a escolha
+    const sec = await cel.page.evaluate(() => [...document.querySelectorAll('#am-relatorio details.rel-secao')].map(d => d.dataset.secao + ':' + (d.open ? 1 : 0)));
+    await cel.page.click('#am-relatorio details[data-secao="operacao"] > summary');
+    await cel.page.waitForTimeout(250);   // o evento toggle chega depois do clique
+    const abriu = await cel.page.evaluate(() => document.querySelector('#am-relatorio details[data-secao="operacao"]').open && JSON.parse(localStorage.getItem('invest-rel-secoes') || '{}').operacao === true);
+    ok(sec.includes('entrar:1') && sec.includes('operacao:0') && abriu, `celular: seções do Relatório com setinha (${sec.join(', ')}); tocar abre e o app lembra`);
+    const cartao = await cel.page.$('#am-relatorio .rel-card[data-ativo]:visible');
     if (cartao) { await cartao.click(); await cel.page.waitForSelector('#am-ativo.aberta', { timeout: 15000 }); ok(true, 'celular: tocar num papel do Relatório abre a tela do ativo'); await cel.page.goBack(); }
     await cel.page.goBack();   // fecha a tela do Relatório (abre por cima, como as outras do Mais)
     await cel.page.waitForSelector('#am-sub-tela', { state: 'hidden', timeout: 5000 });
