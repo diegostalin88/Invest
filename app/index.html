@@ -139,6 +139,12 @@
         .rel-ganho { margin-top: 0.6rem; padding: 0.7rem 0.8rem; border-radius: 0.8rem; background: linear-gradient(135deg, rgba(34,197,94,0.16), rgba(34,197,94,0.04)); border: 1px solid rgba(34,197,94,0.4); text-align: left; }
         .rel-ganho .g { font-size: 1.7rem; font-weight: 800; color: #4ade80; line-height: 1.1; } .rel-ganho .p { font-size: 1.25rem; font-weight: 800; color: #f87171; } .rel-ganho .r { font-size: 0.75rem; color: #a7b0bf; }
         .rel-seguir { display: block; width: 100%; margin-top: 0.35rem; padding: 0.75rem; border-radius: 0.9rem; background: rgba(34,197,94,0.14); border: 1px solid rgba(34,197,94,0.45); color: #86efac; font-weight: 700; text-align: center; }
+        .sim-status { display: inline-block; font-size: 0.85rem; font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 999px; background: rgba(148,163,184,0.12); }
+        .sim-status.verde { background: rgba(34,197,94,0.14); color: #86efac; } .sim-status.amarelo { background: rgba(245,158,11,0.14); color: #fcd34d; } .sim-status.vermelho { background: rgba(240,82,82,0.15); color: #fca5a5; }
+        .sim-barra { position: relative; height: 0.6rem; border-radius: 999px; background: linear-gradient(90deg, rgba(240,82,82,0.35), rgba(148,163,184,0.2) 40%, rgba(34,197,94,0.35)); }
+        .sim-barra-ent { position: absolute; top: -0.2rem; width: 2px; height: 1rem; background: #e5e7eb; }
+        .sim-barra-preco { position: absolute; top: 0; height: 100%; border-radius: 999px; } .sim-barra-preco.alta { background: #22c55e; } .sim-barra-preco.baixa { background: #ef4444; }
+        .sim-barra-ponto { position: absolute; top: 50%; width: 0.95rem; height: 0.95rem; margin-left: -0.475rem; margin-top: -0.475rem; border-radius: 999px; background: #fff; border: 3px solid #4f46e5; }
         .rel-seguir-painel { margin-top: 0.35rem; padding: 0.8rem; border-radius: 0.9rem; background: #151922; border: 1px solid rgba(34,197,94,0.45); color: #f3f4f6; text-align: left; }
         .rel-seguir.fora { background: rgba(59,130,246,0.10); border-color: rgba(59,130,246,0.45); color: #93c5fd; font-weight: 600; }
         .rel-seguir.feito { background: transparent; border-style: dashed; color: #9aa3b2; }
@@ -3272,7 +3278,8 @@
             : o.estado === 'cancelada' ? `<div class="text-sm mt-1" ${mud}>Cancelada: ${o.motivo}.</div>`
             : `<div class="text-sm mt-1"><b>Aplicado ${fmtValorSim(o.custoTotal)}</b> (${fmtNumM(o.custoTotal / o.patrimonioEnt * 100, 1)}% do patrimônio)${o.valor > 0 ? ' · valor escolhido por você' : ` · risco até o stop ${fmtValorSim(o.riscoIni)}`}</div>
                <div class="text-sm mt-1">${o.qtd} ações · entrou em ${fmtDataBR(o.dataEnt)} a ${fmtPrecoM(o.precoEnt)}${o.estado === 'fechada' ? ` · saiu em ${fmtDataBR(o.dataSai)} a ${fmtPrecoM(o.precoSai)} (${o.motivoSai})` : ` · agora ${fmtPrecoM(o.precoAtual)}`}</div>
-               <div class="text-sm mt-1"><b ${cor(o.resultado)}>${fmtPctM(o.ret * 100)} · ${fmtValorSim(o.resultado)}</b>${o.estado === 'aberta' ? ` <span ${mud}>· stop ${fmtPrecoM(o.stop)}${o.alvo ? ` · alvo ${fmtPrecoM(o.alvo)}` : ''}</span>` : ''}</div>`}
+               <div class="text-sm mt-1"><b ${cor(o.resultado)}>${fmtPctM(o.ret * 100)} · ${fmtValorSim(o.resultado)}</b>${o.estado === 'aberta' ? ` <span ${mud}>· stop ${fmtPrecoM(o.stop)}${o.alvo ? ` · alvo ${fmtPrecoM(o.alvo)}` : ''}</span>` : ''}</div>
+               ${htmlProgressoSim(o)}`}
         </div>`;
         const regras = Object.entries(E.porRegra).sort((a, b) => b[1].resultado - a[1].resultado);
         box.innerHTML = `<div class="am-card"><div class="text-sm" ${mud}>Patrimônio simulado ${mercadoCodigo() === 'br' ? 'no Brasil' : 'nos EUA'}</div><div class="am-preco-grande">${fmtValorSim(E.patrimonio)}</div>
@@ -3312,6 +3319,35 @@
         if (!APP_MOVEL || !a.regra) return '';
         const r = estadoSim().porRegra[a.regra]; const s2 = seloSim(r); if (!s2) return '';
         return `<div class="text-xs mt-2">🧪 Na sua simulação, esta estratégia: ${s2.ico} ${s2.txt} · ${r.n} op. · ${fmtValorSim(r.resultado)}</div>`;
+    }
+    // Acompanhamento de uma operação da simulação: quanto do caminho até o objetivo já foi feito
+    function htmlProgressoSim(o) {
+        const d = allData[o.t]; if (!d) return '';
+        if (o.estado === 'fechada') {
+            const st = o.motivoSai === 'alvo' ? ['🎯', 'objetivo cumprido: saiu no alvo'] : o.ret > 0 ? ['✅', `saiu com lucro (${o.motivoSai})`] : ['❌', `saiu com perda (${o.motivoSai})`];
+            return `<div class="sim-status mt-2">${st[0]} ${st[1]}</div>`;
+        }
+        if (o.estado !== 'aberta') return '';
+        const rel = relatorioValido() && relatorioDados.ativos.find(x => x.t === o.t && x.regra === o.regra);
+        const obj = o.alvo ? { p: o.alvo, nome: 'alvo' } : rel && rel.teste && rel.teste.mediaGanho > 0 ? { p: o.precoEnt * (1 + rel.teste.mediaGanho), nome: 'média das vencedoras no teste' } : null;
+        const p = o.precoAtual, n = d.close.length, pregoes = n - o.iEnt;
+        const travado = o.stop >= o.precoEnt, riscoIni = o.precoEnt - o.stopIni;
+        let status;
+        if (travado) status = ['🔒', `Lucro travado: o stop já garante ${fmtPctM((o.stop / o.precoEnt - 1) * 100)}`, 'verde'];
+        else if (obj && p >= obj.p) status = ['🎯', `Passou do objetivo (${obj.nome}); o stop móvel segue protegendo`, 'verde'];
+        else if (riscoIni > 0 && (p - o.stop) < riscoIni * 0.25) status = ['⚠️', 'Perto do stop', 'vermelho'];
+        else if (p >= o.precoEnt) status = ['📈', 'No caminho', 'verde'];
+        else status = ['📉', 'Abaixo da entrada, ainda longe do stop', 'amarelo'];
+        let barra = '';
+        if (obj && obj.p > o.stop) {
+            const pos = v => Math.max(0, Math.min(100, (v - o.stop) / (obj.p - o.stop) * 100));
+            const feito = (p - o.precoEnt) / (obj.p - o.precoEnt) * 100;
+            barra = `<div class="sim-barra mt-2"><div class="sim-barra-ent" style="left:${pos(o.precoEnt)}%"></div><div class="sim-barra-preco ${p >= o.precoEnt ? 'alta' : 'baixa'}" style="left:${Math.min(pos(o.precoEnt), pos(p))}%;width:${Math.abs(pos(p) - pos(o.precoEnt))}%"></div><div class="sim-barra-ponto" style="left:${pos(p)}%"></div></div>
+                <div class="flex justify-between text-xs mt-1" style="color:var(--mudo)"><span>Stop ${fmtPrecoM(o.stop)}</span><span>Entrada ${fmtPrecoM(o.precoEnt)}</span><span>${obj.nome === 'alvo' ? 'Alvo' : 'Objetivo'} ${fmtPrecoM(obj.p)}</span></div>
+                <div class="text-sm mt-1"><b>${feito >= 0 ? `Cumpriu ${fmtNumM(Math.min(feito, 999), 0)}% do caminho até o ${obj.nome === 'alvo' ? 'alvo' : 'objetivo'}` : `${fmtNumM(-feito, 0)}% do caminho para trás (abaixo da entrada)`}</b>${obj.nome !== 'alvo' ? ' <span style="color:var(--mudo)">(sem alvo fixo: o objetivo é a média das vencedoras no teste)</span>' : ''}</div>`;
+        }
+        const tempo = o.rp.saidaDias > 0 ? `<div class="text-xs mt-1" style="color:var(--mudo)">⏱️ Pregão ${pregoes} de ${o.rp.saidaDias} · sai por tempo por volta de ${fmtDataBR(somarPregoes(d.dates[n - 1], Math.max(1, o.rp.saidaDias - pregoes)))}</div>` : `<div class="text-xs mt-1" style="color:var(--mudo)">⏱️ ${pregoes} pregão(ões) na operação</div>`;
+        return `<div class="sim-status ${status[2]} mt-2">${status[0]} ${status[1]}</div>${barra}${tempo}`;
     }
     function htmlBotaoSeguir(a, v) {
         if (!APP_MOVEL || !['entrar', 'atrasado', 'ja'].includes(v.estado)) return '';
