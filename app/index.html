@@ -1626,6 +1626,8 @@
                     let dist = indicators.ATR[i] * (riskParams.trailAtr > 0 ? riskParams.trailAtr : riskParams.atrMult);
                     if (riskParams.trailInicial && distInicial > 0) dist = Math.min(dist, distInicial);
                     stopPrice = Math.max(stopPrice, dataSubset.close[i] - dist);
+                    // Variante em estudo (0 = desligado): stop no preço de entrada depois de andar N ATR a favor
+                    if (riskParams.breakevenAtr > 0 && dataSubset.close[i] >= entryPrice + pendingATR * riskParams.breakevenAtr) stopPrice = Math.max(stopPrice, entryPrice);
                 }
             }
 

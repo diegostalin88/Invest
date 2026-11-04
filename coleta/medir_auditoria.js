@@ -1,7 +1,8 @@
 // Medição (só leitura) dos 3 testes propostos pela auditoria de 04/11/2026, com o MESMO motor do app:
 //  1) só aceitar o sinal se o papel foi bom NO MESMO REGIME (acima/abaixo da MME200) no período de TREINO
 //     (os 60% iniciais; usar o período de teste para filtrar seria olhar o futuro);
-//  2) stop móvel mais curto: distância nunca maior que a do stop inicial, ou 1,5 ATR em vez de 2,5;
+//  2) stop móvel mais curto: distância nunca maior que a do stop inicial, ou 1,5 ATR em vez de 2,5; e stop no
+//     preço de entrada (zero a zero) depois de andar 1 ou 1,5 ATR a favor;
 //  3) carteira com limite de papéis abertos por setor (grupo SIC da SEC), medindo a queda máxima.
 // Roda nos papéis confirmados e em todos os que têm regra (os confirmados passaram no teste, o que infla os números).
 //
@@ -53,7 +54,7 @@ function servir() {
         const saida = {};
         for (const universo of ['confirmadas', 'todas']) {
             const papeis = R.ativos.filter(a => a.regra && (universo === 'todas' || a.confirmada));
-            const t1 = { todas: [], estrito: [], brando: [] }, t2 = { atual: { todas: [], volateis: [] }, inicial: { todas: [], volateis: [] }, atr15: { todas: [], volateis: [] } };
+            const t1 = { todas: [], estrito: [], brando: [] }, t2 = { atual: { todas: [], volateis: [] }, inicial: { todas: [], volateis: [] }, atr15: { todas: [], volateis: [] }, empate1: { todas: [], volateis: [] }, empate15: { todas: [], volateis: [] } };
             const ops = [];  // para a carteira (teste 3)
             for (const a of papeis) {
                 const d = D[a.t]; if (!d) continue; const base = I.regraRp(a.regra); if (!base) continue;
@@ -74,7 +75,7 @@ function servir() {
                 const setor = (SET[a.t] && SET[a.t].grupo) || (F[a.t] && F[a.t].sector) || ('?' + a.t);
                 teste.forEach(x => ops.push({ t: a.t, setor, ent: d.dates[x.ent], sai: d.dates[Math.min(x.sai, d.dates.length - 1)], pct: x.pct, prio: (a.treino && a.treino.pf) || 0 }));
                 // Teste 2
-                for (const [k, extra] of [['atual', {}], ['inicial', { trailInicial: true }], ['atr15', { trailAtr: 1.5 }]]) {
+                for (const [k, extra] of [['atual', {}], ['inicial', { trailInicial: true }], ['atr15', { trailAtr: 1.5 }], ['empate1', { breakevenAtr: 1 }], ['empate15', { breakevenAtr: 1.5 }]]) {
                     const rr = k === 'atual' ? res : I.runCoreBacktest(d, { ...base, ...extra }); if (!rr) continue;
                     rr.tradesDet.filter(x => x.ent >= corte).forEach(x => {
                         t2[k].todas.push(x);
