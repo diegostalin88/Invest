@@ -2156,6 +2156,19 @@
         const base = a.preco || a.entrada; if (a.alvo && base && a.alvo > base) return (a.alvo / base - 1) * 100;
         return a.teste && a.teste.mediaGanho !== undefined && a.teste.mediaGanho !== null ? a.teste.mediaGanho * 100 : -Infinity;
     }
+    // Fundamentos como CONTEXTO no cartão (não entram no veredito: só temos os dados de hoje, não o histórico,
+    // então usá-los no backtest seria look-ahead).
+    function htmlFundRelatorio(t) {
+        const f = fundamentalsData && fundamentalsData[t], n = notaFundamentalista(t); if (!f || !n) return '';
+        const cor = n.critico ? 'vermelho' : n.comDado < MIN_DATA_COVERAGE_FOR_RANKING ? '' : n.ok >= 4 ? 'verde' : n.ok >= 2 ? 'amarelo' : 'vermelho';
+        const leitura = n.critico ? 'evento crítico recente' : n.comDado < MIN_DATA_COVERAGE_FOR_RANKING ? 'poucos dados' : n.ok >= 4 ? 'saudável' : n.ok >= 2 ? 'mediana' : 'fraca';
+        const num = v => Number.isFinite(Number(v)) ? Number(v) : null; const it = [];
+        if (num(f.pe) !== null) it.push(`P/L ${fmtNumM(num(f.pe), 1)}`);
+        if (num(f.roe) !== null) it.push(`ROE ${fmtNumM(num(f.roe) * 100, 1)}%`);
+        if (num(f.netMargin) !== null) it.push(`margem ${fmtNumM(num(f.netMargin) * 100, 1)}%`);
+        if (num(f.debtToEquity) !== null) it.push(`Dívida/PL ${fmtNumM(num(f.debtToEquity), 2)}`);
+        return `<div class="mt-2 text-xs"><span class="rel-chip ${cor}">🏢 Fundamentos ${n.ok}/${n.comDado || 5}: ${leitura}</span>${it.length ? ` <span class="rel-mudo">${it.join(' · ')}</span>` : ''}<div class="rel-mudo mt-1">Só contexto: não entra no veredito (a coleta tem só os dados de hoje, não dá para testar no histórico).</div></div>`;
+    }
     function cartaoRelatorio(a) {
         const d = (r, v, cor) => `<div class="rel-dado"><div class="r">${r}</div><div class="v"${cor ? ` style="color:${cor}"` : ''}>${v}</div></div>`;
         const res = a.situacao === 'posicao' && a.entrada ? (a.preco / a.entrada - 1) * 100 : null;
@@ -2166,6 +2179,7 @@
             ${a.squeeze ? `<div class="mt-2"><span class="rel-chip amarelo">⚡ Possível short squeeze: ${fmtNumM(a.vendido.dias, 1)} dias para zerar + sinal ${a.squeeze.estrategia}</span></div>` : ''}
             ${htmlVeredito(vereditoEntrada(a))}
             ${htmlGanhoPossivel(a)}
+            ${htmlFundRelatorio(a.t)}
             <div class="rel-grade">
                 ${a.situacao === 'entrada' ? d('Entrada (abertura)', '≈ ' + fmtPrecoM(a.entrada)) : d(`Entrada em ${fmtDataBR(a.desde)}`, fmtPrecoM(a.entrada))}
                 ${d('Stop', fmtPrecoM(a.stop), '#f87171')}
@@ -3116,7 +3130,7 @@
             </div>
             ${v ? `<div class="mt-3 text-sm space-y-1">${v.motivos.map(([bom, txt]) => `<div>${bom === true ? '🟢' : bom === false ? '🔴' : '⚪'} ${txt}</div>`).join('')}</div>` : ''}
             <div class="mt-3 text-sm space-y-1" style="color:var(--mudo)">
-                ${f ? `<div>Fundamentos: <b style="color:var(--txt)">${nota}/5</b>${Number.isFinite(Number(f.pe)) ? ` · P/L ${fmtNumM(Number(f.pe), 1)}` : ''}${Number.isFinite(Number(f.roe)) ? ` · ROE ${fmtNumM(f.roe * 100, 1)}%` : ''}${Number.isFinite(Number(f.debtToEquity)) ? ` · Dívida/PL ${fmtNumM(Number(f.debtToEquity), 2)}` : ''}</div>` : ''}
+                ${f ? `<div>Fundamentos: <b style="color:var(--txt)">${nota ? nota.ok : '—'}/5</b>${Number.isFinite(Number(f.pe)) ? ` · P/L ${fmtNumM(Number(f.pe), 1)}` : ''}${Number.isFinite(Number(f.roe)) ? ` · ROE ${fmtNumM(f.roe * 100, 1)}%` : ''}${Number.isFinite(Number(f.debtToEquity)) ? ` · Dívida/PL ${fmtNumM(Number(f.debtToEquity), 2)}` : ''}</div>` : ''}
                 ${perf ? `<div>Perfil: <b style="color:var(--txt)">${perf.nome}</b></div>` : ''}
                 ${rel ? `<div>Relatório: ${rel.regra ? `melhor regra <b style="color:var(--txt)">${nomeRegra(rel.regra)}</b>${rel.confirmada ? '' : ' (não confirmada)'}${rel.situacao === 'posicao' ? ' · a regra está <b style="color:var(--txt)">em operação</b>' : rel.situacao === 'entrada' ? ' · sinal de <b style="color:var(--txt)">entrada</b> hoje' : ''}` : 'sem regra com operações suficientes'}</div>` : ''}
                 ${vend ? `<div>Vendidos: ${vend.dias === null ? '—' : fmtNumM(vend.dias, 1)} dias para zerar${rel && rel.squeeze ? ' · ⚡ possível short squeeze' : ''}</div>` : ''}

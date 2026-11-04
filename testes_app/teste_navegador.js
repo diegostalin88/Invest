@@ -315,6 +315,7 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     ok(/Entrar na próxima abertura/.test(relTxt) && /Em operação: não entrar agora/.test(relTxt) && /Saída que ganhou/.test(relTxt) && /Confiabilidade/.test(relTxt), 'celular: Relatório com vereditos (entrar, em operação), confiabilidade e saída vencedora');
     const ganhoOk = await cel.page.evaluate(() => { const R = window.investDebug.relatorio; const c = R.ativos.filter(a => a.confirmada);
         return c.length > 0 && c.every(a => a.teste.mediaOp !== undefined && (a.teste.mediaGanho === null || a.teste.mediaGanho > 0) && (a.teste.mediaPerda === null || a.teste.mediaPerda <= 0)) && document.querySelectorAll('#am-relatorio .rel-ganho').length > 0; });
+    ok(/🏢 Fundamentos \d\/\d/.test(relTxt) && /não entra no veredito/.test(relTxt), 'celular: cartões do Relatório mostram a nota fundamentalista só como contexto');
     ok(ganhoOk && /Ganho possível/.test(relTxt), 'celular: cartões do Relatório destacam o ganho possível (alvo ou média medida no teste) e o risco até o stop');
     // Ordem: padrão por ganho possível (decrescente); tocar em outra ordem reorganiza
     const ordemOk = await cel.page.evaluate(() => {
@@ -461,6 +462,7 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     await cel.page.click('#am-cart-salvar');
     await cel.page.waitForSelector('#am-carteira [data-cart-editar]', { timeout: 10000 });
     const cartTxt = await cel.page.textContent('#am-carteira');
+    ok(!/object Object/.test(cartTxt), "celular: nota fundamentalista da Carteira aparece como número (sem [object Object])");
     ok(cartTxt.includes(papelCart) && /(Viés de alta|Viés de baixa|Neutro)/.test(cartTxt) && /Resultado/.test(cartTxt), `celular: Carteira mostra ${papelCart} com viés e resultado`);
     await cel.page.waitForTimeout(300);
     await cel.page.screenshot({ path: path.join(SHOTS, 'celular_carteira.png'), fullPage: false });
