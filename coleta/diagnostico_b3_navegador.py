@@ -16,8 +16,7 @@ def dia_util_anterior():
 
 def main():
     d = sys.argv[1] if len(sys.argv) > 1 else dia_util_anterior()
-    paginas = [f'https://arquivos.b3.com.br/tabelas/table/LendingOpenPosition/{d}/{d}',
-               'https://arquivos.b3.com.br/tabelas/']
+    paginas = ['https://arquivos.b3.com.br/bdi/']
     with sync_playwright() as p:
         nav = p.chromium.launch(args=['--no-sandbox', '--disable-dev-shm-usage'])
         for url in paginas:
@@ -32,7 +31,7 @@ def main():
                 linha = f'{r.request.method} {r.status} {tipo[:30]} {r.url[:220]}'
                 if 'json' in tipo:
                     try:
-                        linha += '\n      ' + r.text()[:300].replace('\n', ' ')
+                        linha += '\n      ' + r.text()[:600].replace('\n', ' ')
                     except Exception as e:  # corpo indisponível
                         linha += f'\n      (sem corpo: {e})'
                 vistos.append(linha)
@@ -41,6 +40,14 @@ def main():
             try:
                 pag.goto(url, wait_until='networkidle', timeout=60000)
                 pag.wait_for_timeout(8000)
+                links = pag.eval_on_selector_all('a,button', 'es => es.map(e => (e.innerText||"").trim() + " -> " + (e.href||"")).filter(t => t.length > 4)')
+                print('  links:', ' || '.join(links[:80]))
+                for txt in ('Empréstimo', 'Emprestimo', 'Posições em aberto', 'Posição em aberto'):
+                    alvo = pag.get_by_text(txt, exact=False)
+                    if alvo.count():
+                        print(f'  clicando em "{txt}"')
+                        alvo.first.click()
+                        pag.wait_for_timeout(6000)
             except Exception as e:
                 print(f'erro ao abrir: {e}')
             for v in vistos:
