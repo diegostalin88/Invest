@@ -26,7 +26,9 @@ mostra "$B/api/"
 echo "### 5. Endereços que o site da tabela usa (lidos do código da página)"
 T=$(mktemp -d)
 curl -s -m 30 -A "$UA" "$B/tabelas/table/LendingOpenPosition/$d/$d" -o "$T/index.html"
-grep -oE '(src|href)="[^"]+\.js"' "$T/index.html" | sed -E 's/.*="([^"]+)"/\1/' | sort -u | while read -r js; do
+echo "   página: $(wc -c < "$T/index.html") bytes"
+grep -oiE '<script[^>]*>' "$T/index.html" | head -10
+grep -oE "[^\"' =>]+\.js" "$T/index.html" | sort -u | while read -r js; do
   case "$js" in http*) u="$js" ;; /*) u="$B$js" ;; *) u="$B/tabelas/$js" ;; esac
   echo "-- $u"
   curl -s -m 30 -A "$UA" "$u" -o "$T/a.js"
