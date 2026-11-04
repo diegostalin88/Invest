@@ -2251,7 +2251,7 @@
                 <div class="text-sm rel-mudo">${nomeAtivo(a.t) || ''}</div><div class="text-sm mt-1">Sinal <b>${a.squeeze.estrategia}</b> em ${fmtDataBR(a.squeeze.data)} · ${fmtGrandeM(a.vendido.qtd)} ações vendidas${a.vendido.variacaoPct !== null && a.vendido.variacaoPct !== undefined ? ` (${fmtPctM(a.vendido.variacaoPct)} no período)` : ''}${a.regra ? ` · melhor regra: ${nomeRegra(a.regra)}${a.confirmada ? '' : ' (não confirmada)'}` : ''}</div>${htmlVeredito(vereditoEntrada(a), true)}</button>`).join('')}</div>`)
             : secaoRel('squeeze', 'cinza', '⚡ Possível short squeeze', `<span class="rel-chip">${R.vendidos ? 0 : 'sem dados'}</span>`, R.vendidos
                 ? `<p class="text-sm rel-mudo">Nenhum papel hoje com muita gente vendida (5 dias ou mais de volume para zerar) e sinal de reversão nos últimos 5 pregões. Posição vendida de ${fmtDataBR(R.vendidos.data)} (${R.vendidos.fonte}).</p>`
-                : `<p class="text-sm rel-mudo">Sem dados de posições vendidas para este mercado nesta coleta, então o alerta não pôde ser calculado. ${mercadoAtual === 'br' ? 'No Brasil, os dados vêm do aluguel de ações da B3, e o site da B3 bloqueia o servidor de coleta (que fica fora do Brasil).' : 'A fonte (FINRA) não respondeu nesta coleta.'}</p>`)}
+                : `<p class="text-sm rel-mudo">Sem dados de posições vendidas para este mercado nesta coleta, então o alerta não pôde ser calculado. ${mercadoAtual === 'br' ? 'No Brasil, os dados vêm do aluguel de ações da B3, e o site da B3 bloqueia o servidor de coleta (que fica fora do Brasil).' : 'A fonte (FINRA) não respondeu nesta coleta.'}</p>${mercadoAtual === 'br' ? `<button type="button" class="rel-botao mt-2" style="background:#374151" data-testar-b3>Testar se este aparelho consegue ler a B3</button><div class="text-sm mt-2" id="rel-teste-b3"></div>` : ''}`)}
             ${secaoRel('operacao', 'azul', '🔵 Em operação: não entrar agora', `<span class="rel-chip">${abertas.length}</span>`,
                 `<p class="text-sm rel-mudo mb-2">O sistema já comprou esses papéis. Serve para quem entrou junto acompanhar a saída.</p>
             <div class="rel-lista">${abertas.length ? abertas.map(cartaoRelatorio).join('') : '<p class="text-sm rel-mudo">Nenhuma operação aberta nas regras confirmadas.</p>'}</div>`)}
@@ -2271,6 +2271,17 @@
         }
         alvos.forEach(el => el.innerHTML = html);
     }
+    // Diagnóstico: o navegador do aparelho (no Brasil) consegue ler os dados de aluguel da B3? Se sim, dá para
+    // buscar o dado do próprio aparelho, já que o servidor de coleta (fora do Brasil) é bloqueado.
+    async function testarAcessoB3() {
+        const out = document.querySelectorAll('#rel-teste-b3'); const msg = h => out.forEach(o => o.innerHTML = h);
+        msg('Testando…'); const d = new Date(); d.setDate(d.getDate() - 1); while (!(d.getDay() % 6)) d.setDate(d.getDate() - 1);
+        const url = `https://arquivos.b3.com.br/api/download/requestname?fileName=LendingOpenPositionFile&date=${d.toISOString().slice(0, 10)}`;
+        try {
+            const r = await fetch(url, { cache: 'no-store' }); const txt = await r.text(); let tok = null; try { tok = JSON.parse(txt).token; } catch (e2) {}
+            msg(r.ok && tok ? '✅ Funcionou: este aparelho consegue ler a B3. Me avise que eu faço o app buscar o aluguel daqui.' : `⚠️ A B3 respondeu, mas sem o dado (código ${r.status}). Me mande um print desta mensagem.`);
+        } catch (e) { msg('❌ Não deu: o navegador bloqueou (a B3 não permite que outros sites leiam os dados dela). Fica a opção do servidor no Brasil.'); }
+    }
     let gerandoRelatorio = false;
     async function gerarRelatorioNoAparelho() {
         if (gerandoRelatorio || !Object.keys(allData).length) return; gerandoRelatorio = true;
@@ -2282,6 +2293,7 @@
     }
     document.addEventListener('click', e => {
         if (e.target.closest('[data-gerar-relatorio]')) { gerarRelatorioNoAparelho(); return; }
+        if (e.target.closest('[data-testar-b3]')) { testarAcessoB3(); return; }
         const ord = e.target.closest('[data-rel-ordem]');
         if (ord) { try { localStorage.setItem('invest-rel-ordem', ord.dataset.relOrdem); } catch (e2) {} desenharRelatorio(); return; }
         const el = e.target.closest('#relatorio-desktop [data-ativo]');
