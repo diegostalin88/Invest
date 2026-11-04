@@ -136,6 +136,8 @@
         .rel-botao { display: block; width: 100%; padding: 0.85rem; border-radius: 0.9rem; background: #4f46e5; color: #fff; font-weight: 700; text-align: center; }
         .rel-botao:disabled { opacity: 0.6; }
         .rel-detalhes summary { cursor: pointer; font-weight: 700; padding: 0.4rem 0; }
+        .rel-seguir { display: block; width: 100%; margin-top: 0.35rem; padding: 0.75rem; border-radius: 0.9rem; background: rgba(34,197,94,0.14); border: 1px solid rgba(34,197,94,0.45); color: #86efac; font-weight: 700; text-align: center; }
+        .rel-seguir.feito { background: transparent; border-style: dashed; color: #9aa3b2; }
         /* Seções do relatório que abrem e fecham (setinha), com o título em destaque */
         .rel-secao { margin-top: 1rem; }
         .rel-secao > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; padding: 0.85rem 1rem; border-radius: 0.9rem; background: #1b2130; border: 1px solid #2c3446; font-weight: 700; font-size: 1.08rem; color: #f3f4f6; -webkit-tap-highlight-color: transparent; }
@@ -341,9 +343,13 @@
         </section>
 
         <section class="am-pagina" data-pagina="carteira">
-            <div id="am-carteira"></div>
-            <button type="button" class="am-botao mt-4" id="am-carteira-add">+ Adicionar papel</button>
-            <p class="am-aviso">A carteira fica salva só neste aparelho. Ferramenta de apoio à análise; não é recomendação de investimento.</p>
+            <div class="flex gap-2 mb-3" id="am-cart-abas"><button type="button" class="am-pilula ativa" data-cart-aba="minha">Minha carteira</button><button type="button" class="am-pilula" data-cart-aba="sim">🧪 Simulação</button></div>
+            <div id="am-cart-minha">
+                <div id="am-carteira"></div>
+                <button type="button" class="am-botao mt-4" id="am-carteira-add">+ Adicionar papel</button>
+                <p class="am-aviso">A carteira fica salva só neste aparelho. Ferramenta de apoio à análise; não é recomendação de investimento.</p>
+            </div>
+            <div id="am-simulacao" class="hidden"></div>
         </section>
 
         <section class="am-pagina" data-pagina="testes">
@@ -1885,7 +1891,7 @@
             niveis = { entrada: res.aberta.entrada, desde: res.aberta.data, stop: res.aberta.stop, alvo: res.aberta.alvo, atrEntrada: res.aberta.atr, restam: melhor.r.rp.saidaDias > 0 ? Math.max(1, melhor.r.rp.saidaDias - res.aberta.dias) : null };
         } else if (res.sinalHoje) {
             situacao = 'entrada'; const atr = res.atrHoje; const rp = melhor.r.rp;
-            niveis = { entrada: fech, stop: Math.max(fech - atr * rp.atrMult, fech * (1 - rp.stopLossPct / 100)), alvo: rp.alvoAtr > 0 ? fech + atr * rp.alvoAtr : null, restam: rp.saidaDias > 0 ? rp.saidaDias : null };
+            niveis = { atrSinal: atr, entrada: fech, stop: Math.max(fech - atr * rp.atrMult, fech * (1 - rp.stopLossPct / 100)), alvo: rp.alvoAtr > 0 ? fech + atr * rp.alvoAtr : null, restam: rp.saidaDias > 0 ? rp.saidaDias : null };
         }
         const arred = v => (v === null || v === undefined) ? null : +(+v).toFixed(4);
         if (situacao === 'entrada') niveis.dataSinal = d.dates[n - 1];
@@ -2129,7 +2135,7 @@
                 ${d('Sai por', regraSaida)}
             </div>
             <div class="text-xs rel-mudo mt-2">Confirmado fora da amostra: fator de lucro ${fmtNumM(a.teste.pf, 2)} · acerto ${fmtNumM(a.teste.acerto * 100, 0)}% · ${a.teste.n} operações</div>
-        </button>`;
+        </button>${htmlBotaoSeguir(a, vereditoEntrada(a))}`;
     }
     function htmlCalibracao(R) {
         const c = calibracaoDados && calibracaoDados.mercado === R.mercado ? calibracaoDados : null;
@@ -3090,6 +3096,132 @@
             ${htmlAnaliseCarteira(analisarCarteira())}
             <div class="space-y-3 mt-3">${daqui.map(({ x, k }) => cartaoCarteira(x, k)).join('')}</div>`;
     }
+    // ===== Simulação com dinheiro fictício ("incubação" de Kaufman/Fitschen) =====
+    // A pessoa segue os vereditos 🟢 do Relatório. Compra na ABERTURA seguinte ao toque (preço real dos dados), com o
+    // tamanho do Backtest (risco de X% do patrimônio até o stop) e sai pela regra daquele papel (stop móvel, alvo, tempo
+    // ou média de 5), recalculada a cada coleta com a MESMA lógica do runCoreBacktest. Na entrada atrasada, a saída é a
+    // do sistema (como foi medido). Tudo é recalculado a partir das ordens guardadas: nada de saldo "digitado".
+    const CHAVE_SIM = 'invest-simulacao';
+    const SIM_SALDO_INICIAL = 100000;
+    const fmtValorSim = v => (v < 0 ? '-' : '') + MERCADO.simbolo + ' ' + Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    function lerSimTudo() { try { const v = JSON.parse(localStorage.getItem(CHAVE_SIM) || '{}'); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } }
+    function lerSim() { const v = lerSimTudo()[mercadoCodigo()]; return v && Array.isArray(v.ordens) ? v : null; }
+    function gravarSim(sim) { try { const v = lerSimTudo(); if (sim) v[mercadoCodigo()] = sim; else delete v[mercadoCodigo()]; localStorage.setItem(CHAVE_SIM, JSON.stringify(v)); return true; } catch (e) { return false; } }
+    const proxIndice = (d, iso) => { for (let i = 0; i < d.dates.length; i++) if (d.dates[i] > iso) return i; return -1; };
+    // Mesma saída do runCoreBacktest, a partir do pregão de entrada iEnt (preço de entrada já com custo).
+    function simularSaida(d, iEnt, entrada, atr, rp) {
+        const ind = precomputeAllIndicators(d, getIndicatorParameters());
+        const recuo = rp.modoEntrada === 'recuo', sma5 = recuo ? calculateSMA(d, 5) : null, custo = (rp.costPct || 0) / 100;
+        let stop = Math.max(entrada - atr * rp.atrMult, entrada * (1 - (rp.stopLossPct || 0) / 100));
+        const alvo = rp.alvoAtr > 0 ? entrada + atr * rp.alvoAtr : null;
+        for (let i = iEnt; i < d.close.length; i++) {
+            let px = null, motivo = null;
+            if (d.low[i] <= stop) { px = Math.min(stop, d.open[i]); motivo = 'stop'; }
+            else if (recuo && sma5[i] !== null && d.close[i] > sma5[i]) { px = d.close[i]; motivo = 'média de 5'; }
+            else if (alvo !== null && d.high[i] >= alvo) { px = Math.max(alvo, d.open[i]); motivo = 'alvo'; }
+            else if (rp.saidaDias > 0 && i - iEnt + 1 >= rp.saidaDias) { px = d.close[i]; motivo = 'tempo'; }
+            if (px !== null) return { iSai: i, preco: px * (1 - custo), motivo, stop, alvo };
+            if (ind.ATR[i]) stop = Math.max(stop, d.close[i] - ind.ATR[i] * rp.atrMult);
+        }
+        return { iSai: null, stop, alvo };
+    }
+    // Guarda a ordem a partir do cartão do Relatório (só para veredito 🟢 entrar ou atrasado).
+    function seguirNaSimulacao(t) {
+        const a = relatorioValido() && relatorioDados.ativos.find(x => x.t === t); if (!a) return { ok: false, motivo: 'papel fora do relatório' };
+        const v = vereditoEntrada(a); if (!['entrar', 'atrasado'].includes(v.estado)) return { ok: false, motivo: 'o veredito de hoje não é de entrada' };
+        const sim = lerSim() || { inicio: ultimoPregaoDados(), saldoInicial: SIM_SALDO_INICIAL, ordens: [] };
+        const est = estadoSim(sim);
+        if (est.ordens.some(o => o.t === t && (o.estado === 'aguardando' || o.estado === 'aberta'))) return { ok: false, motivo: 'já está seguindo este papel' };
+        const r = regrasRelatorio(getBacktestRiskParams()).find(x => x.id === a.regra); if (!r) return { ok: false, motivo: 'regra desconhecida' };
+        const rp = r.rp, base = getBacktestRiskParams();
+        sim.ordens.push({ id: `${t}-${Date.now()}`, t, regra: a.regra, tipo: v.estado, dataTela: ultimoPregaoDados(), criadaEm: new Date().toISOString(),
+            sistema: v.estado === 'entrar' ? { dataSinal: a.dataSinal || ultimoPregaoDados(), atr: a.atrSinal } : { desde: a.desde, entrada: a.entrada, atr: a.atrEntrada },
+            rp: { modoEntrada: rp.modoEntrada, atrMult: rp.atrMult, stopLossPct: rp.stopLossPct, alvoAtr: rp.alvoAtr, saidaDias: rp.saidaDias, costPct: rp.costPct, riskTrade: base.riskTrade } });
+        gravarSim(sim); return { ok: true };
+    }
+    // Estado da simulação recalculado dos dados: preenche, dimensiona e fecha cada ordem em ordem de data.
+    function estadoSim(sim) {
+        sim = sim || lerSim(); const ini = sim ? sim.saldoInicial : SIM_SALDO_INICIAL;
+        if (!sim) return { saldoInicial: ini, caixa: ini, emPapeis: 0, patrimonio: ini, ordens: [], fechadas: [], abertas: [], aguardando: [], canceladas: [], porRegra: {}, referencia: null };
+        const ordens = sim.ordens.map(o => {
+            const d = allData[o.t], x = { ...o, estado: 'aguardando' }; if (!d) { x.estado = 'sem_dados'; return x; }
+            const custo = (o.rp.costPct || 0) / 100;
+            // Entrada do sistema (de onde vêm stop e alvo) e entrada da pessoa (abertura seguinte ao toque)
+            const iSis = o.tipo === 'entrar' ? proxIndice(d, o.sistema.dataSinal) : d.dates.indexOf(o.sistema.desde);
+            const iMeu = proxIndice(d, o.dataTela);
+            if (iSis < 0 || iMeu < 0) return x;   // a abertura ainda não aconteceu nos dados
+            const atr = o.sistema.atr; if (!(atr > 0)) { x.estado = 'cancelada'; x.motivo = 'sem ATR do sinal'; return x; }
+            const entSis = o.tipo === 'entrar' ? d.open[iSis] * (1 + custo) : o.sistema.entrada;
+            const s = simularSaida(d, iSis, entSis, atr, o.rp);
+            if (s.iSai !== null && s.iSai < iMeu) { x.estado = 'cancelada'; x.motivo = `o sistema saiu (${s.motivo}) em ${fmtDataBR(d.dates[s.iSai])}, antes da sua entrada`; return x; }
+            Object.assign(x, { iEnt: iMeu, dataEnt: d.dates[iMeu], precoEnt: d.open[iMeu] * (1 + custo), stopIni: Math.max(entSis - atr * o.rp.atrMult, entSis * (1 - (o.rp.stopLossPct || 0) / 100)),
+                stop: s.stop, alvo: s.alvo, iSai: s.iSai, dataSai: s.iSai !== null ? d.dates[s.iSai] : null, precoSai: s.iSai !== null ? s.preco : null, motivoSai: s.motivo || null });
+            return x;
+        });
+        // Linha do tempo: entradas e saídas em ordem de data; tamanho = risco % do patrimônio até o stop, limitado ao caixa
+        const eventos = [];
+        ordens.forEach(o => { if (o.dataEnt) { eventos.push({ data: o.dataEnt, tipo: 0, o }); if (o.dataSai) eventos.push({ data: o.dataSai, tipo: 1, o }); } });
+        eventos.sort((a, b) => a.data < b.data ? -1 : a.data > b.data ? 1 : a.tipo - b.tipo);
+        let caixa = ini; const abertas = new Set();
+        const marcar = (o, data) => { const d = allData[o.t]; let k = d.dates.indexOf(data); if (k < 0) k = d.dates.length - 1; return o.qtd * d.close[Math.max(0, k - 1)]; };
+        for (const e of eventos) {
+            const o = e.o;
+            if (e.tipo === 0) {
+                const patrimonio = caixa + [...abertas].reduce((s2, y) => s2 + marcar(y, e.data), 0);
+                const riscoPorAcao = o.precoEnt - o.stopIni;
+                let qtd = riscoPorAcao > 0 ? Math.floor(patrimonio * (o.rp.riskTrade / 100) / riscoPorAcao) : 0;
+                qtd = Math.min(qtd, Math.floor(caixa / o.precoEnt));
+                if (qtd <= 0) { o.estado = 'cancelada'; o.motivo = 'sem caixa para comprar'; o.dataSai = null; continue; }
+                o.qtd = qtd; o.custoTotal = qtd * o.precoEnt; caixa -= o.custoTotal; abertas.add(o); o.estado = 'aberta';
+            } else if (o.estado === 'aberta') {
+                caixa += o.qtd * o.precoSai; abertas.delete(o); o.estado = 'fechada';
+                o.resultado = o.qtd * (o.precoSai - o.precoEnt); o.ret = o.precoSai / o.precoEnt - 1;
+            }
+        }
+        let emPapeis = 0;
+        abertas.forEach(o => { const d = allData[o.t], f = d.close[d.close.length - 1]; o.precoAtual = f; o.resultado = o.qtd * (f - o.precoEnt); o.ret = f / o.precoEnt - 1; emPapeis += o.qtd * f; });
+        const fechadas = ordens.filter(o => o.estado === 'fechada').sort((a, b) => b.dataSai < a.dataSai ? -1 : 1);
+        // Por estratégia (regra do Relatório): operações encerradas
+        const porRegra = {};
+        fechadas.forEach(o => { const r = porRegra[o.regra] = porRegra[o.regra] || { n: 0, ganhos: 0, perdas: 0, resultado: 0, acertos: 0 }; r.n++; r.resultado += o.resultado; if (o.resultado > 0) { r.ganhos += o.resultado; r.acertos++; } else r.perdas -= o.resultado; });
+        // Referência: comprar todos os papéis do app em partes iguais no início e segurar
+        let somaRef = 0, nRef = 0;
+        for (const t in allData) { const d = allData[t]; const k = d.dates.indexOf(sim.inicio); if (k >= 0 && d.close[k] > 0) { somaRef += d.close[d.close.length - 1] / d.close[k] - 1; nRef++; } }
+        return { saldoInicial: ini, inicio: sim.inicio, caixa, emPapeis, patrimonio: caixa + emPapeis, ordens, fechadas, abertas: [...abertas], aguardando: ordens.filter(o => o.estado === 'aguardando'),
+                 canceladas: ordens.filter(o => o.estado === 'cancelada'), porRegra, referencia: nRef ? somaRef / nRef : null };
+    }
+    function desenharSimulacao() {
+        const box = document.getElementById('am-simulacao'); if (!box) return;
+        const sim = lerSim(), E = estadoSim(sim), ret = (E.patrimonio / E.saldoInicial - 1) * 100;
+        const mud = 'style="color:var(--mudo)"', cor = v => `style="color:${v >= 0 ? 'var(--alta)' : 'var(--baixa)'}"`;
+        const linhaOp = o => `<div class="am-card" data-ativo="${o.t}">
+            <div class="flex items-center justify-between"><span class="am-tk">${o.t}</span><span class="rel-chip">${nomeRegra(o.regra)}${o.tipo === 'atrasado' ? ' · atrasada' : ''}</span></div>
+            ${o.estado === 'aguardando' ? `<div class="text-sm mt-1" ${mud}>Compra na abertura depois de ${fmtDataBR(o.dataTela)} (aguardando a próxima coleta).</div>`
+            : o.estado === 'cancelada' ? `<div class="text-sm mt-1" ${mud}>Cancelada: ${o.motivo}.</div>`
+            : `<div class="text-sm mt-1">${o.qtd} ações · entrou em ${fmtDataBR(o.dataEnt)} a ${fmtPrecoM(o.precoEnt)}${o.estado === 'fechada' ? ` · saiu em ${fmtDataBR(o.dataSai)} a ${fmtPrecoM(o.precoSai)} (${o.motivoSai})` : ` · agora ${fmtPrecoM(o.precoAtual)}`}</div>
+               <div class="text-sm mt-1"><b ${cor(o.resultado)}>${fmtPctM(o.ret * 100)} · ${fmtValorSim(o.resultado)}</b>${o.estado === 'aberta' ? ` <span ${mud}>· stop ${fmtPrecoM(o.stop)}${o.alvo ? ` · alvo ${fmtPrecoM(o.alvo)}` : ''}</span>` : ''}</div>`}
+        </div>`;
+        const regras = Object.entries(E.porRegra).sort((a, b) => b[1].resultado - a[1].resultado);
+        box.innerHTML = `<div class="am-card"><div class="text-sm" ${mud}>Patrimônio simulado ${mercadoCodigo() === 'br' ? 'no Brasil' : 'nos EUA'}</div><div class="am-preco-grande">${fmtValorSim(E.patrimonio)}</div>
+                <div class="text-sm mt-1" ${cor(ret)}>${fmtPctM(ret)} · ${fmtValorSim(E.patrimonio - E.saldoInicial)} sobre ${fmtValorSim(E.saldoInicial)}${sim ? ` desde ${fmtDataBR(E.inicio)}` : ''}</div>
+                ${E.referencia !== null && sim ? `<div class="text-sm mt-1" ${mud}>Comprar todos os papéis do app e segurar no mesmo período: <b ${cor(E.referencia)}>${fmtPctM(E.referencia * 100)}</b></div>` : ''}
+                <div class="text-sm mt-1" ${mud}>Em caixa ${fmtValorSim(E.caixa)} · em papéis ${fmtValorSim(E.emPapeis)}</div></div>
+            ${!sim ? `<div class="am-card mt-3"><div class="font-bold">Como funciona</div><p class="text-sm mt-1" ${mud}>No Relatório (Mais → Relatório), os papéis 🟢 têm o botão "Seguir na simulação". A compra acontece na abertura seguinte, com o preço real; o tamanho arrisca ${getBacktestRiskParams().riskTrade}% do patrimônio até o stop (como no Backtest) e a saída é automática pela regra do papel. Assim dá para ver, com o tempo, qual estratégia rende mais de verdade.</p></div>` : ''}
+            ${E.aguardando.length ? `<div class="rel-titulo">⏳ Aguardando a abertura <span class="rel-chip">${E.aguardando.length}</span></div><div class="space-y-3">${E.aguardando.map(linhaOp).join('')}</div>` : ''}
+            ${E.abertas.length ? `<div class="rel-titulo">📈 Abertas <span class="rel-chip">${E.abertas.length}</span></div><div class="space-y-3">${E.abertas.map(linhaOp).join('')}</div>` : ''}
+            ${regras.length ? `<div class="rel-titulo">🏆 Por estratégia (operações encerradas)</div><div class="am-card"><table class="rel-tabela"><thead><tr ${mud}><th>Estratégia</th><th>Op.</th><th>Acerto</th><th>Resultado</th><th>FL</th></tr></thead><tbody>
+                ${regras.map(([id, r]) => `<tr><td>${nomeRegra(id)}</td><td>${r.n}</td><td>${fmtNumM(r.acertos / r.n * 100, 0)}%</td><td ${cor(r.resultado)}>${fmtValorSim(r.resultado)}</td><td>${r.perdas > 0 ? fmtNumM(r.ganhos / r.perdas, 2) : '—'}</td></tr>`).join('')}
+                </tbody></table><p class="text-xs mt-2" ${mud}>Com poucas operações o resultado ainda é muito sorte. Compare com o Diário de sinais, que acompanha todos os sinais, não só os que você seguiu.</p></div>` : ''}
+            ${E.fechadas.length ? `<div class="rel-titulo">✅ Encerradas <span class="rel-chip">${E.fechadas.length}</span></div><div class="space-y-3">${E.fechadas.slice(0, 20).map(linhaOp).join('')}</div>` : ''}
+            ${E.canceladas.length ? `<div class="rel-titulo">✖️ Canceladas <span class="rel-chip">${E.canceladas.length}</span></div><div class="space-y-3">${E.canceladas.slice(-10).map(linhaOp).join('')}</div>` : ''}
+            ${sim ? `<button type="button" class="am-botao sec mt-4" id="am-sim-zerar">Zerar a simulação</button>` : ''}
+            <p class="am-aviso">Dinheiro fictício, salvo só neste aparelho. Os preços são os reais do fechamento e da abertura; na vida real pode haver diferença de preço na execução.</p>`;
+    }
+    function htmlBotaoSeguir(a, v) {
+        if (!APP_MOVEL || !['entrar', 'atrasado'].includes(v.estado)) return '';
+        const E = estadoSim(); const seguindo = E.ordens.some(o => o.t === a.t && (o.estado === 'aguardando' || o.estado === 'aberta'));
+        return seguindo ? `<div class="rel-seguir feito">✓ Seguindo na simulação</div>` : `<button type="button" class="rel-seguir" data-seguir="${a.t}">🧪 Seguir na simulação</button>`;
+    }
     // ===== Análise da carteira: sugestões de rebalanceamento (só leitura; usa os mesmos sinais do app) =====
     // Regras (simples e explicáveis):
     // - Viés de baixa (≤ -1,5 ponto) E a regra validada do Relatório está fora da operação → "Trocar ou reduzir".
@@ -3215,7 +3347,24 @@
             const b = e.target.closest('[data-cart-editar]'); if (b) abrirFolhaCarteira(true, +b.dataset.cartEditar);
             if (e.target.closest('#am-cart-reanalisar')) desenharCarteira();
         });
-        document.querySelector('.am-nav [data-ir-pagina="carteira"]').addEventListener('click', () => desenharCarteira());
+        document.querySelector('.am-nav [data-ir-pagina="carteira"]').addEventListener('click', () => { desenharCarteira(); desenharSimulacao(); });
+        document.getElementById('am-cart-abas').addEventListener('click', e => {
+            const b = e.target.closest('[data-cart-aba]'); if (!b) return; const sim = b.dataset.cartAba === 'sim';
+            document.querySelectorAll('#am-cart-abas [data-cart-aba]').forEach(x => x.classList.toggle('ativa', x === b));
+            document.getElementById('am-cart-minha').classList.toggle('hidden', sim); document.getElementById('am-simulacao').classList.toggle('hidden', !sim);
+            if (sim) desenharSimulacao();
+        });
+        document.getElementById('am-simulacao').addEventListener('click', e => {
+            if (!e.target.closest('#am-sim-zerar')) return;
+            const b = e.target.closest('#am-sim-zerar');
+            if (b.dataset.confirmar) { gravarSim(null); desenharSimulacao(); } else { b.dataset.confirmar = '1'; b.textContent = 'Toque de novo para apagar tudo e voltar a ' + fmtValorSim(SIM_SALDO_INICIAL); }
+        });
+        // "Seguir na simulação" nos cartões 🟢 do Relatório
+        document.addEventListener('click', e => {
+            const b = e.target.closest('[data-seguir]'); if (!b) return;
+            const r = seguirNaSimulacao(b.dataset.seguir);
+            b.outerHTML = r.ok ? '<div class="rel-seguir feito">✓ Seguindo na simulação: compra na próxima abertura (veja em Carteira → Simulação)</div>' : `<div class="rel-seguir feito">Não foi possível: ${r.motivo}</div>`;
+        });
     }
 
     function montarAppMovel() {
@@ -3401,7 +3550,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { get graficos() { return graficos; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; } };
+    window.investDebug = { get graficos() { return graficos; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).

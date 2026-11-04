@@ -374,6 +374,29 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
         return { n: c.tabela.length, coerente, adotou, alvo: c.alvo, dias: c.dias, motivo: c.motivo, usa: nomes.alvoAtr === 4 && nomes.saidaDias === 20, corte: c.corte };
     });
     ok(cal.n === 9 && cal.coerente && cal.usa, `celular: recalibragem testa 9 combinações na carteira e só adota o que se confirma depois de ${cal.corte} (${cal.alvo}×ATR, ${cal.dias} pregões: ${cal.motivo})`);
+    // Simulação: a saída simulada é a mesma do Backtest, e o caixa fecha a conta
+    const simT = await cel.page.evaluate(() => {
+        const I = window.investDebug, D = I.allData, R = I.relatorio; let n = 0, dif = 0;
+        for (const a of R.ativos.filter(x => x.regra).slice(0, 12)) {
+            const d = D[a.t], rp = I.regraRp(a.regra), res = I.runCoreBacktest(d, rp), ind = I.precomputeAllIndicators(d, I.getIndicatorParameters());
+            for (const x of res.tradesDet) {
+                const s = I.simularSaida(d, x.ent, d.open[x.ent] * (1 + rp.costPct / 100), ind.ATR[x.ent - 1], rp); n++;
+                if (s.iSai !== x.sai || Math.abs(s.preco / (d.open[x.ent] * (1 + rp.costPct / 100)) - 1 - x.ret) > 1e-9) dif++;
+            }
+        }
+        // Ordens fictícias de 30 pregões atrás (entrar) e de uma operação aberta (atrasado): preenche, dimensiona e fecha
+        const comAberta = R.ativos.filter(a => a.situacao === 'posicao' && a.atrEntrada > 0);
+        const t0 = R.ativos.find(a => a.regra && D[a.t])?.t; const d0 = D[t0], k = d0.dates.length - 30;
+        const rp0 = I.regraRp(R.ativos.find(a => a.t === t0).regra), ind0 = I.precomputeAllIndicators(d0, I.getIndicatorParameters());
+        const base = { modoEntrada: rp0.modoEntrada, atrMult: rp0.atrMult, stopLossPct: rp0.stopLossPct, alvoAtr: rp0.alvoAtr, saidaDias: rp0.saidaDias || 5, costPct: rp0.costPct, riskTrade: 1 };
+        const ordens = [{ id: 'a', t: t0, regra: 'tempo', tipo: 'entrar', dataTela: d0.dates[k], sistema: { dataSinal: d0.dates[k], atr: ind0.ATR[k] }, rp: base }];
+        if (comAberta[0]) { const a = comAberta[0], dA = D[a.t]; ordens.push({ id: 'b', t: a.t, regra: a.regra, tipo: 'atrasado', dataTela: dA.dates[dA.dates.indexOf(a.desde)], sistema: { desde: a.desde, entrada: a.entrada, atr: a.atrEntrada }, rp: { ...base, saidaDias: 0 } }); }
+        I.gravarSim({ inicio: d0.dates[k], saldoInicial: 100000, ordens });
+        const E = I.estadoSim(); const fech = E.fechadas.reduce((s2, o) => s2 + o.resultado, 0), custoAbertas = E.abertas.reduce((s2, o) => s2 + o.custoTotal, 0);
+        return { n, dif, estados: E.ordens.map(o => o.estado + ':' + (o.qtd || 0)), conta: Math.abs(E.caixa + custoAbertas - (100000 + fech)) < 1e-6, porRegra: Object.keys(E.porRegra).length, ref: E.referencia !== null };
+    });
+    ok(simT.n > 20 && simT.dif === 0, `celular: saída da simulação igual à do Backtest (${simT.n} operações, ${simT.dif} diferentes)`);
+    ok(simT.conta && simT.estados.every(e => /^(aberta|fechada):[1-9]/.test(e)) && simT.ref, `celular: simulação preenche na abertura, dimensiona pelo risco e o caixa fecha a conta (${simT.estados.join(', ')})`);
     const relInfo = await cel.page.evaluate(() => { const R = window.investDebug.relatorio; return { n: R.ativos.length, sq: R.ativos.filter(a => a.squeeze).length, vend: !!R.vendidos }; });
     ok(relInfo.n > 0 && relInfo.vend && relInfo.sq > 0 && /short squeeze/.test(relTxt), `celular: alerta de short squeeze com os vendidos da B3 ${JSON.stringify(relInfo)}`);
     await cel.page.waitForTimeout(300);
@@ -391,6 +414,13 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     // Carteira: adicionar, ver o viés, editar, persistir e remover
     await cel.page.click('.am-nav [data-ir-pagina="carteira"]');
     ok(/está vazia/.test(await cel.page.textContent('[data-pagina="carteira"]')), 'celular: Carteira vazia convida a adicionar');
+    await cel.page.click('#am-cart-abas [data-cart-aba="sim"]');
+    const simTxt = await cel.page.textContent('#am-simulacao');
+    ok(await cel.page.isVisible('#am-simulacao') && /Patrimônio simulado/.test(simTxt) && /Abertas|Encerradas/.test(simTxt) && /Por estratégia|Abertas/.test(simTxt), 'celular: aba Simulação mostra patrimônio, operações e estratégias');
+    await cel.page.screenshot({ path: path.join(SHOTS, 'celular_simulacao.png'), fullPage: false });
+    await cel.page.click('#am-sim-zerar'); await cel.page.click('#am-sim-zerar');
+    ok(/Como funciona/.test(await cel.page.textContent('#am-simulacao')) && /100[.,]000/.test(await cel.page.textContent('#am-simulacao')), 'celular: zerar a simulação (com confirmação) volta aos 100 mil');
+    await cel.page.click('#am-cart-abas [data-cart-aba="minha"]');
     const papelCart = await cel.page.evaluate(() => Object.keys(window.investDebug.allData)[0]);
     await cel.page.click('#am-carteira-add');
     await cel.page.fill('#am-cart-ticker', 'NAOEXISTE9');
