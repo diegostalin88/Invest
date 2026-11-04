@@ -23,8 +23,20 @@ echo "### 4. Outras APIs da página"
 mostra "$B/apinegocios/"
 mostra "$B/api/"
 
-echo "### 5. Tabela no formato table/NOME/DATA/PÁGINA"
-for k in 1 2 3 4 5; do dd=$(date -d "-$k day" +%F)
-  for n in LendingOpenPosition InstrumentsConsolidated; do
-    echo -n "$dd $n: "; mostra -H 'Accept: application/json' "$B/tabelas/table/$n/$dd/1"; done; done
+dd=$(date -d "-2 day" +%F)
+echo "### 5. Nomes de tabela de aluguel (dia $dd)"
+for n in LendingOpenPosition LendingOpenPositions OpenPositionLending SecuritiesLending SecuritiesLendingOpenPosition \
+         Lending LendingPosition BTB BTBOpenPosition LendingTrade LendingTrades AssetLending LendingBalance \
+         EquitiesLending LendingOpenInterest DerivativesOpenPosition; do
+  echo -n "$n: "; curl -s -m 30 -A "$UA" -H 'Accept: application/json' "$B/tabelas/table/$n/$dd/1" | head -c 120; echo; done
+echo "### 6. Lista de tabelas"
+for c in tables table tabelas menu categories category list api/tables tables/list; do
+  echo -n "$c: "; mostra -H 'Accept: application/json' "$B/tabelas/$c"; done
+echo "### 7. Endereços no código da página"
+T=$(mktemp -d)
+for js in main.d7e13d96.chunk.js 2.dbd3c3d4.chunk.js; do
+  curl -sL -m 30 -A "$UA" "$B/tabelas/static/js/$js" -o "$T/a.js"; echo "-- $js $(wc -c < "$T/a.js") bytes"
+  grep -oE '.{0,80}(table/|tables|Lending|apiUrl|cloudApi|relativeUrl|serverUrl).{0,120}' "$T/a.js" | head -25
+done
+rm -rf "$T"
 echo "fim"
