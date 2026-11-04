@@ -28,7 +28,7 @@
         .btn-secondary { background-color: #374151; }
         .btn-secondary:hover { background-color: #4b5563; }
         .btn:disabled { background-color: #4b5563; cursor: not-allowed; opacity: 0.5; }
-        select, input[type="text"], input[type="number"], .checkbox-label, textarea { background-color: #374151; border: 1px solid #4b5563; color: #e5e7eb; border-radius: 0.5rem; padding: 0.5rem 1rem; font-size: 0.95rem; transition: all 0.2s; }
+        select, input:not([type]), input[type="text"], input[type="search"], input[type="number"], input[type="date"], .checkbox-label, textarea { color-scheme: dark; background-color: #374151; border: 1px solid #4b5563; color: #e5e7eb; border-radius: 0.5rem; padding: 0.5rem 1rem; font-size: 0.95rem; transition: all 0.2s; }
         .checkbox-label { display: flex; align-items: center; user-select: none; padding: 0.5rem; border-radius: 0.5rem; }
         .checkbox-label:hover { background-color: #4b5563; }
         input[type="checkbox"] { margin-right: 0.75rem; width: 1.1rem; height: 1.1rem; accent-color: #6366f1; }
@@ -84,7 +84,7 @@
             .card { padding: 1rem; border-radius: 0.6rem; }
             .tab-btn { padding: 0.6rem 0.9rem; font-size: 0.85rem; }
             .btn { padding: 0.6rem 1rem; }
-            select, input[type="text"], input[type="number"], textarea { font-size: 16px; } /* evita zoom automático do iOS */
+            select, input:not([type]), input[type="text"], input[type="search"], input[type="number"], input[type="date"], textarea { font-size: 16px; } /* evita zoom automático do iOS */
             .results-table th, .results-table td { padding: 0.5rem 0.45rem; font-size: 0.8rem; }
             .result-metric { padding: 0.6rem; }
             .result-metric .value { font-size: 1.2rem; }
@@ -402,7 +402,7 @@
         <div class="am-folha" id="am-cart-folha" role="dialog" aria-modal="true" aria-label="Papel da carteira">
             <div class="am-alca"></div>
             <div class="flex items-center justify-between mb-3"><div class="text-lg font-bold" id="am-cart-titulo">Adicionar papel</div><button type="button" class="text-sm font-semibold" style="color:var(--acento)" id="am-cart-fechar">Fechar</button></div>
-            <label class="block mb-3"><span class="text-sm" style="color:var(--mudo)">Papel (ex.: PETR4, IONQ)</span><input id="am-cart-ticker" list="am-cart-lista" autocomplete="off" autocapitalize="characters" class="w-full mt-1"></label>
+            <label class="block mb-3"><span class="text-sm" style="color:var(--mudo)">Papel (ex.: PETR4, IONQ)</span><input id="am-cart-ticker" type="text" list="am-cart-lista" autocomplete="off" autocapitalize="characters" class="w-full mt-1"></label>
             <datalist id="am-cart-lista"></datalist>
             <div class="grid grid-cols-2 gap-3 mb-3">
                 <label class="block"><span class="text-sm" style="color:var(--mudo)">Quantidade</span><input id="am-cart-qtd" type="number" inputmode="decimal" min="0" step="any" class="w-full mt-1"></label>
