@@ -1577,7 +1577,7 @@
         const sma5 = modoRecuo ? calculateSMA(dataSubset, 5) : null;
         const costFraction = (riskParams.costPct || 0) / 100; // aplicado uma vez na entrada e uma vez na saída
         let position = 'out', entryPrice = 0, capital = riskParams.capital, peak = riskParams.capital, maxDD = 0, stopPrice = 0, positionSize = 0;
-        let pendingEntry = false, pendingATR = 0, entryIdx = -1, targetPrice = null;
+        let pendingEntry = false, pendingATR = 0, entryIdx = -1, targetPrice = null, distInicial = 0;
         const saidas = { stop: 0, alvo: 0, tempo: 0, sinal: 0 }; // por que cada trade terminou
         const trades = []; const eq = [{x: dataSubset.dates[0], y: capital}];
 
@@ -1593,7 +1593,7 @@
                 stopPrice = Math.max(atrStopPrice, hardFloorPrice);
                 // Variante em estudo (0 = desligado, que é o padrão): stop inicial a pelo menos N ATR da entrada
                 if (riskParams.stopMinAtr > 0 && entryPrice - stopPrice < pendingATR * riskParams.stopMinAtr) stopPrice = entryPrice - pendingATR * riskParams.stopMinAtr;
-                const stopDist = entryPrice - stopPrice;
+                const stopDist = entryPrice - stopPrice; distInicial = stopDist;
                 const maxRiskCash = capital * (riskParams.riskTrade / 100);
                 positionSize = stopDist > 0 ? maxRiskCash / stopDist : 0;
                 position = positionSize > 0 ? 'long' : 'out';
@@ -1620,7 +1620,13 @@
                     capital += pnl; position = 'out'; curEq = capital;
                 }
                 // ATR Trailing Stop: sobe só DEPOIS do fechamento de hoje, valendo a partir de amanhã (sem look-ahead)
-                if (position !== 'out' && indicators.ATR[i]) stopPrice = Math.max(stopPrice, dataSubset.close[i] - (indicators.ATR[i] * riskParams.atrMult));
+                if (position !== 'out' && indicators.ATR[i]) {
+                    // Variantes em estudo (desligadas por padrão): distância do stop móvel em outro múltiplo de ATR,
+                    // ou nunca maior que a distância do stop inicial (quando a trava de % venceu o ATR)
+                    let dist = indicators.ATR[i] * (riskParams.trailAtr > 0 ? riskParams.trailAtr : riskParams.atrMult);
+                    if (riskParams.trailInicial && distInicial > 0) dist = Math.min(dist, distInicial);
+                    stopPrice = Math.max(stopPrice, dataSubset.close[i] - dist);
+                }
             }
 
             if (position === 'out' && !pendingEntry) {

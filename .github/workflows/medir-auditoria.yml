@@ -1,0 +1,65 @@
+name: Medir testes da auditoria
+
+# Só leitura, disparado à mão: os 3 testes da auditoria de 04/11 (filtro por regime no treino, stop móvel
+# mais curto, limite por setor numa carteira). Setores pelo SIC da SEC. Não publica nada.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  medir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Baixar os dados já publicados e montar o site
+        env:
+          BASE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data
+        run: |
+          baixar() {  # $1 = URL base, $2 = pasta de destino
+            mkdir -p "$2"
+            curl -fsSL "$1/manifest.json" -o "$2/manifest.json" || return 1
+            for f in $(python3 -c "import json,sys;m=json.load(open(sys.argv[1]));print(' '.join(m['arquivosPrecos']+[m.get('arquivoFundamentos','fundamentos.json')]))" "$2/manifest.json"); do
+              curl -fsSL "$1/$f" -o "$2/$f" || return 1
+            done
+            # Extras opcionais (relatório e vendidos): se não vierem, some do manifesto para o app não pedir
+            python3 - "$1" "$2" <<'PY'
+          import json, sys, subprocess, os
+          base, pasta = sys.argv[1], sys.argv[2]
+          caminho = os.path.join(pasta, 'manifest.json'); m = json.load(open(caminho))
+          for chave in ('arquivoRelatorio', 'arquivoVendidos', 'arquivoDiario', 'arquivoCalibracao'):
+              nome = m.get(chave)
+              if nome and subprocess.run(['curl', '-fsSL', f'{base}/{nome}', '-o', os.path.join(pasta, nome)]).returncode != 0:
+                  m.pop(chave)
+          json.dump(m, open(caminho, 'w'), indent=2)
+          PY
+          }
+          baixar "$BASE" site/data
+          # Brasil é opcional: se ainda não existir (ou falhar), publica só os EUA
+          baixar "$BASE/br" site/data/br || { rm -rf site/data/br; echo "Brasil (IBOVESPA) ainda não publicado." >> "$GITHUB_STEP_SUMMARY"; }
+          cp -r app/. site/
+          echo "### App republicado com os dados de $(python3 -c "import json;print(json.load(open('site/data/manifest.json'))['ultimoPregao'])")" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setores na SEC
+        env:
+          SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+        run: |
+          pip install -q -r coleta/requirements.txt
+          cd coleta && python setores_sec.py ../site/data/relatorio.json ../setores.json | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Medir
+        run: |
+          npm install --no-save --no-package-lock playwright@1.48.2
+          npx playwright install --with-deps chromium
+          node coleta/medir_auditoria.js site setores.json auditoria_us.json
+          MERCADO=br node coleta/medir_auditoria.js site nenhum.json auditoria_br.json || true
+          echo "JSON_INICIO"; python3 -c "import json;print(json.dumps(json.load(open('auditoria_us.json'))))"; echo "JSON_FIM"
