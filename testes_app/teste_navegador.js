@@ -364,12 +364,14 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
         for (const a of R.ativos) {
             const v = I.vereditoEntrada(a, noite); cont[v.estado] = (cont[v.estado] || 0) + 1;
             const n = a.nTotal || 0;
-            if (v.estado === 'entrar' && !(a.confirmada && n >= 15 && a.situacao === 'entrada' && (!a.resistencia || a.resistencia - a.entrada >= a.entrada - a.stop))) erros.push('entrar indevido ' + a.t);
+            if (v.estado === 'entrar' && !(a.confirmada && n >= 15 && a.situacao === 'entrada')) erros.push('entrar indevido ' + a.t);
             if ((!a.confirmada || n < 15) && a.regra && v.estado !== 'nao') erros.push('deveria ser não operar ' + a.t);
+            if (v.motivos.some(m => /vezes o ganho até a resistência|maior que o espaço até a resistência/.test(m))) erros.push('resistência barrando entrada ' + a.t);
+            if (a.confirmada && n >= 15 && a.situacao === 'entrada' && v.estado === 'esperar' && I.vereditoEntrada(a, new Date(R.ultimoPregao + 'T23:30:00Z')).motivos.every(m => !/sinal é de|abertura de hoje/.test(m))) erros.push('esperar sem motivo de tempo ' + a.t);
             if (a.confirmada && n >= 15 && a.situacao === 'posicao' && !['ja', 'atrasado'].includes(v.estado)) erros.push('deveria ser já em operação ou atrasado ' + a.t);
             if (v.estado === 'atrasado') {
                 const d = I.allData[a.t], preg = d.close.length - d.dates.indexOf(a.desde);
-                if (!(preg <= 2 && a.atrEntrada > 0 && (a.preco - a.entrada) / a.atrEntrada <= 0.5 && (!a.resistencia || a.resistencia - a.preco >= a.preco - a.stop))) erros.push('atrasado indevido ' + a.t);
+                if (!(preg <= 2 && a.atrEntrada > 0 && (a.preco - a.entrada) / a.atrEntrada <= 0.5)) erros.push('atrasado indevido ' + a.t);
                 if (!v.rr || !v.motivos.some(m => /risco até o stop/.test(m))) erros.push('atrasado sem risco/retorno ' + a.t);
                 // dias depois, a mesma operação deixa de ser "atrasado"
                 const x = new Date(a.desde + 'T12:00:00'); x.setDate(x.getDate() + 7); if (I.vereditoEntrada(a, x).estado !== 'ja') erros.push('atrasado velho ' + a.t);

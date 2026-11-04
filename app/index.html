@@ -2107,7 +2107,7 @@
             if (preg === null || preg > ATRASO_MAX_PREGOES) falta.push(`já são ${preg ?? 'vários'} pregões desde a compra (o teste de entrada atrasada vai até ${ATRASO_MAX_PREGOES})`);
             if (desvio === null) falta.push('sem o ATR da entrada neste relatório (gere de novo para avaliar a entrada atrasada)');
             else if (desvio > ATRASO_MAX_ATR) falta.push(`o preço já subiu ${fmtNumM(desvio, 1)} ATR desde a entrada (limite ${fmtNumM(ATRASO_MAX_ATR, 1)}): quem entra tão depois ganhou bem menos no teste`);
-            if (rr.relacao !== null && rr.espaco < rr.risco) falta.push(`ao preço de hoje o risco é maior que o espaço até a resistência`);
+            // Espaço até a resistência é só informação (txtRR): medido em 04/11/2026, a trava ≥ 1:1 não melhorou o resultado
             if (!aTempo) falta.push('a abertura seguinte a estes dados já passou');
             if (!falta.length) return V('atrasado', 'Ainda dá para entrar (entrada atrasada)', [comprou,
                 `preço a ${fmtNumM(Math.max(0, desvio), 2)} ATR da entrada do sistema: no teste, entrar até ${ATRASO_MAX_PREGOES} pregões depois e até ${fmtNumM(ATRASO_MAX_ATR, 1)} ATR acima rendeu o mesmo que entrar no dia certo`,
@@ -2121,9 +2121,9 @@
         if (idade >= 2) motivos.push(`o sinal é de ${fmtDataBR(a.dataSinal || ultimo)}, ${idade} pregões atrás (se teve feriado, confira): a entrada testada já passou`);
         else if (idade === 1 && hm.util && hm.min >= abertura) motivos.push(`a abertura de hoje (quando a regra compra) já passou; o preço testado não existe mais`);
         const risco = a.entrada - a.stop; const espaco = a.resistencia ? a.resistencia - a.entrada : null;
-        if (espaco !== null && risco > 0 && espaco < risco) motivos.push(`resistência a ${fmtPctM(espaco / a.entrada * 100)} e stop a ${fmtPctM(-risco / a.entrada * 100)}: o risco é ${fmtNumM(risco / espaco, 1)} vezes o ganho até a resistência`);
+        // Resistência não barra a entrada (decisão do Diego, 04/11/2026): a trava ≥ 1:1 foi medida e nunca melhorou o fator de lucro
         if (motivos.length) return V('esperar', 'Esperar', motivos, { saidas });
-        return V('entrar', 'Entrar na próxima abertura', [`sinal de ${fmtDataBR(a.dataSinal || ultimo)}, regra confirmada, confiabilidade ${conf.nivel.toLowerCase()} (${conf.n} operações)`, espaco !== null ? `risco até o stop ${fmtPctM(-risco / a.entrada * 100)}, espaço até a resistência ${fmtPctM(espaco / a.entrada * 100)} (${fmtNumM(espaco / risco, 1)} para 1)` : 'preço acima das máximas do ano: sem resistência próxima'], { saidas });
+        return V('entrar', 'Entrar na próxima abertura', [`sinal de ${fmtDataBR(a.dataSinal || ultimo)}, regra confirmada, confiabilidade ${conf.nivel.toLowerCase()} (${conf.n} operações)`, espaco !== null ? `risco até o stop ${fmtPctM(-risco / a.entrada * 100)}, espaço até a resistência ${fmtPctM(espaco / a.entrada * 100)} (${fmtNumM(espaco / risco, 1)} para 1; só informação, não barra a entrada)` : 'preço acima das máximas do ano: sem resistência próxima'], { saidas });
     }
     // Estado aberto/fechado de cada seção do relatório (só conveniência deste aparelho)
     const SECOES_PADRAO = { entrar: true, atrasado: true, esperar: false, squeeze: false, operacao: false, diario: false };
