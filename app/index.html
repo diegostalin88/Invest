@@ -136,6 +136,8 @@
         .rel-botao { display: block; width: 100%; padding: 0.85rem; border-radius: 0.9rem; background: #4f46e5; color: #fff; font-weight: 700; text-align: center; }
         .rel-botao:disabled { opacity: 0.6; }
         .rel-detalhes summary { cursor: pointer; font-weight: 700; padding: 0.4rem 0; }
+        .rel-ganho { margin-top: 0.6rem; padding: 0.7rem 0.8rem; border-radius: 0.8rem; background: linear-gradient(135deg, rgba(34,197,94,0.16), rgba(34,197,94,0.04)); border: 1px solid rgba(34,197,94,0.4); text-align: left; }
+        .rel-ganho .g { font-size: 1.7rem; font-weight: 800; color: #4ade80; line-height: 1.1; } .rel-ganho .p { font-size: 1.25rem; font-weight: 800; color: #f87171; } .rel-ganho .r { font-size: 0.75rem; color: #a7b0bf; }
         .rel-seguir { display: block; width: 100%; margin-top: 0.35rem; padding: 0.75rem; border-radius: 0.9rem; background: rgba(34,197,94,0.14); border: 1px solid rgba(34,197,94,0.45); color: #86efac; font-weight: 700; text-align: center; }
         .rel-seguir.fora { background: rgba(59,130,246,0.10); border-color: rgba(59,130,246,0.45); color: #93c5fd; font-weight: 600; }
         .rel-seguir.feito { background: transparent; border-style: dashed; color: #9aa3b2; }
@@ -1869,6 +1871,11 @@
         }
         return null;
     }
+    // Ganho esperado medido (só leitura): retornos por operação no trecho fora da amostra, com custos
+    function ganhoEsperado(lista) {
+        const r = lista.map(x => x.ret), g = r.filter(v => v > 0), p = r.filter(v => v <= 0), m = v => v.length ? +(v.reduce((a, b) => a + b, 0) / v.length).toFixed(4) : null;
+        return { mediaGanho: m(g), mediaPerda: m(p), mediaOp: m(r) };
+    }
     function avaliarPapelRelatorio(t, regras) {
         const d = allData[t]; const n = d.close.length; const corte = Math.floor(n * FRACAO_ESCOLHA);
         const testes = regras.map(r => {
@@ -1902,7 +1909,7 @@
         Object.keys(niveis).forEach(k => { if (typeof niveis[k] === 'number' && !['restam', 'nTotal'].includes(k)) niveis[k] = arred(niveis[k]); });
         if (confirmada && poolRelatorio) (poolRelatorio[melhor.r.id] = poolRelatorio[melhor.r.id] || []).push(...melhor.res.tradesDet.filter(x => x.ent >= corte).map(x => x.ret));
         return { ...base, regra: melhor.r.id, confirmada, treino: { pf: +melhor.treino.pf.toFixed(2), n: melhor.treino.n, acerto: +melhor.treino.acerto.toFixed(3) },
-                 teste: { pf: +melhor.teste.pf.toFixed(2), n: melhor.teste.n, acerto: +melhor.teste.acerto.toFixed(3), ret: +melhor.teste.ret.toFixed(4) },
+                 teste: { pf: +melhor.teste.pf.toFixed(2), n: melhor.teste.n, acerto: +melhor.teste.acerto.toFixed(3), ret: +melhor.teste.ret.toFixed(4), ...ganhoEsperado(melhor.res.tradesDet.filter(x => x.ent >= corte)) },
                  situacao, ...niveis, preco: arred(fech) };
     }
     async function gerarRelatorio(aoProgredir = () => {}) {
@@ -2118,6 +2125,23 @@
             ${v.saidas && v.saidas.length && v.estado !== 'nao' ? `<div class="mt-1"><b>Saída:</b> ${v.saidas.join(' · ')}</div>` : ''}
         </div>`;
     }
+    // Destaque do ganho possível: alvo (quando a regra tem) ou o ganho médio medido no teste (quando a saída é por stop/tempo)
+    function htmlGanhoPossivel(a) {
+        if (!a.regra || !a.teste) return '';
+        const base = a.preco || a.entrada; const T = a.teste;
+        const risco = a.stop && base ? (a.stop / base - 1) * 100 : null;
+        const alvo = a.alvo && base && a.alvo > base ? (a.alvo / base - 1) * 100 : null;
+        const temMedia = T.mediaGanho !== undefined && T.mediaGanho !== null;
+        if (alvo === null && !temMedia) return '';
+        const grande = alvo !== null ? [`+${fmtNumM(alvo, 1)}%`, 'até o alvo'] : [`+${fmtNumM(T.mediaGanho * 100, 1)}%`, 'média das operações vencedoras no teste (sem alvo fixo: o stop sobe junto)'];
+        return `<div class="rel-ganho">
+            <div class="flex items-end justify-between gap-3">
+                <div><div class="r">💰 Ganho possível</div><div class="g">${grande[0]}</div><div class="r">${grande[1]}</div></div>
+                ${risco !== null ? `<div class="text-right"><div class="r">Risco até o stop</div><div class="p">${fmtNumM(risco, 1)}%</div>${alvo !== null ? `<div class="r">${fmtNumM(alvo / -risco, 1)} para 1</div>` : ''}</div>` : ''}
+            </div>
+            ${temMedia ? `<div class="r mt-1">No teste fora da amostra (${T.n} op., acerto ${fmtNumM(T.acerto * 100, 0)}%): vencedoras ${fmtPctM(T.mediaGanho * 100)} · perdedoras ${T.mediaPerda !== null ? fmtPctM(T.mediaPerda * 100) : '—'} · média ${fmtPctM(T.mediaOp * 100)} por operação</div>` : ''}
+        </div>`;
+    }
     function cartaoRelatorio(a) {
         const d = (r, v, cor) => `<div class="rel-dado"><div class="r">${r}</div><div class="v"${cor ? ` style="color:${cor}"` : ''}>${v}</div></div>`;
         const res = a.situacao === 'posicao' && a.entrada ? (a.preco / a.entrada - 1) * 100 : null;
@@ -2127,6 +2151,7 @@
             <div class="text-sm rel-mudo">${nomeAtivo(a.t) || ''}</div>
             ${a.squeeze ? `<div class="mt-2"><span class="rel-chip amarelo">⚡ Possível short squeeze: ${fmtNumM(a.vendido.dias, 1)} dias para zerar + sinal ${a.squeeze.estrategia}</span></div>` : ''}
             ${htmlVeredito(vereditoEntrada(a))}
+            ${htmlGanhoPossivel(a)}
             <div class="rel-grade">
                 ${a.situacao === 'entrada' ? d('Entrada (abertura)', '≈ ' + fmtPrecoM(a.entrada)) : d(`Entrada em ${fmtDataBR(a.desde)}`, fmtPrecoM(a.entrada))}
                 ${d('Stop', fmtPrecoM(a.stop), '#f87171')}

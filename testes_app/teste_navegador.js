@@ -313,6 +313,9 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     await cel.page.waitForFunction(() => /Último teste/.test(document.getElementById('am-relatorio').textContent), null, { timeout: 120000 });
     const relTxt = await cel.page.textContent('#am-relatorio');
     ok(/Entrar na próxima abertura/.test(relTxt) && /Em operação: não entrar agora/.test(relTxt) && /Saída que ganhou/.test(relTxt) && /Confiabilidade/.test(relTxt), 'celular: Relatório com vereditos (entrar, em operação), confiabilidade e saída vencedora');
+    const ganhoOk = await cel.page.evaluate(() => { const R = window.investDebug.relatorio; const c = R.ativos.filter(a => a.confirmada);
+        return c.length > 0 && c.every(a => a.teste.mediaOp !== undefined && (a.teste.mediaGanho === null || a.teste.mediaGanho > 0) && (a.teste.mediaPerda === null || a.teste.mediaPerda <= 0)) && document.querySelectorAll('#am-relatorio .rel-ganho').length > 0; });
+    ok(ganhoOk && /Ganho possível/.test(relTxt), 'celular: cartões do Relatório destacam o ganho possível (alvo ou média medida no teste) e o risco até o stop');
     // Vereditos: travas aplicadas em todos os papéis do relatório
     const vered = await cel.page.evaluate(() => {
         const I = window.investDebug, R = I.relatorio; const erros = []; const cont = {};
