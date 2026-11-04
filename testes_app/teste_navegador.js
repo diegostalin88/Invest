@@ -321,6 +321,17 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
         const esperado = cards.filter(c => { const v = window.investDebug.vsMme200(c.dataset.ativo); return v !== null && v < 0; }).length;
         const achados = cards.filter(c => /Abaixo da média de 200 dias/.test(c.textContent)).length; return { esperado, achados, total: cards.length }; });
     ok(mme.total > 0 && mme.esperado === mme.achados, `celular: cartões abaixo da MME 200 mostram o aviso só como contexto (${mme.achados} de ${mme.total})`);
+    const bal = await cel.page.evaluate(() => { const I = window.investDebug, F = I.fundamentos;
+        const t = document.querySelector('#am-relatorio .rel-card[data-ativo]').dataset.ativo;
+        const em = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+        const antes = { ...F[t] }; F[t].nextEarningsDate = null; F[t].balancoEstimado = em(30);
+        const longe = I.balancoProximo(t); F[t].balancoEstimado = em(3); const perto = I.balancoProximo(t);
+        F[t].nextEarningsDate = em(2); const inf = I.balancoProximo(t); I.desenharRelatorio();
+        const card = [...document.querySelectorAll('#am-relatorio .rel-card[data-ativo]')].find(c => c.dataset.ativo === t);
+        const txt = card ? card.textContent : ''; Object.keys(F[t]).forEach(k => delete F[t][k]); Object.assign(F[t], antes); I.desenharRelatorio();
+        return { longe, perto, inf, txt }; });
+    ok(bal.longe === null && bal.perto && bal.perto.estimado && bal.inf && !bal.inf.estimado && bal.inf.dias === 2 && /Balanço em 2 dias/.test(bal.txt) && /Só aviso/.test(bal.txt),
+        'celular: cartão do Relatório avisa balanço nos próximos dias (data do Yahoo ou estimada pela SEC), só como aviso');
     ok(ganhoOk && /Ganho possível/.test(relTxt), 'celular: cartões do Relatório destacam o ganho possível (alvo ou média medida no teste) e o risco até o stop');
     {
         const [dl] = await Promise.all([cel.page.waitForEvent('download', { timeout: 15000 }), cel.page.click('#am-relatorio button[data-baixar-relatorio]')]);

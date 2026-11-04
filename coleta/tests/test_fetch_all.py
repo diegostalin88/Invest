@@ -190,7 +190,7 @@ def test_radar_sem_evento_e_ignora_antigos(monkeypatch):
     _mock_sec(monkeypatch, submissions([('8-K', '2026-10-01', '5.02,9.01'),
                                         ('8-K', '2025-01-10', '1.03')]))  # falência antiga (> 180 dias)
     r = fa.fetch_corporate_events('XYZ', '0000000123', HOJE)
-    assert r == {'nivel': None, 'eventos': [], 'ok': True}
+    assert r == {'nivel': None, 'eventos': [], 'ok': True, 'balancos': []}
 
 
 def test_radar_falha_sinaliza_nao_ok(monkeypatch):
@@ -412,3 +412,22 @@ def test_extrair_series_aceita_formatos_do_yfinance():
     com_nan = df.copy()
     com_nan.iloc[5, com_nan.columns.get_loc(('AAA', 'Close'))] = np.nan
     assert len(fa.extrair_series(com_nan, ['AAA'])['AAA']['dates']) == 29
+
+
+def test_radar_guarda_datas_de_balanco(monkeypatch):
+    _mock_sec(monkeypatch, submissions([('8-K', '2026-08-06', '2.02,9.01'), ('8-K', '2026-07-01', '5.02'),
+                                        ('8-K', '2026-05-07', '2.02')]))
+    r = fa.fetch_corporate_events('XYZ', '0000000123', HOJE)
+    assert r['balancos'] == ['2026-05-07', '2026-08-06'] and r['nivel'] is None
+
+
+def test_estimar_proximo_balanco():
+    from datetime import date
+    hoje = date(2026, 11, 4)
+    # mesmo trimestre do ano anterior + 364 dias
+    assert fa.estimar_proximo_balanco(['2025-11-06', '2026-02-20', '2026-05-07', '2026-08-06'], hoje) == '2026-11-05'
+    # já divulgou este trimestre: pula para o próximo
+    assert fa.estimar_proximo_balanco(['2025-11-03', '2026-02-20', '2026-05-07', '2026-08-06', '2026-11-02'], hoje) == '2027-02-19'
+    # pouco histórico: último + 91 dias
+    assert fa.estimar_proximo_balanco(['2026-09-01'], hoje) == '2026-12-01'
+    assert fa.estimar_proximo_balanco([], hoje) is None

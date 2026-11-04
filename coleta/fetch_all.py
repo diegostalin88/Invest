@@ -572,7 +572,29 @@ def fetch_corporate_events(ticker, cik, hoje=None):
             elif nivel != 'critico':
                 nivel = 'atencao'
     eventos.sort(key=lambda e: e['data'], reverse=True)
-    return {'nivel': nivel, 'eventos': eventos, 'ok': True}
+    # Datas de divulgação de resultado (8-K item 2.02): servem para estimar o próximo balanço
+    balancos = sorted({dates[i] for i, form in enumerate(forms)
+                       if form in ('8-K', '8-K/A') and i < len(dates) and dates[i]
+                       and '2.02' in [x.strip() for x in ((items_list[i] if i < len(items_list) else '') or '').split(',')]})
+    return {'nivel': nivel, 'eventos': eventos, 'ok': True, 'balancos': balancos[-12:]}
+
+
+def estimar_proximo_balanco(balancos, hoje):
+    """Estima a data do próximo resultado a partir das divulgações passadas (8-K item 2.02).
+    Usa o mesmo trimestre do ano anterior + 364 dias (as empresas repetem o calendário); se não houver,
+    soma 91 dias ao último até passar de hoje. Devolve 'AAAA-MM-DD' ou None."""
+    if not balancos:
+        return None
+    datas = sorted(date.fromisoformat(d) for d in balancos)
+    ultimo = datas[-1]
+    candidatos = [d + timedelta(days=364) for d in datas
+                  if hoje <= d + timedelta(days=364) and ultimo + timedelta(days=30) < d + timedelta(days=364) <= ultimo + timedelta(days=130)]
+    if candidatos:
+        return min(candidatos).isoformat()
+    prox = ultimo + timedelta(days=91)
+    while prox < hoje:
+        prox += timedelta(days=91)
+    return prox.isoformat()
 
 
 # -----------------------------------------------------------------------------------------------
@@ -744,6 +766,9 @@ def atualizar_fundamentos(pool, cache, price_lookup, hoje, sec_map, orcamento_se
             antigo = saida.get(ticker, {})
             registro['alertaEvento'] = antigo.get('alertaEvento')
             registro['eventosCorporativos'] = antigo.get('eventosCorporativos', [])
+            for chave in ('balancos', 'balancoEstimado'):
+                if antigo.get(chave):
+                    registro[chave] = antigo[chave]
             saida[ticker] = registro
             stats['atualizadosHoje'] += 1
         elif ticker in saida and saida[ticker].get('atualizadoEm'):
@@ -780,6 +805,9 @@ def atualizar_fundamentos(pool, cache, price_lookup, hoje, sec_map, orcamento_se
             saida[t]['alertaEvento'] = ev['nivel']
             saida[t]['eventosCorporativos'] = ev['eventos']
             saida[t]['radarEm'] = hoje_iso
+            if ev.get('balancos'):
+                saida[t]['balancos'] = ev['balancos']
+                saida[t]['balancoEstimado'] = estimar_proximo_balanco(ev['balancos'], hoje)
         else:
             stats['radarFalhas'] += 1
         if price_lookup.get(t):

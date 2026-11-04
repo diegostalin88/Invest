@@ -2184,6 +2184,21 @@
         const v = vsMme200(t); if (v === null || v >= 0) return '';
         return `<div class="mt-2 text-xs"><span class="rel-chip amarelo">📉 Abaixo da média de 200 dias (${fmtPctM(v)})</span><div class="rel-mudo mt-1">Só contexto: o papel está em tendência de baixa. No teste fora da amostra, os sinais abaixo da média renderam até mais, mas num mercado de baixa prolongado isso pode se inverter.</div></div>`;
     }
+    // Balanço (resultado trimestral) nos próximos dias: só aviso, não muda o veredito (decisão do Diego em 04/11/2026,
+    // depois da medição: entradas perto do balanço renderam menos, mas ainda com lucro). Usa a data do Yahoo
+    // e, sem ela, a estimada pelas divulgações passadas na SEC (8-K item 2.02); por isso só existe nos EUA.
+    const BALANCO_AVISO_DIAS = 7;  // ≈ 5 pregões
+    function balancoProximo(t) {
+        const f = fundamentalsData && fundamentalsData[t]; if (!f) return null;
+        const inf = f.nextEarningsDate && daysUntil(f.nextEarningsDate) >= 0 ? f.nextEarningsDate : null;
+        const data = inf || f.balancoEstimado || null; if (!data) return null;
+        const dias = daysUntil(data);
+        return dias !== null && dias >= 0 && dias <= BALANCO_AVISO_DIAS ? { data, dias, estimado: !inf } : null;
+    }
+    function htmlBalancoRelatorio(t) {
+        const b = balancoProximo(t); if (!b) return '';
+        return `<div class="mt-2 text-xs"><span class="rel-chip amarelo">📅 Balanço ${b.dias === 0 ? 'hoje' : b.dias === 1 ? 'amanhã' : `em ${b.dias} dias`} (${fmtDataBR(b.data)}${b.estimado ? ', data estimada' : ''})</span><div class="rel-mudo mt-1">Só aviso: no teste, entradas perto do balanço renderam menos (fator de lucro 1,28 contra 1,77), mas ainda com lucro. O preço pode abrir com salto e passar do stop.</div></div>`;
+    }
     function cartaoRelatorio(a) {
         const d = (r, v, cor) => `<div class="rel-dado"><div class="r">${r}</div><div class="v"${cor ? ` style="color:${cor}"` : ''}>${v}</div></div>`;
         const res = a.situacao === 'posicao' && a.entrada ? (a.preco / a.entrada - 1) * 100 : null;
@@ -2196,6 +2211,7 @@
             ${htmlGanhoPossivel(a)}
             ${htmlFundRelatorio(a.t)}
             ${htmlTendenciaRelatorio(a.t)}
+            ${htmlBalancoRelatorio(a.t)}
             <div class="rel-grade">
                 ${a.situacao === 'entrada' ? d('Entrada (abertura)', '≈ ' + fmtPrecoM(a.entrada)) : d(`Entrada em ${fmtDataBR(a.desde)}`, fmtPrecoM(a.entrada))}
                 ${d('Stop', fmtPrecoM(a.stop), '#f87171')}
@@ -2383,6 +2399,7 @@
                     if (a.restam) partes.push(`Saída por tempo: ${a.restam} pregões`);
                     if (Number.isFinite(a.preco)) partes.push(`Preço: ${fmtPrecoM(a.preco)}`);
                     linha(partes.join(' · '), 9);
+                    { const b = balancoProximo(a.t); if (b) linha(`Balanço ${b.dias === 0 ? 'hoje' : b.dias === 1 ? 'amanhã' : `em ${b.dias} dias`} (${fmtDataBR(b.data)}${b.estimado ? ', estimado' : ''}): só aviso, não entra no veredito.`, 8, 'normal', [150, 110, 20]); }
                     { const m = vsMme200(a.t); if (m !== null && m < 0) linha(`Abaixo da média de 200 dias (${fmtPctM(m)}): só contexto, não entra no veredito.`, 8, 'normal', [150, 110, 20]); }
                     linha(`Fora da amostra: fator de lucro ${fmtNumM(a.teste.pf, 2)} · acerto ${fmtNumM(a.teste.acerto * 100, 0)}% · ${a.teste.n} operações${a.vendido && a.vendido.dias !== null && a.vendido.dias !== undefined ? ` · vendidos: ${fmtNumM(a.vendido.dias, 1)} dias para zerar` : ''}`, 8, 'normal', [100, 100, 100]);
                     y += 2.5;
@@ -3839,7 +3856,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200 };
+    window.investDebug = { get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).
