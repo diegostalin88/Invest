@@ -350,6 +350,20 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     ok(diar.novos === diar.nSinaisHoje && diar.aguardando, `celular: diário anota os ${diar.nSinaisHoje} sinais confirmados de hoje, aguardando a abertura`);
     ok(diar.fechado === 'fechado' && diar.retOk, 'celular: diário acompanha um sinal antigo com o mesmo motor e o mesmo resultado');
     ok(diar.desl && diar.vered === 'nao' && /desligada pelo diário/.test(diar.motivo), `celular: regra que vai mal na vida real é desligada (${JSON.stringify(diar)})`);
+    // Recalibragem por Walk-Forward: só adota se confirmar depois do corte; senão mantém a atual
+    const cal = await cel.page.evaluate(async () => {
+        const I = window.investDebug; const c = await I.recalibrar(null);
+        const linha = (a, d) => c.tabela.find(x => x.alvo === a && x.dias === d);
+        const validas = c.tabela.filter(x => x.treino.n >= 50); const melhor = validas.reduce((m, x) => x.treino.pf > m.treino.pf ? x : m, validas[0]);
+        const atual = linha(3, 10); const adotou = c.alvo !== 3 || c.dias !== 10;
+        const coerente = adotou ? (c.alvo === melhor.alvo && c.dias === melhor.dias && melhor.teste.pf >= 1 && melhor.teste.pf >= atual.teste.pf)
+                                : !(melhor.teste.pf >= 1 && melhor.teste.pf >= atual.teste.pf && melhor.teste.n >= 20 && (melhor.alvo !== 3 || melhor.dias !== 10));
+        I.calibracao = { ...c, alvo: 4, dias: 20 };
+        const nomes = I.regraRp('alvo_tempo');
+        I.calibracao = null;
+        return { n: c.tabela.length, coerente, adotou, alvo: c.alvo, dias: c.dias, motivo: c.motivo, usa: nomes.alvoAtr === 4 && nomes.saidaDias === 20, corte: c.corte };
+    });
+    ok(cal.n === 9 && cal.coerente && cal.usa, `celular: recalibragem testa 9 combinações na carteira e só adota o que se confirma depois de ${cal.corte} (${cal.alvo}×ATR, ${cal.dias} pregões: ${cal.motivo})`);
     const relInfo = await cel.page.evaluate(() => { const R = window.investDebug.relatorio; return { n: R.ativos.length, sq: R.ativos.filter(a => a.squeeze).length, vend: !!R.vendidos }; });
     ok(relInfo.n > 0 && relInfo.vend && relInfo.sq > 0 && /short squeeze/.test(relTxt), `celular: alerta de short squeeze com os vendidos da B3 ${JSON.stringify(relInfo)}`);
     await cel.page.waitForTimeout(300);

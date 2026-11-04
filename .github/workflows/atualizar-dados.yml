@@ -90,7 +90,7 @@ jobs:
           key: diario-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: diario-
 
-      - name: Diário de sinais anterior (o publicado ou, se faltar, a cópia do cache)
+      - name: Diário de sinais e calibração anteriores (o publicado ou, se faltar, a cópia do cache)
         continue-on-error: true
         env:
           BASE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data
@@ -109,8 +109,10 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p diario-cache/br
-          cp site/data/diario.json diario-cache/ 2>/dev/null || true
-          cp site/data/br/diario.json diario-cache/br/ 2>/dev/null || true
+          for f in diario.json calibracao.json; do
+            cp "site/data/$f" diario-cache/ 2>/dev/null || true
+            cp "site/data/br/$f" diario-cache/br/ 2>/dev/null || true
+          done
 
       - name: Enviar o diário para o cache
         if: always()
@@ -154,7 +156,7 @@ jobs:
           import json, sys, subprocess, os
           base, pasta = sys.argv[1], sys.argv[2]
           caminho = os.path.join(pasta, 'manifest.json'); m = json.load(open(caminho))
-          for chave in ('arquivoRelatorio', 'arquivoVendidos', 'arquivoDiario'):
+          for chave in ('arquivoRelatorio', 'arquivoVendidos', 'arquivoDiario', 'arquivoCalibracao'):
               nome = m.get(chave)
               if nome and subprocess.run(['curl', '-fsSL', f'{base}/{nome}', '-o', os.path.join(pasta, nome)]).returncode != 0:
                   m.pop(chave)
@@ -191,7 +193,7 @@ jobs:
           key: diario-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: diario-
 
-      - name: Diário de sinais anterior (o publicado ou, se faltar, a cópia do cache)
+      - name: Diário de sinais e calibração anteriores (o publicado ou, se faltar, a cópia do cache)
         continue-on-error: true
         env:
           BASE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data
@@ -210,8 +212,10 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p diario-cache/br
-          cp site/data/diario.json diario-cache/ 2>/dev/null || true
-          cp site/data/br/diario.json diario-cache/br/ 2>/dev/null || true
+          for f in diario.json calibracao.json; do
+            cp "site/data/$f" diario-cache/ 2>/dev/null || true
+            cp "site/data/br/$f" diario-cache/br/ 2>/dev/null || true
+          done
 
       - name: Enviar o diário para o cache
         if: always()

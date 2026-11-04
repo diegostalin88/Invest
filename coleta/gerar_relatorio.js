@@ -58,22 +58,29 @@ function resumo(linhas) {
             // Diário de sinais: continua o da publicação anterior (baixado pelo workflow) e acompanha os sinais
             const arqDiario = path.join(RAIZ, pasta, 'diario.json');
             let anterior = null; try { anterior = JSON.parse(fs.readFileSync(arqDiario, 'utf-8')); } catch (e) { /* primeiro dia */ }
-            const { rel, diario, nEntrar } = await page.evaluate(async ant => {
-                const I = window.investDebug; const rel = await I.gerarRelatorio();
+            const arqCalib = path.join(RAIZ, pasta, 'calibracao.json');
+            let calibAnt = null; try { calibAnt = JSON.parse(fs.readFileSync(arqCalib, 'utf-8')); } catch (e) { /* primeira vez */ }
+            const { rel, diario, nEntrar, calib, recalibrou } = await page.evaluate(async ([ant, cAnt]) => {
+                const I = window.investDebug; const ultimo = Object.values(I.allData).reduce((u, d) => d.dates.length && d.dates[d.dates.length - 1] > u ? d.dates[d.dates.length - 1] : u, '');
+                const recalibrou = I.precisaRecalibrar(cAnt, ultimo);
+                const calib = recalibrou ? await I.recalibrar(cAnt) : cAnt; I.calibracao = calib;
+                const rel = await I.gerarRelatorio();
                 const diario = I.atualizarDiario(ant, rel); I.diario = diario;
                 const nEntrar = rel.ativos.filter(a => I.vereditoEntrada(a).estado === 'entrar').length;
-                return { rel, diario, nEntrar };
-            }, anterior);
+                return { rel, diario, nEntrar, calib, recalibrou };
+            }, [anterior, calibAnt]);
+            fs.writeFileSync(arqCalib, JSON.stringify(calib));
             fs.writeFileSync(path.join(RAIZ, pasta, 'relatorio.json'), JSON.stringify(rel));
             fs.writeFileSync(arqDiario, JSON.stringify(diario));
             const arqManifesto = path.join(RAIZ, pasta, 'manifest.json');   // avisa o app que os extras existem
-            const m = JSON.parse(fs.readFileSync(arqManifesto, 'utf-8')); m.arquivoRelatorio = 'relatorio.json'; m.arquivoDiario = 'diario.json';
+            const m = JSON.parse(fs.readFileSync(arqManifesto, 'utf-8')); m.arquivoRelatorio = 'relatorio.json'; m.arquivoDiario = 'diario.json'; m.arquivoCalibracao = 'calibracao.json';
             fs.writeFileSync(arqManifesto, JSON.stringify(m, null, 2));
             const fech = diario.sinais.filter(x => x.estado === 'fechado').length, desl = Object.entries(diario.regras || {}).filter(([, r]) => r.desligada).map(([id]) => id);
+            const linhaCalib = `  - Saídas: alvo ${calib.alvo}×ATR e ${calib.dias} pregões${recalibrou ? ` — recalibrado hoje: ${calib.motivo}` : ` (recalibradas em ${calib.data})`}.`;
             const linhaDiario = (`  - Diário: ${diario.sinais.length} sinais anotados desde ${diario.inicio} (${fech} encerrados)${anterior ? '' : ' — começou hoje'}${desl.length ? `; regras desligadas: ${desl.join(', ')}` : ''}.`);
             const conf = rel.ativos.filter(a => a.confirmada).length;
             const sq = rel.ativos.filter(a => a.squeeze).length;
-            linhas.push(`- ${mercado.toUpperCase()}: ✅ ${rel.universo} papéis testados, ${conf} com regra confirmada, ${nEntrar} com veredito 🟢 entrar, ${sq} alertas de short squeeze (${Math.round((Date.now() - inicio) / 1000)} s).`, linhaDiario);
+            linhas.push(`- ${mercado.toUpperCase()}: ✅ ${rel.universo} papéis testados, ${conf} com regra confirmada, ${nEntrar} com veredito 🟢 entrar, ${sq} alertas de short squeeze (${Math.round((Date.now() - inicio) / 1000)} s).`, linhaCalib, linhaDiario);
         } catch (e) {
             console.error(`[${mercado}] falhou:`, e);
             linhas.push(`- ${mercado.toUpperCase()}: ⚠️ não consegui gerar (${e.message.split('\n')[0]}). O app oferece "Gerar agora" no aparelho.`);

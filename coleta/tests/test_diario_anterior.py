@@ -9,6 +9,8 @@ def test_escolhe_o_mais_recente_e_ignora_invalido():
     b = {'sinais': [1, 2], 'atualizadoEm': '2026-11-04T23:00:00Z'}
     assert da.escolher(a, b, None, {'x': 1}) is b
     assert da.escolher(None, {'sinais': 'x'}) is None
+    c1, c2 = {'alvo': 3, 'dias': 10, 'calculadoEm': '2026-10-01'}, {'alvo': 2, 'dias': 5, 'calculadoEm': '2026-11-01'}
+    assert da.escolher(c1, c2, {'alvo': 3}, nome='calibracao.json') is c2
 
 
 def test_main_usa_o_cache_quando_o_pages_falha(tmp_path, monkeypatch):

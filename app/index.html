@@ -1169,11 +1169,12 @@
             atualizarProgresso('Preparando indicadores…', 1);
             await new Promise(r => setTimeout(r, 30)); // deixa a barra pintar 100% antes do cálculo pesado
             // Extras opcionais: só busca o que o manifesto diz que foi publicado (evita 404 no console)
-            const [rel, vend, diario] = await Promise.all([manifest.arquivoRelatorio, manifest.arquivoVendidos, manifest.arquivoDiario].map(nome =>
+            const [rel, vend, diario, calib] = await Promise.all([manifest.arquivoRelatorio, manifest.arquivoVendidos, manifest.arquivoDiario, manifest.arquivoCalibracao].map(nome =>
                 nome ? buscar(MERCADO.pasta + nome).then(r => r.json()).catch(() => null) : null));
             relatorioDados = rel && Array.isArray(rel.ativos) ? rel : null;
             vendidosDados = vend && vend.ativos ? vend : null;
             diarioDados = diario && Array.isArray(diario.sinais) ? diario : null;
+            calibracaoDados = calib && calib.alvo ? calib : null;
             inicializarComDados(precos, fundamentos, { manifest });
             if (!fundamentos) mostrarMensagem('Preços carregados, mas o arquivo de fundamentos não veio. O Módulo 6 fica sem dados até a próxima coleta.', 'aviso');
             esconderProgresso();
@@ -1772,8 +1773,46 @@
     // Roda toda noite no GitHub (coleta/gerar_relatorio.js) e, se faltar, no próprio aparelho.
     let relatorioDados = null, vendidosDados = null, diarioDados = null, poolRelatorio = null;
     const FRACAO_ESCOLHA = 0.6, MIN_TRADES_ESCOLHA = 5, MIN_TRADES_CONFIRMA = 3, LIMITE_RELATORIO = 400;
-    function regrasRelatorio(base) {
-        const alvo = 3, dias = 10;
+    // ===== Recalibragem mensal por Walk-Forward (Fitschen/Kaufman/Pardo) =====
+    // Só o alvo (múltiplos de ATR) e a saída por tempo (pregões) das regras do Relatório são recalibrados, e
+    // para a CARTEIRA INTEIRA (nunca papel a papel, que é sobreajuste). A escolha usa só o passado até 6 meses
+    // atrás; ela só é adotada se, nos últimos 6 meses (que a escolha não viu), também for melhor que a atual
+    // e der lucro. Senão fica a atual. As travas do veredito e os parâmetros do Backtest não mudam.
+    const CALIB_PADRAO = { alvo: 3, dias: 10 }, CALIB_ALVOS = [2, 3, 4], CALIB_DIAS = [5, 10, 20], CALIB_MESES_TESTE = 6, CALIB_INTERVALO_DIAS = 28, CALIB_MIN_TRADES = 50;
+    let calibracaoDados = null;
+    function paramsCalibrados() { const c = calibracaoDados && calibracaoDados.mercado === (mercadoAtual === 'br' ? 'br' : 'us') ? calibracaoDados : null; return c ? { alvo: c.alvo, dias: c.dias } : { ...CALIB_PADRAO }; }
+    function precisaRecalibrar(c, ultimo) {
+        if (!c || c.mercado !== (mercadoAtual === 'br' ? 'br' : 'us') || !c.data) return true;
+        return (new Date(ultimo + 'T12:00:00') - new Date(c.data + 'T12:00:00')) / 86400000 >= CALIB_INTERVALO_DIAS;
+    }
+    async function recalibrar(anterior) {
+        const merc = mercadoAtual === 'br' ? 'br' : 'us'; const base = getBacktestRiskParams(); const universo = universoRelatorio();
+        const ultimo = ultimoPregaoDados(); const c = new Date(ultimo + 'T12:00:00'); c.setMonth(c.getMonth() - CALIB_MESES_TESTE); const corte = c.toISOString().slice(0, 10);
+        const atual = anterior && anterior.mercado === merc ? { alvo: anterior.alvo, dias: anterior.dias } : { ...CALIB_PADRAO };
+        const est = r => { let g = 0, p = 0; r.forEach(v => v > 0 ? g += v : p -= v); return { n: r.length, pf: p > 0 ? +(g / p).toFixed(3) : (g > 0 ? 99 : 0), media: r.length ? +(r.reduce((a, b) => a + b, 0) / r.length).toFixed(5) : null }; };
+        const tabela = []; let pausa = performance.now();
+        for (const alvo of CALIB_ALVOS) for (const dias of CALIB_DIAS) {
+            const rp = { ...base, modoEntrada: 'score', alvoAtr: alvo, saidaDias: dias }; const treino = [], teste = [];
+            for (const t of universo) {
+                if (performance.now() - pausa > 60) { await new Promise(r => setTimeout(r, 0)); pausa = performance.now(); }
+                const d = allData[t]; const res = runCoreBacktest(d, rp); if (!res) continue;
+                res.tradesDet.forEach(x => (d.dates[x.ent] < corte ? treino : teste).push(x.ret));
+            }
+            tabela.push({ alvo, dias, treino: est(treino), teste: est(teste) });
+        }
+        const linha = (a, d) => tabela.find(x => x.alvo === a && x.dias === d);
+        const validas = tabela.filter(x => x.treino.n >= CALIB_MIN_TRADES);
+        const escolhida = validas.length ? validas.reduce((m, x) => x.treino.pf > m.treino.pf ? x : m, validas[0]) : null;
+        const la = linha(atual.alvo, atual.dias) || linha(CALIB_PADRAO.alvo, CALIB_PADRAO.dias);
+        let fica = atual, motivo;
+        if (!escolhida) motivo = 'poucas operações no período de escolha: mantidos os parâmetros atuais';
+        else if (escolhida.alvo === atual.alvo && escolhida.dias === atual.dias) motivo = 'a melhor combinação no passado é a atual: mantida';
+        else if (escolhida.teste.n >= 20 && escolhida.teste.pf >= 1 && escolhida.teste.pf >= (la ? la.teste.pf : 0)) { fica = { alvo: escolhida.alvo, dias: escolhida.dias }; motivo = `alvo ${escolhida.alvo}×ATR e ${escolhida.dias} pregões venceram no passado e também nos últimos ${CALIB_MESES_TESTE} meses (fator de lucro ${fmtNumM(escolhida.teste.pf, 2)} contra ${la ? fmtNumM(la.teste.pf, 2) : '—'} da atual): adotados`; }
+        else motivo = `alvo ${escolhida.alvo}×ATR e ${escolhida.dias} pregões venceram no passado, mas não se confirmaram nos últimos ${CALIB_MESES_TESTE} meses: mantidos os atuais`;
+        return { versao: 1, mercado: merc, data: ultimo, calculadoEm: new Date().toISOString(), corte, ...fica, anterior: atual, mudou: fica !== atual, motivo, universo: universo.length, tabela };
+    }
+    function regrasRelatorio(base, calib = paramsCalibrados()) {
+        const alvo = calib.alvo, dias = calib.dias;
         return [
             { id: 'stop', nome: 'Score + stop móvel', saida: 'preço', rp: { ...base, modoEntrada: 'score', alvoAtr: 0, saidaDias: 0 } },
             { id: 'alvo', nome: `Score + alvo ${alvo}×ATR`, saida: 'preço', rp: { ...base, modoEntrada: 'score', alvoAtr: alvo, saidaDias: 0 } },
@@ -1870,7 +1909,7 @@
         let ultimo = null; for (const t in allData) { const ds = allData[t].dates; if (ds.length && (!ultimo || ds[ds.length - 1] > ultimo)) ultimo = ds[ds.length - 1]; }
         return { versao: 1, mercado: mercadoAtual === 'br' ? 'br' : 'us', geradoEm: new Date().toISOString(), ultimoPregao: ultimo,
                  universo: universo.length, regras: regras.map(r => ({ id: r.id, nome: r.nome, saida: r.saida })),
-                 parametros: { fracaoEscolha: FRACAO_ESCOLHA, minTradesEscolha: MIN_TRADES_ESCOLHA, minTradesConfirma: MIN_TRADES_CONFIRMA, atrMult: base.atrMult, stopLossPct: base.stopLossPct, minScore: base.minScore, custoPct: base.costPct },
+                 parametros: { calibracao: { ...paramsCalibrados(), data: calibracaoDados ? calibracaoDados.data : null }, fracaoEscolha: FRACAO_ESCOLHA, minTradesEscolha: MIN_TRADES_ESCOLHA, minTradesConfirma: MIN_TRADES_CONFIRMA, atrMult: base.atrMult, stopLossPct: base.stopLossPct, minScore: base.minScore, custoPct: base.costPct },
                  vendidos: vendidosDados ? { fonte: vendidosDados.fonte, data: vendidosDados.data } : null, ativos };
     }
 
@@ -1914,7 +1953,8 @@
         // 1) anota os sinais novos (veredito avaliado na noite do sinal, antes da abertura seguinte)
         R.ativos.filter(a => a.situacao === 'entrada' && a.confirmada && (a.nTotal || 0) >= CONF_MIN && a.dataSinal).forEach(a => {
             const id = `${a.t}|${a.regra}|${a.dataSinal}`; if (existentes.has(id)) return;
-            D.sinais.push({ id, t: a.t, regra: a.regra, dataSinal: a.dataSinal, veredito: vereditoEntrada(a, new Date(a.dataSinal + 'T23:30:00Z')).estado, entradaPrev: a.entrada, estado: 'aguardando' });
+            const rr = porId[a.regra]; const params = rr ? { alvoAtr: rr.rp.alvoAtr, saidaDias: rr.rp.saidaDias } : null;
+            D.sinais.push({ id, t: a.t, regra: a.regra, dataSinal: a.dataSinal, veredito: vereditoEntrada(a, new Date(a.dataSinal + 'T23:30:00Z')).estado, entradaPrev: a.entrada, params, estado: 'aguardando' });
         });
         // 2) acompanha os que não terminaram, com o mesmo motor
         const cache = {};
@@ -1922,7 +1962,8 @@
             const d = allData[x.t]; const r = porId[x.regra]; if (!d || !r) return;
             const idx = d.dates.indexOf(x.dataSinal); if (idx < 0) return;
             if (idx + 1 >= d.close.length) return;   // a abertura seguinte ainda não aconteceu
-            const chave = x.t + '|' + x.regra; const res = cache[chave] || (cache[chave] = runCoreBacktest(d, r.rp)); if (!res) return;
+            const rp = x.params ? { ...r.rp, ...x.params } : r.rp;   // segue com os parâmetros do dia do sinal
+            const chave = x.t + '|' + x.regra + '|' + JSON.stringify(x.params || null); const res = cache[chave] || (cache[chave] = runCoreBacktest(d, rp)); if (!res) return;
             const tr = res.tradesDet.find(z => z.ent === idx + 1);
             if (tr) Object.assign(x, { estado: 'fechado', dataEntrada: d.dates[idx + 1], entrada: +d.open[idx + 1].toFixed(4), dataSaida: d.dates[tr.sai], ret: +tr.ret.toFixed(5) });
             else if (res.aberta && res.aberta.data === d.dates[idx + 1]) Object.assign(x, { estado: 'aberto', dataEntrada: res.aberta.data, entrada: +res.aberta.entrada.toFixed(4), parcial: +(d.close[d.close.length - 1] / res.aberta.entrada - 1).toFixed(5) });
@@ -2044,6 +2085,16 @@
             <div class="text-xs rel-mudo mt-2">Confirmado fora da amostra: fator de lucro ${fmtNumM(a.teste.pf, 2)} · acerto ${fmtNumM(a.teste.acerto * 100, 0)}% · ${a.teste.n} operações</div>
         </button>`;
     }
+    function htmlCalibracao(R) {
+        const c = calibracaoDados && calibracaoDados.mercado === R.mercado ? calibracaoDados : null;
+        const p = (R.parametros && R.parametros.calibracao) || CALIB_PADRAO;
+        if (!c) return `<div class="text-xs rel-mudo mt-2">Saídas: alvo ${p.alvo}×ATR e ${p.dias} pregões (padrão; a recalibragem mensal roda na próxima coleta).</div>`;
+        const prox = new Date(c.data + 'T12:00:00'); prox.setDate(prox.getDate() + CALIB_INTERVALO_DIAS);
+        const linhas = c.tabela.map(x => `<tr${x.alvo === c.alvo && x.dias === c.dias ? ' style="font-weight:700"' : ''}><td>${x.alvo}×ATR · ${x.dias} preg.</td><td>${fmtNumM(x.treino.pf, 2)} (${x.treino.n})</td><td>${fmtNumM(x.teste.pf, 2)} (${x.teste.n})</td></tr>`).join('');
+        return `<details class="text-xs rel-mudo mt-2"><summary>Saídas recalibradas em ${fmtDataBR(c.data)}: alvo ${c.alvo}×ATR e ${c.dias} pregões${c.mudou ? ' (mudou)' : ''} · próxima por volta de ${fmtDataBR(prox.toISOString().slice(0, 10))}</summary>
+            <p class="mt-1">${c.motivo}. Escolha feita na carteira inteira (${c.universo} papéis) com o histórico até ${fmtDataBR(c.corte)} e conferida nos meses seguintes, que a escolha não viu.</p>
+            <table class="rel-tabela mt-1"><thead><tr><th>Combinação</th><th>Fator de lucro até ${fmtDataBR(c.corte)} (op.)</th><th>Depois (op.)</th></tr></thead><tbody>${linhas}</tbody></table></details>`;
+    }
     function desenharRelatorio() {
         const alvos = document.querySelectorAll('.relatorio-alvo'); if (!alvos.length) return;
         const ultimo = ultimoPregaoDados();
@@ -2074,6 +2125,7 @@
                 <div class="text-sm mt-1">Saída que ganhou: por preço <b>${porTipo['preço']}</b> · por tempo <b>${porTipo.tempo}</b> · preço ou tempo <b>${porTipo['preço ou tempo']}</b>.</div>
                 ${velho ? '<button type="button" class="rel-botao mt-3" data-gerar-relatorio>Atualizar agora</button>' : ''}
                 ${R.vendidos ? `<div class="text-xs rel-mudo mt-2">Vendidos: ${R.vendidos.fonte}, posição de ${fmtDataBR(R.vendidos.data)}.</div>` : ''}
+                ${htmlCalibracao(R)}
             </div>
             <div class="rel-titulo">🟢 Entrar na próxima abertura <span class="rel-chip verde">${entrar.length}</span></div>
             <div class="rel-lista">${entrar.length ? entrar.map(cartaoRelatorio).join('') : '<p class="text-sm rel-mudo">Nenhum papel passou em todas as travas hoje. Não entrar também é uma decisão.</p>'}</div>
@@ -2096,6 +2148,7 @@
                 <div class="text-sm rel-mudo space-y-2 mt-1">
                     <p>Para cada papel, o app testa ${R.regras.length} regras: ${R.regras.map(r => r.nome).join('; ')}.</p>
                     <p>A melhor é escolhida olhando só os primeiros ${Math.round(R.parametros.fracaoEscolha * 100)}% do histórico, pelo fator de lucro pesado pelo número de operações (mínimo de ${R.parametros.minTradesEscolha}). Ela só aparece nas listas se também tiver dado lucro nos ${100 - Math.round(R.parametros.fracaoEscolha * 100)}% finais, que ela "não viu" (mínimo de ${R.parametros.minTradesConfirma} operações). É o walk-forward de Fitschen e Kaufman, que evita escolher a regra que só deu certo por acaso.</p>
+                    <p><b>Recalibragem mensal</b>: a cada ${CALIB_INTERVALO_DIAS} dias o servidor testa ${CALIB_ALVOS.length * CALIB_DIAS.length} combinações de alvo (${CALIB_ALVOS.join(', ')}×ATR) e saída por tempo (${CALIB_DIAS.join(', ')} pregões) na carteira inteira. Escolhe com o histórico até ${CALIB_MESES_TESTE} meses atrás e só troca se a escolha também for melhor nos últimos ${CALIB_MESES_TESTE} meses. Nunca ajusta papel a papel nem as travas.</p>
                     <p><b>Veredito de cada papel</b> (travas fixas, que não se ajustam sozinhas): 🟢 entrar só se a regra foi confirmada, tem pelo menos ${CONF_MIN} operações (confiabilidade alta a partir de ${CONF_ALTA}), o sinal é do último pregão, a abertura em que a regra compra ainda não passou e o risco até o stop não é maior que o espaço até a resistência. Faltou uma condição: 🟡 esperar. Já comprado pelo sistema: 🔵 não entrar agora. A trava de resistência é gestão de risco e não faz parte do backtest.</p>
                     <p>Entrada na abertura do pregão seguinte ao sinal; stop inicial = o mais protetor entre ${fmtNumM(R.parametros.atrMult, 1)}×ATR e ${fmtNumM(R.parametros.stopLossPct, 1)}%; custo de ${fmtNumM(R.parametros.custoPct, 2)}% por perna. ${avisoSobrevivencia().replace(/<\/?b>/g, '')}</p>
                 </div></details>`;
@@ -3299,7 +3352,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { get graficos() { return graficos; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; } };
+    window.investDebug = { get graficos() { return graficos; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; } };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).

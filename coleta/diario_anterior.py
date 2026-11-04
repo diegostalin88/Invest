@@ -1,4 +1,4 @@
-"""Recupera o diário de sinais da publicação anterior (os dados não ficam no git).
+"""Recupera o diário de sinais e a calibração da publicação anterior (os dados não ficam no git).
 
 Fontes: o diario.json publicado no Pages e a cópia de segurança do cache do Actions. Fica com o mais
 recente (campo atualizadoEm). Sem nenhum dos dois, o diário começa do zero (só um aviso).
@@ -28,9 +28,16 @@ def ler_arquivo(caminho):
         return None
 
 
-def escolher(*opcoes):
-    validas = [o for o in opcoes if isinstance(o, dict) and isinstance(o.get('sinais'), list)]
-    return max(validas, key=lambda o: o.get('atualizadoEm') or '') if validas else None
+ARQUIVOS = {  # arquivo: (teste de validade, campo de data usado para escolher o mais recente)
+    'diario.json': (lambda o: isinstance(o.get('sinais'), list), 'atualizadoEm'),
+    'calibracao.json': (lambda o: bool(o.get('alvo')) and bool(o.get('dias')), 'calculadoEm'),
+}
+
+
+def escolher(*opcoes, nome='diario.json'):
+    valido, campo = ARQUIVOS[nome]
+    validas = [o for o in opcoes if isinstance(o, dict) and valido(o)]
+    return max(validas, key=lambda o: o.get(campo) or '') if validas else None
 
 
 def main(argv):
@@ -39,15 +46,16 @@ def main(argv):
         destino = os.path.join(saida, sub)
         if not os.path.isfile(os.path.join(destino, 'manifest.json')):
             continue
-        url = f'{base}/{sub}/diario.json' if sub else f'{base}/diario.json'
-        d = escolher(ler_url(url), ler_arquivo(os.path.join(cache, sub, 'diario.json')))
-        nome = sub.upper() or 'US'
-        if d is None:
-            print(f'{nome}: nenhum diário anterior; começa hoje.')
-            continue
-        with open(os.path.join(destino, 'diario.json'), 'w', encoding='utf-8') as f:
-            json.dump(d, f, ensure_ascii=False)
-        print(f"{nome}: diário anterior com {len(d['sinais'])} sinais (atualizado em {d.get('atualizadoEm')}).")
+        for arq in ARQUIVOS:
+            url = f'{base}/{sub}/{arq}' if sub else f'{base}/{arq}'
+            d = escolher(ler_url(url), ler_arquivo(os.path.join(cache, sub, arq)), nome=arq)
+            rotulo = f"{sub.upper() or 'US'} {arq}"
+            if d is None:
+                print(f'{rotulo}: nenhum anterior; começa do zero.')
+                continue
+            with open(os.path.join(destino, arq), 'w', encoding='utf-8') as f:
+                json.dump(d, f, ensure_ascii=False)
+            print(f'{rotulo}: anterior recuperado.')
     return 0
 
 
