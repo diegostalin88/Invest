@@ -55,4 +55,6 @@ jobs:
           npm install --no-save --no-package-lock playwright@1.48.2
           npx playwright install --with-deps chromium
           node coleta/analise_entradas.js site analise_entradas.json
-          echo "JSON_INICIO"; cat analise_entradas.json; echo; echo "JSON_FIM"
+          echo "JSON_INICIO"
+          python3 -c "import json;d=json.load(open('analise_entradas.json'));print(json.dumps({k:v for k,v in d.items() if k!='entradas'}));[print(json.dumps(e,ensure_ascii=False)) for e in d['entradas']]"
+          echo "JSON_FIM"

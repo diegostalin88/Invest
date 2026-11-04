@@ -64,14 +64,17 @@ function servir() {
             porPapel[a.t] = { acima: est(sep.acima), abaixo: est(sep.abaixo) };
         });
         // 2) Papéis com veredito de entrada (entrar ou atrasado)
-        const entradas = R.ativos.map(a => ({ a, v: I.vereditoEntrada(a) })).filter(x => ['entrar', 'atrasado'].includes(x.v.estado)).map(({ a, v }) => {
+        const entradas = R.ativos.map(a => ({ a, v: I.vereditoEntrada(a) })).filter(x => ['entrar', 'atrasado', 'ja'].includes(x.v.estado)).map(({ a, v }) => {
             const d = D[a.t], n = d.close.length, i = n - 1, ind = I.precomputeAllIndicators(d, P);
             const e200 = ind.EMA_200[i], e50 = (() => { const k = 2 / 51; let m = d.close[0]; for (let j = 1; j < n; j++) m = d.close[j] * k + m * (1 - k); return m; })();
             const atr = ind.ATR ? ind.ATR[i] : null;
             let sinais = null; try { const ie = a.desde ? d.dates.indexOf(a.desde) : -1; const s = I.analyzeAllSignals(d, ind, ie > 0 ? ie - 1 : i); sinais = I.computeStrategyScore(s, I.getCurrentWeights()); } catch (e) { sinais = { erro: String(e) }; }
             const max252 = Math.max(...d.high.slice(-252)), ret = k => n > k ? +((d.close[i] / d.close[i - k] - 1) * 100).toFixed(1) : null;
             const f = F[a.t] || {};
-            return { t: a.t, nome: f.longName || f.shortName || '', setor: f.sector || null, industria: f.industry || null, balanco: f.nextEarningsDate || null,
+            const ie2 = a.desde ? d.dates.indexOf(a.desde) : -1, maxDesde = ie2 >= 0 ? Math.max(...d.high.slice(ie2)) : null;
+            return { t: a.t, estado: v.estado, desde: a.desde, pregoes: ie2 >= 0 ? n - ie2 : null, resultadoPct: a.entrada ? +((d.close[i] / a.entrada - 1) * 100).toFixed(2) : null,
+                maxDesdePct: maxDesde && a.entrada ? +((maxDesde / a.entrada - 1) * 100).toFixed(2) : null, stopVsEntradaPct: a.entrada ? +((a.stop / a.entrada - 1) * 100).toFixed(2) : null,
+                andouAtr: a.atrEntrada ? +((d.close[i] - a.entrada) / a.atrEntrada).toFixed(2) : null, nome: f.longName || f.shortName || '', setor: f.sector || null, industria: f.industry || null, balanco: f.nextEarningsDate || null,
                 regra: a.regra, conf: v.conf, pfTeste: a.teste.pf, nTeste: a.teste.n, acerto: a.teste.acerto, mediaGanho: a.teste.mediaGanho, mediaPerda: a.teste.mediaPerda,
                 preco: d.close[i], entrada: a.entrada, stop: a.stop, alvo: a.alvo, resistencia: a.resistencia, suporte: a.suporte,
                 mme200: e200, vsMme200: e200 ? +((d.close[i] / e200 - 1) * 100).toFixed(1) : null, mme50: e50, vsMme50: +((d.close[i] / e50 - 1) * 100).toFixed(1),
@@ -89,7 +92,7 @@ function servir() {
         `| Sinal abaixo da MME200 | ${r.global.abaixo.n} | ${r.global.abaixo.pf} | ${r.global.abaixo.acerto} | ${r.global.abaixo.medRet}% |`, '',
         ...Object.entries(r.regras).map(([k, x]) => `- ${k}: acima ${x.acima.n} op. FL ${x.acima.pf} · abaixo ${x.abaixo.n} op. FL ${x.abaixo.pf}`), '',
         '| papel | setor | preço × MME200 | × MME50 | ATR % | stop em ATR | IFR14 | 20d | topo 52s | balanço | FL teste (n) | estratégias |', '|---|---|---|---|---|---|---|---|---|---|---|---|',
-        ...r.entradas.map(e => `| ${e.t} | ${e.industria || e.setor || ''} | ${e.vsMme200}% | ${e.vsMme50}% | ${e.atrPct} | ${e.stopEmAtr} | ${e.ifr14} | ${e.ret20}% | ${e.doTopo52s}% | ${e.balanco || '—'} | ${e.pfTeste} (${e.nTeste}) | ${(e.estrategias || []).join(', ')} |`)];
+        ...r.entradas.filter(e => e.estado !== 'ja').map(e => `| ${e.t} | ${e.industria || e.setor || ''} | ${e.vsMme200}% | ${e.vsMme50}% | ${e.atrPct} | ${e.stopEmAtr} | ${e.ifr14} | ${e.ret20}% | ${e.doTopo52s}% | ${e.balanco || '—'} | ${e.pfTeste} (${e.nTeste}) | ${(e.estrategias || []).join(', ')} |`)];
     console.log(L.join('\n'));
     if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, L.join('\n') + '\n');
     await browser.close(); srv.close();
