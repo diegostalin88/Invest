@@ -317,6 +317,13 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
         return c.length > 0 && c.every(a => a.teste.mediaOp !== undefined && (a.teste.mediaGanho === null || a.teste.mediaGanho > 0) && (a.teste.mediaPerda === null || a.teste.mediaPerda <= 0)) && document.querySelectorAll('#am-relatorio .rel-ganho').length > 0; });
     ok(/🏢 Fundamentos \d\/\d/.test(relTxt) && /não entra no veredito/.test(relTxt), 'celular: cartões do Relatório mostram a nota fundamentalista só como contexto');
     ok(ganhoOk && /Ganho possível/.test(relTxt), 'celular: cartões do Relatório destacam o ganho possível (alvo ou média medida no teste) e o risco até o stop');
+    {
+        const [dl] = await Promise.all([cel.page.waitForEvent('download', { timeout: 15000 }), cel.page.click('#am-relatorio [data-baixar-relatorio]')]);
+        const conteudo = JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
+        const nAtivos = await cel.page.evaluate(() => window.investDebug.relatorio.ativos.length);
+        ok(/^relatorio-(us|br)-.+\.json$/.test(dl.suggestedFilename()) && conteudo.ativos.length === nAtivos && conteudo.vereditos.length === nAtivos && conteudo.vereditos.every(v => v.t && v.estado),
+            `celular: botão "Baixar relatório" entrega o .json com os ${nAtivos} papéis e o veredito de cada um (${dl.suggestedFilename()})`);
+    }
     // Ordem: padrão por ganho possível (decrescente); tocar em outra ordem reorganiza
     const ordemOk = await cel.page.evaluate(() => {
         const lerG = () => [...document.querySelectorAll('#am-relatorio details[data-secao="operacao"] .rel-ganho .g')].map(x => parseFloat(x.textContent.replace('+', '').replace(',', '.')));

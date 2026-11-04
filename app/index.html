@@ -2234,6 +2234,7 @@
                 <div class="text-sm mt-2"><b>${confirmados.length}</b> papéis têm uma regra confirmada fora da amostra.${regraTop ? ` A que mais venceu: <b>${nomeRegra(regraTop[0])}</b> (${regraTop[1]}).` : ''}</div>
                 <div class="text-sm mt-1">Saída que ganhou: por preço <b>${porTipo['preço']}</b> · por tempo <b>${porTipo.tempo}</b> · preço ou tempo <b>${porTipo['preço ou tempo']}</b>.</div>
                 ${velho ? '<button type="button" class="rel-botao mt-3" data-gerar-relatorio>Atualizar agora</button>' : ''}
+                <button type="button" class="rel-botao mt-3" data-baixar-relatorio>⬇️ Baixar relatório</button>
                 ${R.vendidos ? `<div class="text-xs rel-mudo mt-2">Vendidos: ${R.vendidos.fonte}, posição de ${fmtDataBR(R.vendidos.data)}.</div>` : ''}
                 ${htmlCalibracao(R)}
             </div>
@@ -2291,7 +2292,26 @@
         } catch (e) { console.error('Erro ao gerar o relatório:', e); mostrarMensagem('Não consegui gerar o relatório: ' + (e && e.message ? e.message : e), 'erro'); }
         finally { gerandoRelatorio = false; desenharRelatorio(); }
     }
+    // Baixa o relatório que está na tela (com o veredito de cada papel) num arquivo .json para compartilhar.
+    function arquivoDoRelatorio() {
+        const R = relatorioDados;
+        const conteudo = { ...R, baixadoEm: new Date().toISOString(), vereditos: R.ativos.map(a => ({ t: a.t, ...vereditoEntrada(a) })) };
+        const nome = `relatorio-${R.mercado || mercadoAtual}-${R.ultimoPregao || 'sem-data'}.json`;
+        return { nome, texto: JSON.stringify(conteudo, null, 1) };
+    }
+    async function baixarRelatorio() {
+        if (!relatorioValido()) return;
+        const { nome, texto } = arquivoDoRelatorio();
+        const arq = typeof File === 'function' ? new File([texto], nome, { type: 'application/json' }) : null;
+        if (arq && navigator.canShare && navigator.canShare({ files: [arq] })) {
+            try { await navigator.share({ files: [arq], title: nome }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+        }
+        const url = URL.createObjectURL(new Blob([texto], { type: 'application/json' }));
+        const a = document.createElement('a'); a.href = url; a.download = nome; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }
     document.addEventListener('click', e => {
+        if (e.target.closest('[data-baixar-relatorio]')) { baixarRelatorio(); return; }
         if (e.target.closest('[data-gerar-relatorio]')) { gerarRelatorioNoAparelho(); return; }
         if (e.target.closest('[data-testar-b3]')) { testarAcessoB3(); return; }
         const ord = e.target.closest('[data-rel-ordem]');
