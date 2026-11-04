@@ -82,6 +82,20 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Cópia de segurança do diário de sinais
+        continue-on-error: true
+        uses: actions/cache/restore@v4
+        with:
+          path: diario-cache
+          key: diario-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: diario-
+
+      - name: Diário de sinais anterior (o publicado ou, se faltar, a cópia do cache)
+        continue-on-error: true
+        env:
+          BASE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data
+        run: python3 coleta/diario_anterior.py site/data "$BASE" diario-cache
+
       - name: Relatório automático (backtests do app num navegador invisível)
         continue-on-error: true
         timeout-minutes: 60
@@ -89,6 +103,22 @@ jobs:
           npm install --no-save --no-package-lock playwright@1.48.2
           npx playwright install --with-deps chromium
           node coleta/gerar_relatorio.js site
+
+      - name: Guardar o diário (cópia de segurança)
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p diario-cache/br
+          cp site/data/diario.json diario-cache/ 2>/dev/null || true
+          cp site/data/br/diario.json diario-cache/br/ 2>/dev/null || true
+
+      - name: Enviar o diário para o cache
+        if: always()
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: diario-cache
+          key: diario-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Configurar Pages
         uses: actions/configure-pages@v5
@@ -124,7 +154,7 @@ jobs:
           import json, sys, subprocess, os
           base, pasta = sys.argv[1], sys.argv[2]
           caminho = os.path.join(pasta, 'manifest.json'); m = json.load(open(caminho))
-          for chave in ('arquivoRelatorio', 'arquivoVendidos'):
+          for chave in ('arquivoRelatorio', 'arquivoVendidos', 'arquivoDiario'):
               nome = m.get(chave)
               if nome and subprocess.run(['curl', '-fsSL', f'{base}/{nome}', '-o', os.path.join(pasta, nome)]).returncode != 0:
                   m.pop(chave)
@@ -153,6 +183,20 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Cópia de segurança do diário de sinais
+        continue-on-error: true
+        uses: actions/cache/restore@v4
+        with:
+          path: diario-cache
+          key: diario-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: diario-
+
+      - name: Diário de sinais anterior (o publicado ou, se faltar, a cópia do cache)
+        continue-on-error: true
+        env:
+          BASE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data
+        run: python3 coleta/diario_anterior.py site/data "$BASE" diario-cache
+
       - name: Relatório automático (backtests do app num navegador invisível)
         continue-on-error: true
         timeout-minutes: 60
@@ -160,6 +204,22 @@ jobs:
           npm install --no-save --no-package-lock playwright@1.48.2
           npx playwright install --with-deps chromium
           node coleta/gerar_relatorio.js site
+
+      - name: Guardar o diário (cópia de segurança)
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p diario-cache/br
+          cp site/data/diario.json diario-cache/ 2>/dev/null || true
+          cp site/data/br/diario.json diario-cache/br/ 2>/dev/null || true
+
+      - name: Enviar o diário para o cache
+        if: always()
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: diario-cache
+          key: diario-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Configurar Pages
         uses: actions/configure-pages@v5

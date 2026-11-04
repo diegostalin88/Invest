@@ -1169,10 +1169,11 @@
             atualizarProgresso('Preparando indicadores…', 1);
             await new Promise(r => setTimeout(r, 30)); // deixa a barra pintar 100% antes do cálculo pesado
             // Extras opcionais: só busca o que o manifesto diz que foi publicado (evita 404 no console)
-            const [rel, vend] = await Promise.all([manifest.arquivoRelatorio, manifest.arquivoVendidos].map(nome =>
+            const [rel, vend, diario] = await Promise.all([manifest.arquivoRelatorio, manifest.arquivoVendidos, manifest.arquivoDiario].map(nome =>
                 nome ? buscar(MERCADO.pasta + nome).then(r => r.json()).catch(() => null) : null));
             relatorioDados = rel && Array.isArray(rel.ativos) ? rel : null;
             vendidosDados = vend && vend.ativos ? vend : null;
+            diarioDados = diario && Array.isArray(diario.sinais) ? diario : null;
             inicializarComDados(precos, fundamentos, { manifest });
             if (!fundamentos) mostrarMensagem('Preços carregados, mas o arquivo de fundamentos não veio. O Módulo 6 fica sem dados até a próxima coleta.', 'aviso');
             esconderProgresso();
@@ -1587,7 +1588,7 @@
                 else if (riskParams.saidaDias > 0 && i - entryIdx + 1 >= riskParams.saidaDias) { exitPrice = dataSubset.close[i]; saidas.tempo++; }
                 if (exitPrice !== null) {
                     exitPrice *= (1 - costFraction);
-                    const pnl = (exitPrice - entryPrice) * positionSize; trades.push({ pnl, pct: pnl/capital, ent: entryIdx });
+                    const pnl = (exitPrice - entryPrice) * positionSize; trades.push({ pnl, pct: pnl/capital, ent: entryIdx, sai: i, ret: exitPrice / entryPrice - 1 });
                     capital += pnl; position = 'out'; curEq = capital;
                 }
                 // ATR Trailing Stop: sobe só DEPOIS do fechamento de hoje, valendo a partir de amanhã (sem look-ahead)
@@ -1630,7 +1631,7 @@
         const profitFactor = grossLoss > 0 ? grossWin/grossLoss : (grossWin > 0 ? Infinity : 0);
         // Estado no último candle (só leitura, para o "Plano de operação"; não muda o resultado)
         const aberta = position === 'long' ? { entrada: entryPrice, data: dataSubset.dates[entryIdx], stop: stopPrice, alvo: targetPrice, dias: dataSubset.close.length - entryIdx } : null;
-        return { final: capital, returnPct, maxDD, winRate, expectancy, trades: trades.length, eq, profitFactor, aberta, sinalHoje: pendingEntry, atrHoje: pendingATR, saidas, retornosTrades: trades.map(t => t.pct), tradesDet: trades.map(t => ({ pct: t.pct, ent: t.ent })) };
+        return { final: capital, returnPct, maxDD, winRate, expectancy, trades: trades.length, eq, profitFactor, aberta, sinalHoje: pendingEntry, atrHoje: pendingATR, saidas, retornosTrades: trades.map(t => t.pct), tradesDet: trades.map(t => ({ pct: t.pct, ent: t.ent, sai: t.sai, ret: t.ret })) };
     }
 
     // ===== Ferramentas de validação tiradas dos livros (só leitura: não mudam o resultado do Backtest) =====
@@ -1769,7 +1770,7 @@
     // histórico e CONFIRMA nos 40% finais (walk-forward, Fitschen/Kaufman). Depois diz a situação de hoje com a
     // regra escolhida: entrada no próximo pregão, operação em andamento (com stop/alvo/tempo) ou nada.
     // Roda toda noite no GitHub (coleta/gerar_relatorio.js) e, se faltar, no próprio aparelho.
-    let relatorioDados = null, vendidosDados = null;
+    let relatorioDados = null, vendidosDados = null, diarioDados = null, poolRelatorio = null;
     const FRACAO_ESCOLHA = 0.6, MIN_TRADES_ESCOLHA = 5, MIN_TRADES_CONFIRMA = 3, LIMITE_RELATORIO = 400;
     function regrasRelatorio(base) {
         const alvo = 3, dias = 10;
@@ -1844,12 +1845,13 @@
         niveis.suporte = isFinite(sr.sup) ? sr.sup : null; niveis.resistencia = isFinite(sr.resis) ? sr.resis : null;
         niveis.nTotal = melhor.treino.n + melhor.teste.n;
         Object.keys(niveis).forEach(k => { if (typeof niveis[k] === 'number' && !['restam', 'nTotal'].includes(k)) niveis[k] = arred(niveis[k]); });
+        if (confirmada && poolRelatorio) (poolRelatorio[melhor.r.id] = poolRelatorio[melhor.r.id] || []).push(...melhor.res.tradesDet.filter(x => x.ent >= corte).map(x => x.ret));
         return { ...base, regra: melhor.r.id, confirmada, treino: { pf: +melhor.treino.pf.toFixed(2), n: melhor.treino.n, acerto: +melhor.treino.acerto.toFixed(3) },
                  teste: { pf: +melhor.teste.pf.toFixed(2), n: melhor.teste.n, acerto: +melhor.teste.acerto.toFixed(3), ret: +melhor.teste.ret.toFixed(4) },
                  situacao, ...niveis, preco: arred(fech) };
     }
     async function gerarRelatorio(aoProgredir = () => {}) {
-        const base = getBacktestRiskParams(); const regras = regrasRelatorio(base);
+        const base = getBacktestRiskParams(); const regras = regrasRelatorio(base); poolRelatorio = {};
         const universo = universoRelatorio(); const ativos = [];
         let pausa = performance.now();
         for (let k = 0; k < universo.length; k++) {
@@ -1889,6 +1891,80 @@
         p.push(`stop ${fmtPrecoM(a.stop)}`);
         return p.join(' · ');
     }
+    // ===== Diário de sinais: confronto com a realidade =====
+    // Cada sinal de entrada confirmado é anotado no dia em que aparece e acompanhado nos pregões seguintes
+    // com o MESMO motor (entrada na abertura seguinte, stop, alvo, tempo). Esses resultados são de depois
+    // do sinal: o teste não tinha como conhecê-los, então não dá para sobreajustar. Se a média real de uma
+    // regra (com 10+ sinais encerrados) cair abaixo do pior cenário do Monte Carlo (percentil 5 dos trades
+    // fora da amostra da própria regra), ela é desligada até a média voltar para dentro da faixa.
+    const DIARIO_MIN_FECHADOS = 10, DIARIO_MAX_SINAIS = 600;
+    function regraDesligada(id) { const r = diarioDados && diarioDados.mercado === mercadoCodigo() && diarioDados.regras && diarioDados.regras[id]; return r && r.desligada ? r.motivo : null; }
+    function percentil5DaMedia(pool, k, vezes = 2000) {
+        if (!pool || pool.length < 20 || k < 1) return null;
+        let semente = 98765; const aleat = () => { semente = (semente * 1103515245 + 12345) % 2147483648; return semente / 2147483648; };
+        const medias = [];
+        for (let v = 0; v < vezes; v++) { let s = 0; for (let j = 0; j < k; j++) s += pool[Math.floor(aleat() * pool.length)]; medias.push(s / k); }
+        medias.sort((a, b) => a - b); return medias[Math.floor(vezes * 0.05)];
+    }
+    function atualizarDiario(anterior, R) {
+        const merc = R.mercado; const agoraIso = new Date().toISOString();
+        const D = anterior && anterior.mercado === merc && Array.isArray(anterior.sinais) ? JSON.parse(JSON.stringify(anterior)) : { versao: 1, mercado: merc, inicio: R.ultimoPregao, sinais: [], regras: {} };
+        const regras = regrasRelatorio(getBacktestRiskParams()); const porId = Object.fromEntries(regras.map(r => [r.id, r]));
+        const existentes = new Set(D.sinais.map(x => x.id));
+        // 1) anota os sinais novos (veredito avaliado na noite do sinal, antes da abertura seguinte)
+        R.ativos.filter(a => a.situacao === 'entrada' && a.confirmada && (a.nTotal || 0) >= CONF_MIN && a.dataSinal).forEach(a => {
+            const id = `${a.t}|${a.regra}|${a.dataSinal}`; if (existentes.has(id)) return;
+            D.sinais.push({ id, t: a.t, regra: a.regra, dataSinal: a.dataSinal, veredito: vereditoEntrada(a, new Date(a.dataSinal + 'T23:30:00Z')).estado, entradaPrev: a.entrada, estado: 'aguardando' });
+        });
+        // 2) acompanha os que não terminaram, com o mesmo motor
+        const cache = {};
+        D.sinais.filter(x => x.estado === 'aguardando' || x.estado === 'aberto').forEach(x => {
+            const d = allData[x.t]; const r = porId[x.regra]; if (!d || !r) return;
+            const idx = d.dates.indexOf(x.dataSinal); if (idx < 0) return;
+            if (idx + 1 >= d.close.length) return;   // a abertura seguinte ainda não aconteceu
+            const chave = x.t + '|' + x.regra; const res = cache[chave] || (cache[chave] = runCoreBacktest(d, r.rp)); if (!res) return;
+            const tr = res.tradesDet.find(z => z.ent === idx + 1);
+            if (tr) Object.assign(x, { estado: 'fechado', dataEntrada: d.dates[idx + 1], entrada: +d.open[idx + 1].toFixed(4), dataSaida: d.dates[tr.sai], ret: +tr.ret.toFixed(5) });
+            else if (res.aberta && res.aberta.data === d.dates[idx + 1]) Object.assign(x, { estado: 'aberto', dataEntrada: res.aberta.data, entrada: +res.aberta.entrada.toFixed(4), parcial: +(d.close[d.close.length - 1] / res.aberta.entrada - 1).toFixed(5) });
+            else Object.assign(x, { estado: 'sem_entrada' });   // o motor não entrou (ex.: dado revisado pela fonte)
+        });
+        // 3) estatística real por regra e desligamento automático
+        const fechados = D.sinais.filter(x => x.estado === 'fechado');
+        D.regras = {}; const poolTodos = poolRelatorio ? Object.values(poolRelatorio).flat() : null;
+        regras.forEach(r => {
+            const f = fechados.filter(x => x.regra === r.id); const rets = f.map(x => x.ret);
+            const media = rets.length ? rets.reduce((a, b) => a + b, 0) / rets.length : null;
+            const ganhos = rets.filter(v => v > 0).reduce((a, b) => a + b, 0), perdas = -rets.filter(v => v <= 0).reduce((a, b) => a + b, 0);
+            // referência: trades fora da amostra da própria regra (se forem poucos, de todas as regras confirmadas)
+            const poolRegra = poolRelatorio && poolRelatorio[r.id] && poolRelatorio[r.id].length >= 20 ? poolRelatorio[r.id] : poolTodos;
+            const p5 = rets.length ? percentil5DaMedia(poolRegra, rets.length) : null;
+            const desligada = rets.length >= DIARIO_MIN_FECHADOS && p5 !== null && media < p5;
+            D.regras[r.id] = { n: rets.length, abertos: D.sinais.filter(x => x.regra === r.id && x.estado === 'aberto').length, acerto: rets.length ? rets.filter(v => v > 0).length / rets.length : null,
+                media, pf: perdas > 0 ? ganhos / perdas : (ganhos > 0 ? 99 : null), p5, desligada,
+                motivo: desligada ? `média real de ${fmtPctM(media * 100)} por operação em ${rets.length} sinais, abaixo do pior cenário do teste (${fmtPctM(p5 * 100)})` : null };
+        });
+        // 4) separa o que o veredito mandou entrar do que mandou esperar (mede se a trava ajuda)
+        const grupo = v => { const r = fechados.filter(x => x.veredito === v).map(x => x.ret); return { n: r.length, media: r.length ? r.reduce((a, b) => a + b, 0) / r.length : null }; };
+        D.porVeredito = { entrar: grupo('entrar'), esperar: grupo('esperar') };
+        if (D.sinais.length > DIARIO_MAX_SINAIS) { const abertos = D.sinais.filter(x => x.estado !== 'fechado' && x.estado !== 'sem_entrada'); D.sinais = [...D.sinais.filter(x => x.estado === 'fechado').slice(-(DIARIO_MAX_SINAIS - abertos.length)), ...abertos]; }
+        D.atualizadoEm = agoraIso; D.ultimoPregao = R.ultimoPregao;
+        return D;
+    }
+    function htmlDiario() {
+        if (!relatorioValido()) return '';
+        const D = diarioDados && diarioDados.mercado === relatorioDados.mercado ? diarioDados : null;
+        if (!D) return `<details class="rel-detalhes mt-3"><summary>📒 Diário de sinais (resultado real)</summary><p class="text-sm rel-mudo mt-1">Começa a ser preenchido na próxima coleta: cada sinal de entrada confirmado é anotado e acompanhado nos pregões seguintes, para comparar o resultado real com o teste.</p></details>`;
+        const fech = D.sinais.filter(x => x.estado === 'fechado'), abert = D.sinais.filter(x => x.estado === 'aberto'), aguard = D.sinais.filter(x => x.estado === 'aguardando');
+        const linhasRegra = Object.entries(D.regras || {}).filter(([, r]) => r.n || r.abertos).map(([id, r]) => `<tr><td>${nomeRegra(id)}</td><td>${r.n}${r.abertos ? ` + ${r.abertos} abertos` : ''}</td><td>${r.media === null ? '—' : fmtPctM(r.media * 100)}</td><td>${r.acerto === null ? '—' : fmtNumM(r.acerto * 100, 0) + '%'}</td><td>${r.desligada ? '⛔ desligada' : r.n >= DIARIO_MIN_FECHADOS ? '✅ dentro do esperado' : `⏳ ${r.n}/${DIARIO_MIN_FECHADOS}`}</td></tr>`).join('');
+        const pv = D.porVeredito || {};
+        const ult = fech.slice(-8).reverse().map(x => `<tr data-ativo="${x.t}" style="cursor:pointer"><td><b>${x.t}</b></td><td>${fmtDataBR(x.dataEntrada)} → ${fmtDataBR(x.dataSaida)}</td><td style="color:${x.ret >= 0 ? '#4ade80' : '#f87171'}">${fmtPctM(x.ret * 100)}</td><td>${x.veredito === 'entrar' ? '🟢' : '🟡'}</td></tr>`).join('');
+        return `<details class="rel-detalhes mt-3" open><summary>📒 Diário de sinais: resultado real desde ${fmtDataBR(D.inicio)}</summary>
+            <p class="text-sm rel-mudo mt-1">${fech.length} sinais encerrados, ${abert.length} em andamento e ${aguard.length} aguardando a abertura. São resultados de depois do sinal, que o teste não conhecia. Uma regra é desligada sozinha se a média real ficar abaixo do pior cenário do teste (com ${DIARIO_MIN_FECHADOS}+ sinais) e volta quando se recupera.</p>
+            ${linhasRegra ? `<table class="rel-tabela mt-2"><thead><tr class="rel-mudo"><th>Regra</th><th>Sinais</th><th>Média real</th><th>Acerto</th><th>Situação</th></tr></thead><tbody>${linhasRegra}</tbody></table>` : ''}
+            ${(pv.entrar && pv.entrar.n) || (pv.esperar && pv.esperar.n) ? `<p class="text-sm mt-2">Veredito na prática: 🟢 entrar ${pv.entrar.n ? `${fmtPctM(pv.entrar.media * 100)} em ${pv.entrar.n}` : '—'} · 🟡 esperar ${pv.esperar.n ? `${fmtPctM(pv.esperar.media * 100)} em ${pv.esperar.n}` : '—'} (média por operação).</p>` : ''}
+            ${ult ? `<table class="rel-tabela mt-2"><thead><tr class="rel-mudo"><th>Papel</th><th>Entrada → saída</th><th>Resultado</th><th></th></tr></thead><tbody>${ult}</tbody></table>` : ''}
+        </details>`;
+    }
     // ===== Veredito de entrada: deixa explícito QUANDO NÃO agir (só usa regras já existentes) =====
     // Travas fixas (não se ajustam): confiabilidade mínima de 15 operações (alta a partir de 30), regra
     // confirmada fora da amostra, dados do último pregão, abertura ainda por vir e risco até o stop
@@ -1914,7 +1990,8 @@
         const ultimo = ultimoPregaoDados(); const conf = confiabilidade(a && (a.nTotal ?? ((a.treino ? a.treino.n : 0) + (a.teste ? a.teste.n : 0))));
         const V = (estado, titulo, motivos, extra = {}) => ({ estado, titulo, motivos, conf, ...extra });
         if (!a || !a.regra) return V('nao', 'Não operar', ['nenhuma regra teve operações suficientes neste papel']);
-        if (a.desligada) return V('nao', 'Não operar', [`regra desligada pelo diário de sinais: ${a.desligada}`]);
+        const desl = regraDesligada(a.regra);
+        if (desl) return V('nao', 'Não operar', [`regra desligada pelo diário de sinais: ${desl}`]);
         if (!a.confirmada) return V('nao', 'Não operar', ['a melhor regra não se confirmou no período final do teste (pode ter sido sorte)']);
         if (conf.n < CONF_MIN) return V('nao', 'Não operar', [`só ${conf.n} operações no histórico (mínimo ${CONF_MIN}): pouco para confiar`]);
         const saidas = [];
@@ -2010,6 +2087,7 @@
             <div class="rel-titulo">🔵 Em operação: não entrar agora <span class="rel-chip">${abertas.length}</span></div>
             <p class="text-sm rel-mudo mb-2">O sistema já comprou esses papéis. Serve para quem entrou junto acompanhar a saída.</p>
             <div class="rel-lista">${abertas.length ? abertas.map(cartaoRelatorio).join('') : '<p class="text-sm rel-mudo">Nenhuma operação aberta nas regras confirmadas.</p>'}</div>
+            ${htmlDiario()}
             <details class="rel-detalhes mt-5"><summary>Melhor regra de cada papel (${A.length})</summary>
                 <table class="rel-tabela mt-2"><thead><tr class="rel-mudo"><th>Papel</th><th>Melhor regra</th><th>Fator de lucro fora da amostra</th><th></th></tr></thead><tbody>
                 ${A.slice().sort((x, y) => (y.confirmada - x.confirmada) || ((y.teste ? y.teste.pf : 0) - (x.teste ? x.teste.pf : 0))).map(a => `<tr data-ativo="${a.t}" style="cursor:pointer"><td><b>${a.t}</b></td><td>${a.regra ? nomeRegra(a.regra) : `<span class="rel-mudo">${a.motivo || '—'}</span>`}</td><td>${a.teste ? `${fmtNumM(a.teste.pf, 2)} (${a.teste.n} op.)` : '—'}</td><td>${a.confirmada ? '✅' : '⚠️'}</td></tr>`).join('')}
@@ -3221,7 +3299,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { get graficos() { return graficos; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; } };
+    window.investDebug = { get graficos() { return graficos; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; } };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).

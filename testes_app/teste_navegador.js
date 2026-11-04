@@ -329,6 +329,27 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
         return { erros, cont, velho };
     });
     ok(vered.erros.length === 0 && (vered.velho === null || vered.velho === 'esperar'), `celular: vereditos seguem as travas ${JSON.stringify(vered.cont)}${vered.erros.length ? ' ' + vered.erros.slice(0, 3).join('; ') : ''} · sinal velho → ${vered.velho}`);
+    // Diário de sinais: anota, acompanha com o mesmo motor e desliga regra que vai mal na vida real
+    const diar = await cel.page.evaluate(() => {
+        const I = window.investDebug, R = I.relatorio, D = I.allData;
+        const novo = I.atualizarDiario(null, R);
+        const nSinaisHoje = R.ativos.filter(a => a.situacao === 'entrada' && a.confirmada && (a.nTotal || 0) >= 15).length;
+        // um sinal antigo que o motor executou: precisa sair "fechado" com o mesmo resultado do backtest
+        const a = R.ativos.find(x => x.confirmada && x.regra); const regras = { stop: 0, alvo: 1, tempo: 2, alvo_tempo: 3, recuo: 4, recuo_tempo: 5 };
+        const rp = (() => { const b = I.getBacktestRiskParams(); return null; })();
+        const res = I.runCoreBacktest(D[a.t], window.investDebug.regraRp(a.regra));
+        const tr = res.tradesDet[res.tradesDet.length - 2];
+        const ant = { versao: 1, mercado: R.mercado, inicio: '2020-01-01', regras: {}, sinais: [{ id: 'x', t: a.t, regra: a.regra, dataSinal: D[a.t].dates[tr.ent - 1], veredito: 'entrar', estado: 'aguardando' }] };
+        const d2 = I.atualizarDiario(ant, R); const s0 = d2.sinais.find(x => x.id === 'x');
+        // 12 sinais encerrados muito ruins na regra de a → desligada → veredito "não operar"
+        const ruins = Array.from({ length: 12 }, (_, k) => ({ id: 'r' + k, t: a.t, regra: a.regra, dataSinal: '2025-01-0' + (k % 9 + 1), veredito: 'entrar', estado: 'fechado', ret: -0.25 }));
+        const d3 = I.atualizarDiario({ ...ant, sinais: ruins }, R);
+        I.diario = d3; const v = I.vereditoEntrada(a); I.diario = null;
+        return { novos: novo.sinais.length, nSinaisHoje, aguardando: novo.sinais.every(x => x.estado === 'aguardando'), fechado: s0.estado, retOk: Math.abs(s0.ret - tr.ret) < 1e-4, desl: d3.regras[a.regra].desligada, vered: v.estado, motivo: v.motivos[0] };
+    });
+    ok(diar.novos === diar.nSinaisHoje && diar.aguardando, `celular: diário anota os ${diar.nSinaisHoje} sinais confirmados de hoje, aguardando a abertura`);
+    ok(diar.fechado === 'fechado' && diar.retOk, 'celular: diário acompanha um sinal antigo com o mesmo motor e o mesmo resultado');
+    ok(diar.desl && diar.vered === 'nao' && /desligada pelo diário/.test(diar.motivo), `celular: regra que vai mal na vida real é desligada (${JSON.stringify(diar)})`);
     const relInfo = await cel.page.evaluate(() => { const R = window.investDebug.relatorio; return { n: R.ativos.length, sq: R.ativos.filter(a => a.squeeze).length, vend: !!R.vendidos }; });
     ok(relInfo.n > 0 && relInfo.vend && relInfo.sq > 0 && /short squeeze/.test(relTxt), `celular: alerta de short squeeze com os vendidos da B3 ${JSON.stringify(relInfo)}`);
     await cel.page.waitForTimeout(300);

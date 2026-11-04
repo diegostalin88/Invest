@@ -55,15 +55,25 @@ function resumo(linhas) {
             await page.goto(`${base}index.html?mercado=${mercado}`);
             await page.waitForFunction(() => window.investDebug && Object.keys(window.investDebug.allData || {}).length > 0
                 && document.querySelector('#screener-results-container table'), null, { timeout: 15 * 60 * 1000 });
-            const rel = await page.evaluate(async () => window.investDebug.gerarRelatorio());
+            // Diário de sinais: continua o da publicação anterior (baixado pelo workflow) e acompanha os sinais
+            const arqDiario = path.join(RAIZ, pasta, 'diario.json');
+            let anterior = null; try { anterior = JSON.parse(fs.readFileSync(arqDiario, 'utf-8')); } catch (e) { /* primeiro dia */ }
+            const { rel, diario, nEntrar } = await page.evaluate(async ant => {
+                const I = window.investDebug; const rel = await I.gerarRelatorio();
+                const diario = I.atualizarDiario(ant, rel); I.diario = diario;
+                const nEntrar = rel.ativos.filter(a => I.vereditoEntrada(a).estado === 'entrar').length;
+                return { rel, diario, nEntrar };
+            }, anterior);
             fs.writeFileSync(path.join(RAIZ, pasta, 'relatorio.json'), JSON.stringify(rel));
-            const arqManifesto = path.join(RAIZ, pasta, 'manifest.json');   // avisa o app que o relatório existe
-            const m = JSON.parse(fs.readFileSync(arqManifesto, 'utf-8')); m.arquivoRelatorio = 'relatorio.json';
+            fs.writeFileSync(arqDiario, JSON.stringify(diario));
+            const arqManifesto = path.join(RAIZ, pasta, 'manifest.json');   // avisa o app que os extras existem
+            const m = JSON.parse(fs.readFileSync(arqManifesto, 'utf-8')); m.arquivoRelatorio = 'relatorio.json'; m.arquivoDiario = 'diario.json';
             fs.writeFileSync(arqManifesto, JSON.stringify(m, null, 2));
-            const ent = rel.ativos.filter(a => a.situacao === 'entrada' && a.confirmada).length;
+            const fech = diario.sinais.filter(x => x.estado === 'fechado').length, desl = Object.entries(diario.regras || {}).filter(([, r]) => r.desligada).map(([id]) => id);
+            const linhaDiario = (`  - Diário: ${diario.sinais.length} sinais anotados desde ${diario.inicio} (${fech} encerrados)${anterior ? '' : ' — começou hoje'}${desl.length ? `; regras desligadas: ${desl.join(', ')}` : ''}.`);
             const conf = rel.ativos.filter(a => a.confirmada).length;
             const sq = rel.ativos.filter(a => a.squeeze).length;
-            linhas.push(`- ${mercado.toUpperCase()}: ✅ ${rel.universo} papéis testados, ${conf} com regra confirmada, ${ent} entradas para o próximo pregão, ${sq} alertas de short squeeze (${Math.round((Date.now() - inicio) / 1000)} s).`);
+            linhas.push(`- ${mercado.toUpperCase()}: ✅ ${rel.universo} papéis testados, ${conf} com regra confirmada, ${nEntrar} com veredito 🟢 entrar, ${sq} alertas de short squeeze (${Math.round((Date.now() - inicio) / 1000)} s).`, linhaDiario);
         } catch (e) {
             console.error(`[${mercado}] falhou:`, e);
             linhas.push(`- ${mercado.toUpperCase()}: ⚠️ não consegui gerar (${e.message.split('\n')[0]}). O app oferece "Gerar agora" no aparelho.`);
