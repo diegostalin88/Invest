@@ -49,6 +49,7 @@ class SessaoFalsa:
             if params['date'] in self.b3_falha_dias:
                 return Resp(status=404)
             return Resp(payload={'token': 'tok-' + params['date']})
+        assert url.startswith(v.B3_DOWNLOAD_URL + '?token=tok-')   # token cru no endereço, como a página da B3
         return Resp(conteudo=self.b3_csv.encode('latin-1'))
 
 
@@ -154,3 +155,9 @@ def test_copia_velha_do_coletor_e_ignorada(tmp_path):
     arq.write_text(json.dumps({'data': '2026-10-01', 'ativos': {'MOVI3': {'qtd': 1}}}))
     assert v.ler_b3_bruto(str(arq), {'MOVI3'}, date(2026, 11, 4)) is None
     assert v.ler_b3_bruto(str(tmp_path / 'nao_existe.json'), {'MOVI3'}, date(2026, 11, 4)) is None
+
+
+def test_token_b3_aceita_formato_novo_redirect():
+    assert v._token_b3({'token': 'abc'}) == 'abc'
+    assert v._token_b3({'redirectUrl': '~/download?token=R2c+/x=='}) == 'R2c+/x=='
+    assert v._token_b3({'redirectUrl': '~/download'}) is None and v._token_b3({}) is None

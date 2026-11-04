@@ -1,0 +1,19 @@
+name: Diagnóstico B3 (coletor no Brasil)
+
+# Roda só quando disparado à mão. Faz pedidos de leitura à B3 a partir do coletor no Brasil
+# e mostra as respostas, para achar o caminho certo do arquivo de aluguel.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostico:
+    runs-on: [self-hosted, brasil]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Testar endereços da B3
+        run: bash coleta/diagnostico_b3.sh | tee -a "$GITHUB_STEP_SUMMARY"

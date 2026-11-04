@@ -19,15 +19,15 @@ if [ "$(id -u)" = "0" ]; then
   echo "Rode como usuário comum (ex.: ubuntu), não como root."; exit 1
 fi
 
-echo "== 1/4 Testando se esta máquina consegue ler a B3 =="
+echo "== 1/4 Testando se esta máquina consegue falar com a B3 =="
+# Usa um arquivo público que sempre existe (cadastro de instrumentos). Fora do Brasil a B3 nem responde.
 ok=""
-for atras in 1 2 3 4 5; do
+for atras in 1 2 3 4 5 6 7; do
   dia=$(date -d "-$atras day" +%F)
-  codigo=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
-    -A 'Mozilla/5.0 (InvestApp)' \
-    "https://arquivos.b3.com.br/api/download/requestname?fileName=LendingOpenPositionFile&date=$dia" || true)
-  echo "   $dia -> HTTP $codigo"
-  if [ "$codigo" = "200" ]; then ok="sim"; break; fi
+  resp=$(curl -s --max-time 30 -A 'Mozilla/5.0 (InvestApp)' \
+    "https://arquivos.b3.com.br/api/download/requestname?fileName=InstrumentsConsolidatedFile&date=$dia" || true)
+  if echo "$resp" | grep -q 'token'; then echo "   $dia -> B3 respondeu"; ok="sim"; break; fi
+  echo "   $dia -> sem arquivo"
 done
 if [ -z "$ok" ]; then
   echo "A B3 não respondeu desta máquina. Confira se ela está numa região do Brasil (São Paulo/Vinhedo)."

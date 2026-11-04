@@ -152,14 +152,23 @@ def _get_com_nova_tentativa(sessao, url, tentativas=2, **k):
     raise erro
 
 
+def _token_b3(obj):
+    """A B3 respondia {"token": ...}; desde 2026 responde {"redirectUrl": "~/download?token=..."}."""
+    if obj.get('token'):
+        return obj['token']
+    url = obj.get('redirectUrl') or ''
+    return url.split('token=', 1)[1] if 'token=' in url else None
+
+
 def baixar_b3_arquivo(dia, sessao=requests):
     """Caminho 1: arquivo CSV (pede um token e baixa com ele)."""
     pedido = _get_com_nova_tentativa(sessao, B3_PEDIDO_URL, params={'fileName': 'LendingOpenPositionFile',
                                                                      'date': dia.isoformat()})
-    token = (pedido.json() or {}).get('token')
+    token = _token_b3(pedido.json() or {})
     if not token:
         raise ValueError('B3 não devolveu token')
-    arq = _get_com_nova_tentativa(sessao, B3_DOWNLOAD_URL, params={'token': token})
+    # A página da B3 monta o endereço com o token cru (sem codificar); fazemos igual.
+    arq = _get_com_nova_tentativa(sessao, B3_DOWNLOAD_URL + '?token=' + token)
     try:
         texto = arq.content.decode('utf-8')
     except UnicodeDecodeError:
