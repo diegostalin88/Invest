@@ -2,8 +2,9 @@
 
 - EUA: short interest da FINRA (publicado duas vezes por mês), API pública
   https://api.finra.org/data/group/otcMarket/name/consolidatedShortInterest
-- Brasil: posições em aberto de empréstimo (aluguel) de ações da B3, arquivo diário
-  "LendingOpenPositionFile" (https://arquivos.b3.com.br/).
+- Brasil: posições em aberto de empréstimo (aluguel) de ações da B3. Desde 2026 o dado sai na tabela
+  "BTBLendingOpenPosition" do Boletim Diário (https://arquivos.b3.com.br/bdi/); o arquivo antigo
+  "LendingOpenPositionFile" fica como plano B.
 
 Grava <saida>/vendidos.json e <saida>/br/vendidos.json no formato
     {"fonte": ..., "data": "AAAA-MM-DD", "geradoEm": ..., "ativos": {"TICKER": {"qtd": N, ...}}}
@@ -125,7 +126,8 @@ def baixar_finra(universo, sessao=requests, hoje=None):
 
 
 # ---------------- Brasil: B3 (aluguel) ----------------
-B3_TABELA_URL = 'https://arquivos.b3.com.br/tabelas/table/LendingOpenPosition/{d}/{d}/{p}'
+B3_BDI_URL = 'https://arquivos.b3.com.br/bdi/table/BTBLendingOpenPosition/{d}/{d}/{p}/{n}'
+B3_BDI_POR_PAGINA = 1000   # a B3 recusa 5000; com 1000 são ~3 páginas por dia
 UA_NAVEGADOR = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) '
                               'Chrome/130.0 Safari/537.36', 'Accept': '*/*', 'Accept-Language': 'pt-BR,pt;q=0.9'}
 
@@ -176,30 +178,55 @@ def baixar_b3_arquivo(dia, sessao=requests):
     return _ler_csv_b3(texto)
 
 
-def baixar_b3_tabela(dia, sessao=requests):
-    """Caminho 2: a mesma tabela em JSON, paginada (é o que a página de consultas da B3 usa)."""
-    linhas, pagina, total = [], 1, 1
-    while pagina <= total and pagina <= 200:
-        obj = _get_com_nova_tentativa(sessao, B3_TABELA_URL.format(d=dia.isoformat(), p=pagina), tentativas=1).json()
-        tab = obj.get('table') or obj
+def _post_com_nova_tentativa(sessao, url, tentativas=2):
+    erro = None
+    for _ in range(tentativas):
+        try:
+            resp = sessao.post(url, json={}, headers={**UA_NAVEGADOR, 'Accept': 'application/json'}, timeout=90)
+            _erro_http(resp, 'B3')
+            return resp
+        except Exception as e:  # noqa: BLE001 - 504 da B3 costuma ser passageiro
+            erro = e
+    raise erro
+
+
+def baixar_b3_bdi(dia, sessao=requests):
+    """Caminho 1: tabela "Posições em aberto" do Boletim Diário (BDI), em JSON e paginada.
+    Cada papel vem numa linha por mercado (D+0, D+1, Registro...) e numa linha "Total"; usamos a "Total"
+    (ou a soma das outras, se faltar). Devolve linhas no formato do arquivo antigo (TckrSymb, BalQty, BalVal)."""
+    por_papel, pagina, total = {}, 1, 1
+    while pagina <= total and pagina <= 50:
+        url = B3_BDI_URL.format(d=dia.isoformat(), p=pagina, n=B3_BDI_POR_PAGINA)
+        tab = (_post_com_nova_tentativa(sessao, url).json() or {}).get('table') or {}
         nomes = [c.get('name') if isinstance(c, dict) else c for c in (tab.get('columns') or [])]
         for v in tab.get('values') or []:
-            linhas.append(dict(zip(nomes, v)) if isinstance(v, list) else v)
-        total = int(obj.get('pageCount') or tab.get('pageCount') or 1)
+            l = dict(zip(nomes, v)) if isinstance(v, list) else v
+            t = (l.get('TckrSymb') or '').strip().upper()
+            if not t:
+                continue
+            p = por_papel.setdefault(t, {'total': None, 'soma': [0, 0.0]})
+            qtd, val = _numero(l.get('StockBalance')), _numero(l.get('Balance'))
+            if (l.get('Market') or '').strip().lower() == 'total':
+                p['total'] = [qtd, val]
+            else:
+                p['soma'][0] += qtd
+                p['soma'][1] += val
+        total = int(tab.get('pageCount') or 1)
         pagina += 1
-    if not linhas:
-        raise ValueError('tabela da B3 vazia')
-    return linhas
+    if not por_papel:
+        raise ValueError('tabela do BDI vazia')
+    return [{'TckrSymb': t, 'BalQty': (p['total'] or p['soma'])[0], 'BalVal': (p['total'] or p['soma'])[1]}
+            for t, p in por_papel.items()]
 
 
 def baixar_b3_um_dia(dia, sessao=requests):
     try:
-        return baixar_b3_arquivo(dia, sessao)
+        return baixar_b3_bdi(dia, sessao)
     except Exception as e1:  # noqa: BLE001
         try:
-            return baixar_b3_tabela(dia, sessao)
+            return baixar_b3_arquivo(dia, sessao)
         except Exception as e2:  # noqa: BLE001
-            raise RuntimeError(f'{dia}: arquivo ({e1}); tabela ({e2})') from e2
+            raise RuntimeError(f'{dia}: boletim diário ({e1}); arquivo ({e2})') from e2
 
 
 def baixar_b3(universo, hoje, sessao=requests, dias_atras=5):

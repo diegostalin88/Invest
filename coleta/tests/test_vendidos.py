@@ -21,11 +21,17 @@ class Resp:
 
 
 class SessaoFalsa:
-    def __init__(self, finra_linhas=None, b3_csv=None, b3_falha_dias=(), sem_ordenacao=False, b3_tabela=None):
+    def __init__(self, finra_linhas=None, b3_csv=None, b3_falha_dias=(), sem_ordenacao=False, b3_bdi=None):
         self.finra_linhas, self.b3_csv, self.b3_falha_dias, self.pedidos = finra_linhas or [], b3_csv, set(b3_falha_dias), []
-        self.sem_ordenacao, self.b3_tabela = sem_ordenacao, b3_tabela
+        self.sem_ordenacao, self.b3_bdi = sem_ordenacao, b3_bdi
 
     def post(self, url, json=None, **k):
+        if '/bdi/table/BTBLendingOpenPosition/' in url:
+            self.pedidos.append(('bdi', url))
+            if self.b3_bdi is None:
+                return Resp(status=504)
+            pagina = int(url.rstrip('/').split('/')[-2])
+            return Resp(payload=self.b3_bdi[pagina - 1])
         self.pedidos.append(('post', json))
         if json.get('sortFields'):
             if self.sem_ordenacao:
@@ -39,10 +45,6 @@ class SessaoFalsa:
 
     def get(self, url, params=None, **k):
         self.pedidos.append(('get', params))
-        if '/tabelas/table/' in url:
-            if self.b3_tabela is None:
-                return Resp(status=504)
-            return Resp(payload=self.b3_tabela)
         if url == v.B3_PEDIDO_URL:
             if self.b3_csv is None:
                 return Resp(status=504)
@@ -117,12 +119,31 @@ def test_finra_sem_ordenacao_procura_a_data_dia_a_dia():
     assert dados['data'] == '2026-10-15' and dados['ativos']['AAPL']['qtd'] == 10
 
 
-def test_b3_usa_a_tabela_json_quando_o_arquivo_falha():
-    tabela = {'pageCount': 1, 'table': {'columns': [{'name': 'TckrSymb'}, {'name': 'BalQty'}, {'name': 'BalVal'}],
-                                        'values': [['MOVI3', 1500000, 14250000.5], ['PETR4', 0, 0]]}}
-    dados = v.baixar_b3({'MOVI3', 'PETR4'}, date(2026, 11, 3), SessaoFalsa(b3_tabela=tabela))
+def _pagina_bdi(linhas, paginas):
+    cols = ['RptDt', 'DtRef', 'TckrSymb', 'ISIN', 'Company', 'Type', 'Market', 'StockBalance', 'AvgPric', 'Balance']
+    return {'table': {'name': 'BTBLendingOpenPosition', 'pageCount': paginas,
+                      'columns': [{'name': c, 'type': 1} for c in cols],
+                      'values': [['2026-11-03T00:00:00', '2026-11-03T00:00:00', t, 'BR', 'EMPRESA', '-', m, q, None, val]
+                                 for t, m, q, val in linhas]}}
+
+
+def test_b3_usa_o_boletim_diario_com_linha_total_e_paginas():
+    paginas = [_pagina_bdi([('MOVI3', 'Neg. Eletrônica D+1', 1000000, 9500000.0), ('MOVI3', 'Registro', 500000, 4750000.5),
+                            ('MOVI3', 'Total', 1500000, 14250000.5)], 2),
+               _pagina_bdi([('PETR4', 'Neg. Eletrônica D+0', 300, 9000.0), ('PETR4', 'Registro', 200, 6000.0),   # sem "Total": soma
+                            ('VALE3', 'Total', 0, 0), ('XXXX3', 'Total', 10, 10.0)], 2)]
+    s = SessaoFalsa(b3_bdi=paginas)
+    dados = v.baixar_b3({'MOVI3', 'PETR4', 'VALE3'}, date(2026, 11, 3), s)
     assert dados['data'] == '2026-11-03'
-    assert dados['ativos'] == {'MOVI3': {'qtd': 1500000, 'valor': 14250000.5}}
+    assert dados['ativos'] == {'MOVI3': {'qtd': 1500000, 'valor': 14250000.5}, 'PETR4': {'qtd': 500, 'valor': 15000.0}}
+    urls = [u for tipo, u in s.pedidos if tipo == 'bdi']
+    assert urls == [v.B3_BDI_URL.format(d='2026-11-03', p=k, n=v.B3_BDI_POR_PAGINA) for k in (1, 2)]
+    assert not any(tipo == 'get' for tipo, _ in s.pedidos)   # nem tentou o arquivo antigo
+
+
+def test_b3_cai_no_arquivo_antigo_quando_o_boletim_falha():
+    dados = v.baixar_b3({'PETR4'}, date(2026, 11, 3), SessaoFalsa(b3_csv=CSV_B3))
+    assert dados['ativos'] == {'PETR4': {'qtd': 5000000, 'valor': 150500000.0}}
 
 
 def test_erro_http_mostra_o_motivo():

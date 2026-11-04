@@ -15,7 +15,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+      - name: Coletor de aluguel de ponta a ponta (sem gravar nada no site)
+        run: |
+          python3 -m venv /tmp/venv-diag && /tmp/venv-diag/bin/pip install -q requests
+          /tmp/venv-diag/bin/python coleta/vendidos.py --somente-b3-bruto /tmp/aluguel_teste.json
+          python3 -c "import json;d=json.load(open('/tmp/aluguel_teste.json'));a=d['ativos'];print('### Aluguel B3:',len(a),'papéis em',d['data'],'|',d['fonte']);[print(t,a.get(t)) for t in ('PETR4','VALE3','MGLU3','IRBR3','CASH3')]" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Boletim Diário (BDI)
+        if: false
         run: python3 coleta/diagnostico_bdi.py | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Testar endereços da B3
         if: false
