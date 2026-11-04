@@ -12,6 +12,14 @@ const ok = (cond, msg) => { console.log(`${cond ? '✅' : '❌'} ${msg}`); if (!
 
 async function mercado(browser, m) {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, acceptDownloads: true });
+    if (process.env.LIBS_LOCAIS) {  // só para rodar localmente sem acesso aos CDNs
+        const local = { 'cdn.tailwindcss.com': 'tailwind.js', 'cdn.plot.ly': 'plotly.min.js', 'xlsx.full.min.js': 'xlsx.full.min.js', 'FileSaver.min.js': 'FileSaver.min.js', 'lightweight-charts': 'lightweight-charts.standalone.production.js', 'jspdf': 'jspdf.umd.min.js' };
+        await page.route(/^https:\/\/(cdn\.tailwindcss\.com|cdn\.plot\.ly|cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net|unpkg\.com|s3\.tradingview\.com)\//, rt => {
+            const k = Object.keys(local).find(c => rt.request().url().includes(c));
+            return k ? rt.fulfill({ status: 200, contentType: 'application/javascript', body: fs.readFileSync(path.join(process.env.LIBS_LOCAIS, local[k])) }) : rt.fulfill({ status: 200, contentType: 'application/javascript', body: '' });
+        });
+        await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, rt => rt.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+    }
     const erros = []; page.on('console', x => { if (x.type() === 'error') erros.push(x.text()); }); page.on('pageerror', e => erros.push(String(e)));
     await page.goto(`${BASE}?mercado=${m}`);
     await page.waitForSelector('#am-top .am-linha', { timeout: 180000 });
@@ -38,6 +46,26 @@ async function mercado(browser, m) {
     ok(r.abaixo === r.comChipMme, `${m}: aviso "abaixo da MME 200" em ${r.comChipMme} de ${r.abaixo} cartões esperados`);
     ok(r.balanco.length === r.comChipBal, `${m}: aviso de balanço em ${r.comChipBal} de ${r.balanco.length} cartões esperados`);
     if (r.aaoi) console.log(`AAOI no cartão: ${r.aaoi}`);
+    // Simulação com os dados publicados: ordem dada no pregão anterior já tem de estar comprada na abertura do último
+    // pregão; ordem dada hoje fica aguardando a próxima coleta. Usa uma cópia e devolve o que havia no aparelho.
+    const sim = await page.evaluate(() => {
+        const I = window.investDebug, R = I.relatorio, chaves = Object.keys(localStorage), guardado = {}; chaves.forEach(k => guardado[k] = localStorage.getItem(k));
+        try {
+            const a = R.ativos.find(x => ['entrar', 'atrasado'].includes(I.vereditoEntrada(x).estado)) || R.ativos.find(x => I.vereditoEntrada(x).estado === 'ja' && x.atrEntrada > 0 && x.desde < I.allData[x.t].dates[I.allData[x.t].dates.length - 2]); if (!a) return { semCandidato: true };
+            localStorage.removeItem('invest-simulacao');
+            const r1 = I.seguirNaSimulacao(a.t); const s = I.lerSim(); const hoje = s.ordens[0].dataTela;
+            const d = I.allData[a.t], ult = d.dates[d.dates.length - 1], penult = d.dates[d.dates.length - 2];
+            const eHoje = I.estadoSim(); const antes = eHoje.ordens[0].estado;
+            s.ordens[0].dataTela = penult; if (s.ordens[0].tipo === 'entrar') s.ordens[0].sistema.dataSinal = penult; I.gravarSim(s);
+            const e = I.estadoSim(); const o = e.ordens[0];
+            return { t: a.t, tipo: s.ordens[0].tipo, ok: r1.ok, hoje, ult, antes, depois: o.estado, dataEnt: o.dataEnt, precoEnt: o.precoEnt, abertura: d.open[d.dates.length - 1], motivo: o.motivo || null };
+        } finally { localStorage.clear(); Object.entries(guardado).forEach(([k, v]) => localStorage.setItem(k, v)); }
+    });
+    console.log(`${m}: simulação ${JSON.stringify(sim)}`);
+    if (!sim.semCandidato) {
+        ok(sim.ok && sim.antes === 'aguardando', `${m}: ordem dada hoje (${sim.t}) fica aguardando a abertura do próximo pregão, que só entra na coleta da noite`);
+        ok(['aberta', 'fechada', 'cancelada'].includes(sim.depois) && (sim.depois === 'cancelada' || sim.dataEnt === sim.ult), `${m}: ordem dada no pregão anterior foi executada na abertura de ${sim.ult} (${sim.depois}${sim.motivo ? ': ' + sim.motivo : ''})`);
+    }
     const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }), page.click('#am-relatorio [data-baixar-relatorio-pdf]')]);
     const destino = path.join(PASTA, dl.suggestedFilename()); await dl.saveAs(destino);
     const bytes = fs.readFileSync(destino);
