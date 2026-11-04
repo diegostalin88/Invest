@@ -402,18 +402,31 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
         const rp0 = I.regraRp(R.ativos.find(a => a.t === t0).regra), ind0 = I.precomputeAllIndicators(d0, I.getIndicatorParameters());
         const base = { modoEntrada: rp0.modoEntrada, atrMult: rp0.atrMult, stopLossPct: rp0.stopLossPct, alvoAtr: rp0.alvoAtr, saidaDias: rp0.saidaDias || 5, costPct: rp0.costPct, riskTrade: 1 };
         const ordens = [{ id: 'a', t: t0, regra: 'tempo', tipo: 'entrar', dataTela: d0.dates[k], sistema: { dataSinal: d0.dates[k], atr: ind0.ATR[k] }, rp: base }];
+        ordens.push({ ...ordens[0], id: 'c', valor: 20000, dataTela: d0.dates[k + 12], sistema: { dataSinal: d0.dates[k + 12], atr: ind0.ATR[k + 12] } });
         if (comAberta[0]) { const a = comAberta[0], dA = D[a.t]; ordens.push({ id: 'b', t: a.t, regra: a.regra, tipo: 'fora', dataTela: dA.dates[dA.dates.indexOf(a.desde)], sistema: { desde: a.desde, entrada: a.entrada, atr: a.atrEntrada }, rp: { ...base, saidaDias: 0 } }); }
         I.gravarSim({ inicio: d0.dates[k], saldoInicial: 100000, ordens });
         const E = I.estadoSim(); const fech = E.fechadas.reduce((s2, o) => s2 + o.resultado, 0), custoAbertas = E.abertas.reduce((s2, o) => s2 + o.custoTotal, 0);
-        return { n, dif, estados: E.ordens.map(o => o.estado + ':' + (o.qtd || 0)), conta: Math.abs(E.caixa + custoAbertas - (100000 + fech)) < 1e-6, porRegra: Object.keys(E.porRegra).length, ref: E.referencia !== null, controle: E.dentro.n + E.fora.n === E.fechadas.length && Object.values(E.porRegra).reduce((x, r) => x + r.n, 0) === E.dentro.n && E.fora.n === E.fechadas.filter(o => o.tipo === 'fora').length, selos: [{ n: 5, ganhos: 9, perdas: 1, resultado: 8 }, { n: 12, ganhos: 30, perdas: 10, resultado: 20 }, { n: 12, ganhos: 5, perdas: 10, resultado: -5 }, { n: 12, ganhos: 11, perdas: 10, resultado: 1 }].map(r => I.seloSim(r).ico).join('') };
+        return { n, dif, estados: E.ordens.map(o => o.estado + ':' + (o.qtd || 0)), conta: Math.abs(E.caixa + custoAbertas - (100000 + fech)) < 1e-6, porRegra: Object.keys(E.porRegra).length, ref: E.referencia !== null, valorEscolhido: (o => o && o.custoTotal <= 20000 && o.custoTotal > 20000 - o.precoEnt && o.patrimonioEnt > 0)(E.ordens.find(o => o.id === 'c')), controle: E.dentro.n + E.fora.n === E.fechadas.length && Object.values(E.porRegra).reduce((x, r) => x + r.n, 0) === E.dentro.n && E.fora.n === E.fechadas.filter(o => o.tipo === 'fora').length, selos: [{ n: 5, ganhos: 9, perdas: 1, resultado: 8 }, { n: 12, ganhos: 30, perdas: 10, resultado: 20 }, { n: 12, ganhos: 5, perdas: 10, resultado: -5 }, { n: 12, ganhos: 11, perdas: 10, resultado: 1 }].map(r => I.seloSim(r).ico).join('') };
     });
     ok(simT.n > 20 && simT.dif === 0, `celular: saída da simulação igual à do Backtest (${simT.n} operações, ${simT.dif} diferentes)`);
+    ok(simT.valorEscolhido, 'celular: simulação respeita o valor escolhido pela pessoa e mostra quanto foi aplicado');
     ok(simT.controle, 'celular: entradas fora das travas (🔵) ficam num placar de controle e não contam no selo da estratégia');
     ok(simT.selos === '⏳✅❌➖', `celular: selo da simulação com critério fixo (10 operações; FL ≥ 1,2) ${simT.selos}`);
     ok(simT.conta && simT.estados.every(e => /^(aberta|fechada):[1-9]/.test(e)) && simT.ref, `celular: simulação preenche na abertura, dimensiona pelo risco e o caixa fecha a conta (${simT.estados.join(', ')})`);
     const relInfo = await cel.page.evaluate(() => { const R = window.investDebug.relatorio; return { n: R.ativos.length, sq: R.ativos.filter(a => a.squeeze).length, vend: !!R.vendidos }; });
     ok(relInfo.n > 0 && relInfo.vend && relInfo.sq > 0 && /short squeeze/.test(relTxt), `celular: alerta de short squeeze com os vendidos da B3 ${JSON.stringify(relInfo)}`);
     await cel.page.waitForTimeout(300);
+    const botaoSeguir = await cel.page.$('#am-relatorio [data-seguir]');
+    if (botaoSeguir) {
+        const guardado = await cel.page.evaluate(() => { const g = { sim: localStorage.getItem('invest-simulacao'), sec: [...document.querySelectorAll('#am-relatorio details.rel-secao')].map(d => d.open) }; localStorage.removeItem('invest-simulacao'); document.querySelectorAll('#am-relatorio details.rel-secao').forEach(d => d.open = true); return g; });
+        const tSeg = await botaoSeguir.getAttribute('data-seguir'); await botaoSeguir.click();
+        const painelTxt = await cel.page.textContent(`.rel-seguir-painel[data-painel="${tSeg}"]`);
+        await cel.page.click(`.rel-seguir-painel[data-painel="${tSeg}"] [data-seguir-ok="sugerido"]`);
+        const ordem = await cel.page.evaluate(t => (window.investDebug.lerSim() || { ordens: [] }).ordens.find(o => o.t === t), tSeg);
+        ok(/Quanto aplicar/.test(painelTxt) && /Sugerido/.test(painelTxt) && ordem && !ordem.valor, `celular: "Seguir na simulação" pergunta quanto aplicar e mostra o sugerido (${tSeg})`);
+        await cel.page.evaluate(g => { if (g.sim) localStorage.setItem('invest-simulacao', g.sim); else localStorage.removeItem('invest-simulacao'); document.querySelectorAll('#am-relatorio details.rel-secao').forEach((d, i) => d.open = g.sec[i]); }, guardado);
+        await cel.page.waitForTimeout(250); await cel.page.evaluate(() => localStorage.removeItem('invest-rel-secoes'));
+    } else ok(true, 'celular: sem cartão 🟢/🔵 com botão de seguir nestes dados (painel não testado)');
     await cel.page.screenshot({ path: path.join(SHOTS, 'celular_relatorio.png'), fullPage: false });
     // Seções com setinha: abre e fecha ao tocar no título e lembra a escolha
     const sec = await cel.page.evaluate(() => [...document.querySelectorAll('#am-relatorio details.rel-secao')].map(d => d.dataset.secao + ':' + (d.open ? 1 : 0)));

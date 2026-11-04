@@ -139,6 +139,7 @@
         .rel-ganho { margin-top: 0.6rem; padding: 0.7rem 0.8rem; border-radius: 0.8rem; background: linear-gradient(135deg, rgba(34,197,94,0.16), rgba(34,197,94,0.04)); border: 1px solid rgba(34,197,94,0.4); text-align: left; }
         .rel-ganho .g { font-size: 1.7rem; font-weight: 800; color: #4ade80; line-height: 1.1; } .rel-ganho .p { font-size: 1.25rem; font-weight: 800; color: #f87171; } .rel-ganho .r { font-size: 0.75rem; color: #a7b0bf; }
         .rel-seguir { display: block; width: 100%; margin-top: 0.35rem; padding: 0.75rem; border-radius: 0.9rem; background: rgba(34,197,94,0.14); border: 1px solid rgba(34,197,94,0.45); color: #86efac; font-weight: 700; text-align: center; }
+        .rel-seguir-painel { margin-top: 0.35rem; padding: 0.8rem; border-radius: 0.9rem; background: #151922; border: 1px solid rgba(34,197,94,0.45); color: #f3f4f6; text-align: left; }
         .rel-seguir.fora { background: rgba(59,130,246,0.10); border-color: rgba(59,130,246,0.45); color: #93c5fd; font-weight: 600; }
         .rel-seguir.feito { background: transparent; border-style: dashed; color: #9aa3b2; }
         /* Seções do relatório que abrem e fecham (setinha), com o título em destaque */
@@ -3165,7 +3166,15 @@
         return { iSai: null, stop, alvo };
     }
     // Guarda a ordem a partir do cartão do Relatório (só para veredito 🟢 entrar ou atrasado).
-    function seguirNaSimulacao(t) {
+    // Valor sugerido para a ordem (gestão de risco do Backtest): arrisca X% do patrimônio até o stop, limitado ao caixa
+    function sugestaoAporte(t) {
+        const a = relatorioValido() && relatorioDados.ativos.find(x => x.t === t); if (!a || !a.stop) return null;
+        const E = estadoSim(), preco = a.preco || a.entrada, risco = preco - a.stop, pct = getBacktestRiskParams().riskTrade;
+        if (!(risco > 0)) return null;
+        const qtd = Math.min(Math.floor(E.patrimonio * pct / 100 / risco), Math.floor(E.caixa / preco));
+        return { valor: Math.max(0, qtd * preco), risco: qtd * risco, pct, caixa: E.caixa, patrimonio: E.patrimonio, preco };
+    }
+    function seguirNaSimulacao(t, valor) {
         const a = relatorioValido() && relatorioDados.ativos.find(x => x.t === t); if (!a) return { ok: false, motivo: 'papel fora do relatório' };
         const v = vereditoEntrada(a); if (!['entrar', 'atrasado', 'ja'].includes(v.estado)) return { ok: false, motivo: 'o veredito de hoje não é de entrada' };
         if (v.estado === 'ja' && !(a.atrEntrada > 0)) return { ok: false, motivo: 'relatório sem o ATR da entrada (aguarde a próxima coleta)' };
@@ -3176,7 +3185,8 @@
         const rp = r.rp, base = getBacktestRiskParams();
         sim.ordens.push({ id: `${t}-${Date.now()}`, t, regra: a.regra, tipo: v.estado === 'ja' ? 'fora' : v.estado, dataTela: ultimoPregaoDados(), criadaEm: new Date().toISOString(),
             sistema: v.estado === 'entrar' ? { dataSinal: a.dataSinal || ultimoPregaoDados(), atr: a.atrSinal } : { desde: a.desde, entrada: a.entrada, atr: a.atrEntrada },
-            rp: { modoEntrada: rp.modoEntrada, atrMult: rp.atrMult, stopLossPct: rp.stopLossPct, alvoAtr: rp.alvoAtr, saidaDias: rp.saidaDias, costPct: rp.costPct, riskTrade: base.riskTrade } });
+            rp: { modoEntrada: rp.modoEntrada, atrMult: rp.atrMult, stopLossPct: rp.stopLossPct, alvoAtr: rp.alvoAtr, saidaDias: rp.saidaDias, costPct: rp.costPct, riskTrade: base.riskTrade },
+            ...(valor > 0 ? { valor } : {}) });
         gravarSim(sim); return { ok: true };
     }
     // Estado da simulação recalculado dos dados: preenche, dimensiona e fecha cada ordem em ordem de data.
@@ -3226,10 +3236,12 @@
             if (e.tipo === 0) {
                 const patrimonio = caixa + [...abertas].reduce((s2, y) => s2 + marcar(y, e.data), 0);
                 const riscoPorAcao = o.precoEnt - o.stopIni;
-                let qtd = riscoPorAcao > 0 ? Math.floor(patrimonio * (o.rp.riskTrade / 100) / riscoPorAcao) : 0;
+                // Valor escolhido pela pessoa (se houver) ou o tamanho do Backtest (risco % do patrimônio até o stop)
+                let qtd = o.valor > 0 ? Math.floor(o.valor / o.precoEnt) : riscoPorAcao > 0 ? Math.floor(patrimonio * (o.rp.riskTrade / 100) / riscoPorAcao) : 0;
+                o.patrimonioEnt = patrimonio;
                 qtd = Math.min(qtd, Math.floor(caixa / o.precoEnt));
                 if (qtd <= 0) { o.estado = 'cancelada'; o.motivo = 'sem caixa para comprar'; o.dataSai = null; continue; }
-                o.qtd = qtd; o.custoTotal = qtd * o.precoEnt; caixa -= o.custoTotal; abertas.add(o); o.estado = 'aberta';
+                o.qtd = qtd; o.custoTotal = qtd * o.precoEnt; o.riscoIni = qtd * Math.max(0, o.precoEnt - o.stopIni); caixa -= o.custoTotal; abertas.add(o); o.estado = 'aberta';
             } else if (o.estado === 'aberta') {
                 caixa += o.qtd * o.precoSai; abertas.delete(o); o.estado = 'fechada';
                 o.resultado = o.qtd * (o.precoSai - o.precoEnt); o.ret = o.precoSai / o.precoEnt - 1;
@@ -3256,9 +3268,10 @@
         const mud = 'style="color:var(--mudo)"', cor = v => `style="color:${v >= 0 ? 'var(--alta)' : 'var(--baixa)'}"`;
         const linhaOp = o => `<div class="am-card" data-ativo="${o.t}">
             <div class="flex items-center justify-between"><span class="am-tk">${o.t}</span><span class="rel-chip">${nomeRegra(o.regra)}${o.tipo === 'atrasado' ? ' · atrasada' : o.tipo === 'fora' ? ' · 🔵 fora das travas' : ''}</span></div>
-            ${o.estado === 'aguardando' ? `<div class="text-sm mt-1" ${mud}>Compra na abertura depois de ${fmtDataBR(o.dataTela)} (aguardando a próxima coleta).</div>`
+            ${o.estado === 'aguardando' ? `<div class="text-sm mt-1" ${mud}>Compra na abertura depois de ${fmtDataBR(o.dataTela)} (aguardando a próxima coleta). ${o.valor > 0 ? `Valor escolhido: <b>${fmtValorSim(o.valor)}</b>.` : `Valor: o sugerido pelo risco (${o.rp.riskTrade}% do patrimônio até o stop), calculado na abertura.`}</div>`
             : o.estado === 'cancelada' ? `<div class="text-sm mt-1" ${mud}>Cancelada: ${o.motivo}.</div>`
-            : `<div class="text-sm mt-1">${o.qtd} ações · entrou em ${fmtDataBR(o.dataEnt)} a ${fmtPrecoM(o.precoEnt)}${o.estado === 'fechada' ? ` · saiu em ${fmtDataBR(o.dataSai)} a ${fmtPrecoM(o.precoSai)} (${o.motivoSai})` : ` · agora ${fmtPrecoM(o.precoAtual)}`}</div>
+            : `<div class="text-sm mt-1"><b>Aplicado ${fmtValorSim(o.custoTotal)}</b> (${fmtNumM(o.custoTotal / o.patrimonioEnt * 100, 1)}% do patrimônio)${o.valor > 0 ? ' · valor escolhido por você' : ` · risco até o stop ${fmtValorSim(o.riscoIni)}`}</div>
+               <div class="text-sm mt-1">${o.qtd} ações · entrou em ${fmtDataBR(o.dataEnt)} a ${fmtPrecoM(o.precoEnt)}${o.estado === 'fechada' ? ` · saiu em ${fmtDataBR(o.dataSai)} a ${fmtPrecoM(o.precoSai)} (${o.motivoSai})` : ` · agora ${fmtPrecoM(o.precoAtual)}`}</div>
                <div class="text-sm mt-1"><b ${cor(o.resultado)}>${fmtPctM(o.ret * 100)} · ${fmtValorSim(o.resultado)}</b>${o.estado === 'aberta' ? ` <span ${mud}>· stop ${fmtPrecoM(o.stop)}${o.alvo ? ` · alvo ${fmtPrecoM(o.alvo)}` : ''}</span>` : ''}</div>`}
         </div>`;
         const regras = Object.entries(E.porRegra).sort((a, b) => b[1].resultado - a[1].resultado);
@@ -3445,9 +3458,26 @@
         });
         // "Seguir na simulação" nos cartões 🟢 do Relatório
         document.addEventListener('click', e => {
+            const conf = e.target.closest('[data-seguir-ok]');
+            if (conf) {
+                const painel = conf.closest('.rel-seguir-painel'), t = painel.dataset.painel;
+                const v = conf.dataset.seguirOk === 'digitado' ? parseFloat(painel.querySelector('input').value) : 0;
+                if (conf.dataset.seguirOk === 'digitado' && !(v > 0)) { painel.querySelector('input').focus(); return; }
+                const r = seguirNaSimulacao(t, v);
+                painel.outerHTML = r.ok ? `<div class="rel-seguir feito">✓ Seguindo na simulação com ${v > 0 ? fmtValorSim(v) : 'o valor sugerido'}: compra na próxima abertura (veja em Carteira → Simulação)</div>` : `<div class="rel-seguir feito">Não foi possível: ${r.motivo}</div>`;
+                return;
+            }
+            if (e.target.closest('[data-seguir-cancelar]')) { const p2 = e.target.closest('.rel-seguir-painel'); const t = p2.dataset.painel; p2.outerHTML = `<button type="button" class="rel-seguir" data-seguir="${t}">🧪 Seguir na simulação</button>`; return; }
             const b = e.target.closest('[data-seguir]'); if (!b) return;
-            const r = seguirNaSimulacao(b.dataset.seguir);
-            b.outerHTML = r.ok ? '<div class="rel-seguir feito">✓ Seguindo na simulação: compra na próxima abertura (veja em Carteira → Simulação)</div>' : `<div class="rel-seguir feito">Não foi possível: ${r.motivo}</div>`;
+            const t = b.dataset.seguir, sug = sugestaoAporte(t);
+            b.outerHTML = `<div class="rel-seguir-painel" data-painel="${t}">
+                <div class="font-bold">Quanto aplicar em ${t}?</div>
+                ${sug ? `<div class="text-sm mt-1">Sugerido: <b>${fmtValorSim(sug.valor)}</b> (${fmtNumM(sug.valor / sug.patrimonio * 100, 1)}% do patrimônio). Se bater no stop, perde cerca de ${fmtValorSim(sug.risco)} (${sug.pct}% do patrimônio), como no Backtest.</div>` : ''}
+                <div class="text-xs mt-1" style="color:#a7b0bf">Caixa disponível: ${fmtValorSim(sug ? sug.caixa : estadoSim().caixa)}. A compra é na próxima abertura; o valor final depende do preço de abertura.</div>
+                <button type="button" class="rel-botao mt-2" data-seguir-ok="sugerido">Usar o sugerido</button>
+                <div class="flex gap-2 mt-2"><input type="number" inputmode="decimal" placeholder="Outro valor" class="rounded-lg px-3 py-2" style="flex:1 1 0;min-width:0;width:100%"><button type="button" class="rel-botao" style="width:auto;flex:0 0 auto;white-space:nowrap;padding:0.6rem 1rem;background:#374151" data-seguir-ok="digitado">Usar este</button></div>
+                <button type="button" class="text-sm mt-2" style="color:#a5b4fc" data-seguir-cancelar>Cancelar</button>
+            </div>`;
         });
     }
 
@@ -3634,7 +3664,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { get graficos() { return graficos; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim };
+    window.investDebug = { get graficos() { return graficos; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).
