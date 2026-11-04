@@ -15,9 +15,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+      - name: Boletim Diário (BDI)
+        run: python3 coleta/diagnostico_bdi.py | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Testar endereços da B3
+        if: false
         run: bash coleta/diagnostico_b3.sh | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Ver o que a página da B3 chama (navegador sem tela)
+        if: false
         run: |
           V="$HOME/pw-venv"
           [ -x "$V/bin/python" ] || python3 -m venv "$V"
