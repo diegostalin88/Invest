@@ -1,7 +1,7 @@
 name: Medir testes da auditoria
 
 # Só leitura, disparado à mão: os 3 testes da auditoria de 04/11 (filtro por regime no treino, stop móvel
-# mais curto, limite por setor numa carteira). Setores pelo SIC da SEC. Não publica nada.
+# mais curto, limite por setor numa carteira). Setores pelo SIC da SEC (EUA). Não publica nada.
 on:
   workflow_dispatch:
 
