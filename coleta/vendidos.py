@@ -10,7 +10,12 @@ Grava <saida>/vendidos.json e <saida>/br/vendidos.json no formato
 Só entram os tickers que o app tem preço. Qualquer falha só gera aviso: nunca bloqueia a publicação.
 O app calcula "dias para zerar" = qtd vendida / volume médio de 20 pregões, com os próprios preços.
 
-Uso: python coleta/vendidos.py --saida site/data
+Uso: python coleta/vendidos.py --saida site/data [--b3-bruto b3-cache/aluguel_b3.json]
+     python coleta/vendidos.py --somente-b3-bruto b3-cache/aluguel_b3.json   (no coletor no Brasil)
+
+A B3 bloqueia o servidor do GitHub (fora do Brasil). Por isso um coletor numa máquina no Brasil
+(workflow aluguel-b3.yml) baixa o arquivo bruto, com todos os papéis, e a coleta principal usa essa
+cópia se ela tiver até B3_BRUTO_MAX_DIAS dias; senão tenta a B3 direto.
 """
 import argparse
 import csv
@@ -203,7 +208,7 @@ def baixar_b3(universo, hoje, sessao=requests, dias_atras=5):
         ativos = {}
         for l in linhas:
             t = (l.get('TckrSymb') or '').strip().upper()
-            if t in universo:
+            if universo is None or t in universo:
                 qtd = _numero(l.get('BalQty'), inteiro=isinstance(l.get('BalQty'), str))
                 if qtd > 0:
                     a = ativos.setdefault(t, {'qtd': 0, 'valor': 0.0})
@@ -215,6 +220,26 @@ def baixar_b3(universo, hoje, sessao=requests, dias_atras=5):
             return {'fonte': 'B3 (aluguel de ações, posições em aberto)', 'data': dia.isoformat(), 'ativos': ativos}
         ultimo_erro = ValueError(f'arquivo de {dia} sem nenhum papel da carteira')
     raise RuntimeError(f'B3 indisponível nos últimos {dias_atras} dias: {ultimo_erro}')
+
+
+B3_BRUTO_MAX_DIAS = 5
+
+
+def ler_b3_bruto(caminho, universo, hoje):
+    """Usa a cópia baixada pelo coletor no Brasil, se existir e for recente; devolve None se não servir."""
+    try:
+        with open(caminho, encoding='utf-8') as f:
+            bruto = json.load(f)
+        dia = date.fromisoformat(bruto['data'])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    if (hoje - dia).days > B3_BRUTO_MAX_DIAS:
+        log(f'Vendidos Brasil: cópia do coletor no Brasil é de {dia}, velha demais; ignorada.')
+        return None
+    ativos = {t: a for t, a in (bruto.get('ativos') or {}).items() if t in universo}
+    if not ativos:
+        return None
+    return {'fonte': bruto.get('fonte', 'B3 (aluguel de ações, posições em aberto)') + ' · via coletor no Brasil', 'data': dia.isoformat(), 'ativos': ativos}
 
 
 def gravar(pasta, dados):
@@ -237,11 +262,26 @@ def registrar_no_manifesto(pasta, chave, nome):
 def main(argv=None, hoje=None, sessao=requests):
     ap = argparse.ArgumentParser(description='Coleta posições vendidas (FINRA e B3).')
     ap.add_argument('--saida', default='site/data')
+    ap.add_argument('--b3-bruto', default=None, help='cópia da B3 baixada pelo coletor no Brasil (usada se recente)')
+    ap.add_argument('--somente-b3-bruto', default=None, help='só baixa a B3 inteira para este arquivo (coletor no Brasil)')
     args = ap.parse_args(argv)
     hoje = hoje or date.today()
+    if args.somente_b3_bruto:
+        dados = baixar_b3(None, hoje, sessao)
+        os.makedirs(os.path.dirname(os.path.abspath(args.somente_b3_bruto)), exist_ok=True)
+        with open(args.somente_b3_bruto, 'w', encoding='utf-8') as f:
+            json.dump(dados, f, ensure_ascii=False, separators=(',', ':'))
+        log(f"B3 bruto: {len(dados['ativos'])} papéis com posição de aluguel em {dados['data']} → {args.somente_b3_bruto}")
+        return 0
+    def brasil(u):
+        if args.b3_bruto:
+            d = ler_b3_bruto(args.b3_bruto, u, hoje)
+            if d:
+                return d
+        return baixar_b3(u, hoje, sessao)
     resumo = ['', '## Vendidos (alerta de short squeeze)', '']
     for nome, pasta, func in (('EUA', args.saida, lambda u: baixar_finra(u, sessao, hoje)),
-                              ('Brasil', os.path.join(args.saida, 'br'), lambda u: baixar_b3(u, hoje, sessao))):
+                              ('Brasil', os.path.join(args.saida, 'br'), brasil)):
         universo = tickers_com_preco(pasta)
         if not universo:
             resumo.append(f'- {nome}: sem preços nesta publicação; pulado.')

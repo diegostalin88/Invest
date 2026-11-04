@@ -128,3 +128,29 @@ def test_erro_http_mostra_o_motivo():
     import pytest
     with pytest.raises(RuntimeError, match='invalid sort'):
         v._erro_http(Resp(texto='{"message":"invalid sort"}', status=400), 'FINRA')
+
+
+def test_coletor_no_brasil_grava_bruto_e_a_coleta_usa_a_copia(tmp_path, monkeypatch):
+    """O coletor no Brasil baixa a B3 inteira; a coleta principal (bloqueada pela B3) usa essa cópia recente."""
+    monkeypatch.delenv('GITHUB_STEP_SUMMARY', raising=False)
+    bruto = tmp_path / 'cache' / 'aluguel_b3.json'
+    assert v.main(['--somente-b3-bruto', str(bruto)], hoje=date(2026, 11, 3), sessao=SessaoFalsa(b3_csv=CSV_B3)) == 0
+    obj = json.loads(bruto.read_text())
+    assert {'MOVI3', 'PETR4', 'XXXX3'} <= set(obj['ativos'])          # sem filtro: todos os papéis
+    pasta = tmp_path / 'site'
+    for p, tk in ((pasta, ['AAPL']), (pasta / 'br', ['MOVI3'])):
+        os.makedirs(p, exist_ok=True)
+        (p / 'manifest.json').write_text(json.dumps({'arquivosPrecos': ['precos_001.json']}))
+        (p / 'precos_001.json').write_text(json.dumps({'formato': 'colunar-v1', 'ativos': {t: {} for t in tk}}))
+    bloqueada = SessaoFalsa()   # B3 direta dá 504, FINRA sem dados
+    assert v.main(['--saida', str(pasta), '--b3-bruto', str(bruto)], hoje=date(2026, 11, 4), sessao=bloqueada) == 0
+    br = json.loads((pasta / 'br' / 'vendidos.json').read_text())
+    assert br['ativos'] == {'MOVI3': obj['ativos']['MOVI3']} and 'coletor no Brasil' in br['fonte']
+    assert not any(p[0] == 'get' for p in bloqueada.pedidos)          # nem tentou a B3 direta
+
+
+def test_copia_velha_do_coletor_e_ignorada(tmp_path):
+    arq = tmp_path / 'b.json'
+    arq.write_text(json.dumps({'data': '2026-10-01', 'ativos': {'MOVI3': {'qtd': 1}}}))
+    assert v.ler_b3_bruto(str(arq), {'MOVI3'}, date(2026, 11, 4)) is None
+    assert v.ler_b3_bruto(str(tmp_path / 'nao_existe.json'), {'MOVI3'}, date(2026, 11, 4)) is None

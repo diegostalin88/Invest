@@ -1,0 +1,39 @@
+name: Aluguel B3 (coletor no Brasil)
+
+# A B3 bloqueia os servidores do GitHub (fora do Brasil). Este workflow roda num coletor nosso no Brasil
+# (máquina gratuita com o "runner" do GitHub, rótulo "brasil"), baixa o aluguel de ações da B3 e guarda
+# no cache do Actions. A coleta principal (atualizar-dados.yml) usa essa cópia se ela for recente.
+# Só roda se a variável do repositório COLETOR_BRASIL = sim (assim nada fica na fila sem o coletor).
+on:
+  schedule:
+    - cron: "45 21 * * 1-5"   # 45 min antes da coleta principal
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aluguel-b3
+  cancel-in-progress: true
+
+jobs:
+  baixar:
+    if: vars.COLETOR_BRASIL == 'sim'
+    runs-on: [self-hosted, brasil]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Baixar o aluguel da B3 (todos os papéis)
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install -q requests
+          .venv/bin/python coleta/vendidos.py --somente-b3-bruto b3-cache/aluguel_b3.json
+          python3 -c "import json;d=json.load(open('b3-cache/aluguel_b3.json'));print('### Aluguel B3:', len(d['ativos']), 'papéis em', d['data'])" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Guardar no cache (a coleta principal lê daqui)
+        uses: actions/cache/save@v4
+        with:
+          path: b3-cache
+          key: b3-aluguel-${{ github.run_id }}-${{ github.run_attempt }}

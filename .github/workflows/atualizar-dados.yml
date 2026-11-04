@@ -73,9 +73,17 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Aluguel B3 baixado pelo coletor no Brasil (se houver)
+        continue-on-error: true
+        uses: actions/cache/restore@v4
+        with:
+          path: b3-cache
+          key: b3-aluguel-${{ github.run_id }}
+          restore-keys: b3-aluguel-
+
       - name: Vendidos (aluguel B3 e short interest FINRA)
         continue-on-error: true
-        run: python coleta/vendidos.py --saida site/data
+        run: python coleta/vendidos.py --saida site/data --b3-bruto b3-cache/aluguel_b3.json
 
       - name: Node (para o relatório)
         uses: actions/setup-node@v4
@@ -174,11 +182,19 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Aluguel B3 baixado pelo coletor no Brasil (se houver)
+        continue-on-error: true
+        uses: actions/cache/restore@v4
+        with:
+          path: b3-cache
+          key: b3-aluguel-${{ github.run_id }}
+          restore-keys: b3-aluguel-
+
       - name: Vendidos (aluguel B3 e short interest FINRA)
         continue-on-error: true
         run: |
           pip install requests
-          python coleta/vendidos.py --saida site/data
+          python coleta/vendidos.py --saida site/data --b3-bruto b3-cache/aluguel_b3.json
 
       - name: Node (para o relatório)
         uses: actions/setup-node@v4
