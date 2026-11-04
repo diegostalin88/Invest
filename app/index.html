@@ -137,6 +137,7 @@
         .rel-botao:disabled { opacity: 0.6; }
         .rel-detalhes summary { cursor: pointer; font-weight: 700; padding: 0.4rem 0; }
         .rel-seguir { display: block; width: 100%; margin-top: 0.35rem; padding: 0.75rem; border-radius: 0.9rem; background: rgba(34,197,94,0.14); border: 1px solid rgba(34,197,94,0.45); color: #86efac; font-weight: 700; text-align: center; }
+        .rel-seguir.fora { background: rgba(59,130,246,0.10); border-color: rgba(59,130,246,0.45); color: #93c5fd; font-weight: 600; }
         .rel-seguir.feito { background: transparent; border-style: dashed; color: #9aa3b2; }
         /* Seções do relatório que abrem e fecham (setinha), com o título em destaque */
         .rel-secao { margin-top: 1rem; }
@@ -3129,13 +3130,14 @@
     // Guarda a ordem a partir do cartão do Relatório (só para veredito 🟢 entrar ou atrasado).
     function seguirNaSimulacao(t) {
         const a = relatorioValido() && relatorioDados.ativos.find(x => x.t === t); if (!a) return { ok: false, motivo: 'papel fora do relatório' };
-        const v = vereditoEntrada(a); if (!['entrar', 'atrasado'].includes(v.estado)) return { ok: false, motivo: 'o veredito de hoje não é de entrada' };
+        const v = vereditoEntrada(a); if (!['entrar', 'atrasado', 'ja'].includes(v.estado)) return { ok: false, motivo: 'o veredito de hoje não é de entrada' };
+        if (v.estado === 'ja' && !(a.atrEntrada > 0)) return { ok: false, motivo: 'relatório sem o ATR da entrada (aguarde a próxima coleta)' };
         const sim = lerSim() || { inicio: ultimoPregaoDados(), saldoInicial: SIM_SALDO_INICIAL, ordens: [] };
         const est = estadoSim(sim);
         if (est.ordens.some(o => o.t === t && (o.estado === 'aguardando' || o.estado === 'aberta'))) return { ok: false, motivo: 'já está seguindo este papel' };
         const r = regrasRelatorio(getBacktestRiskParams()).find(x => x.id === a.regra); if (!r) return { ok: false, motivo: 'regra desconhecida' };
         const rp = r.rp, base = getBacktestRiskParams();
-        sim.ordens.push({ id: `${t}-${Date.now()}`, t, regra: a.regra, tipo: v.estado, dataTela: ultimoPregaoDados(), criadaEm: new Date().toISOString(),
+        sim.ordens.push({ id: `${t}-${Date.now()}`, t, regra: a.regra, tipo: v.estado === 'ja' ? 'fora' : v.estado, dataTela: ultimoPregaoDados(), criadaEm: new Date().toISOString(),
             sistema: v.estado === 'entrar' ? { dataSinal: a.dataSinal || ultimoPregaoDados(), atr: a.atrSinal } : { desde: a.desde, entrada: a.entrada, atr: a.atrEntrada },
             rp: { modoEntrada: rp.modoEntrada, atrMult: rp.atrMult, stopLossPct: rp.stopLossPct, alvoAtr: rp.alvoAtr, saidaDias: rp.saidaDias, costPct: rp.costPct, riskTrade: base.riskTrade } });
         gravarSim(sim); return { ok: true };
@@ -3160,7 +3162,7 @@
     }
     function calcularEstadoSim(sim) {
         sim = sim || lerSim(); const ini = sim ? sim.saldoInicial : SIM_SALDO_INICIAL;
-        if (!sim) return { saldoInicial: ini, caixa: ini, emPapeis: 0, patrimonio: ini, ordens: [], fechadas: [], abertas: [], aguardando: [], canceladas: [], porRegra: {}, referencia: null };
+        if (!sim) return { saldoInicial: ini, caixa: ini, emPapeis: 0, patrimonio: ini, ordens: [], fechadas: [], abertas: [], aguardando: [], canceladas: [], porRegra: {}, dentro: { n: 0 }, fora: { n: 0 }, referencia: null };
         const ordens = sim.ordens.map(o => {
             const d = allData[o.t], x = { ...o, estado: 'aguardando' }; if (!d) { x.estado = 'sem_dados'; return x; }
             const custo = (o.rp.costPct || 0) / 100;
@@ -3200,20 +3202,23 @@
         abertas.forEach(o => { const d = allData[o.t], f = d.close[d.close.length - 1]; o.precoAtual = f; o.resultado = o.qtd * (f - o.precoEnt); o.ret = f / o.precoEnt - 1; emPapeis += o.qtd * f; });
         const fechadas = ordens.filter(o => o.estado === 'fechada').sort((a, b) => b.dataSai < a.dataSai ? -1 : 1);
         // Por estratégia (regra do Relatório): operações encerradas
+        // Grupo de controle: entradas 🔵 (fora das travas) não entram no selo da estratégia
+        const somar = (lista) => { const r = { n: 0, ganhos: 0, perdas: 0, resultado: 0, acertos: 0 }; lista.forEach(o => { r.n++; r.resultado += o.resultado; if (o.resultado > 0) { r.ganhos += o.resultado; r.acertos++; } else r.perdas -= o.resultado; }); return r; };
+        const dentro = somar(fechadas.filter(o => o.tipo !== 'fora')), fora = somar(fechadas.filter(o => o.tipo === 'fora'));
         const porRegra = {};
-        fechadas.forEach(o => { const r = porRegra[o.regra] = porRegra[o.regra] || { n: 0, ganhos: 0, perdas: 0, resultado: 0, acertos: 0 }; r.n++; r.resultado += o.resultado; if (o.resultado > 0) { r.ganhos += o.resultado; r.acertos++; } else r.perdas -= o.resultado; });
+        fechadas.filter(o => o.tipo !== 'fora').forEach(o => { const r = porRegra[o.regra] = porRegra[o.regra] || { n: 0, ganhos: 0, perdas: 0, resultado: 0, acertos: 0 }; r.n++; r.resultado += o.resultado; if (o.resultado > 0) { r.ganhos += o.resultado; r.acertos++; } else r.perdas -= o.resultado; });
         // Referência: comprar todos os papéis do app em partes iguais no início e segurar
         let somaRef = 0, nRef = 0;
         for (const t in allData) { const d = allData[t]; const k = d.dates.indexOf(sim.inicio); if (k >= 0 && d.close[k] > 0) { somaRef += d.close[d.close.length - 1] / d.close[k] - 1; nRef++; } }
         return { saldoInicial: ini, inicio: sim.inicio, caixa, emPapeis, patrimonio: caixa + emPapeis, ordens, fechadas, abertas: [...abertas], aguardando: ordens.filter(o => o.estado === 'aguardando'),
-                 canceladas: ordens.filter(o => o.estado === 'cancelada'), porRegra, referencia: nRef ? somaRef / nRef : null };
+                 canceladas: ordens.filter(o => o.estado === 'cancelada'), porRegra, dentro, fora, referencia: nRef ? somaRef / nRef : null };
     }
     function desenharSimulacao() {
         const box = document.getElementById('am-simulacao'); if (!box) return;
         const sim = lerSim(), E = estadoSim(sim), ret = (E.patrimonio / E.saldoInicial - 1) * 100;
         const mud = 'style="color:var(--mudo)"', cor = v => `style="color:${v >= 0 ? 'var(--alta)' : 'var(--baixa)'}"`;
         const linhaOp = o => `<div class="am-card" data-ativo="${o.t}">
-            <div class="flex items-center justify-between"><span class="am-tk">${o.t}</span><span class="rel-chip">${nomeRegra(o.regra)}${o.tipo === 'atrasado' ? ' · atrasada' : ''}</span></div>
+            <div class="flex items-center justify-between"><span class="am-tk">${o.t}</span><span class="rel-chip">${nomeRegra(o.regra)}${o.tipo === 'atrasado' ? ' · atrasada' : o.tipo === 'fora' ? ' · 🔵 fora das travas' : ''}</span></div>
             ${o.estado === 'aguardando' ? `<div class="text-sm mt-1" ${mud}>Compra na abertura depois de ${fmtDataBR(o.dataTela)} (aguardando a próxima coleta).</div>`
             : o.estado === 'cancelada' ? `<div class="text-sm mt-1" ${mud}>Cancelada: ${o.motivo}.</div>`
             : `<div class="text-sm mt-1">${o.qtd} ações · entrou em ${fmtDataBR(o.dataEnt)} a ${fmtPrecoM(o.precoEnt)}${o.estado === 'fechada' ? ` · saiu em ${fmtDataBR(o.dataSai)} a ${fmtPrecoM(o.precoSai)} (${o.motivoSai})` : ` · agora ${fmtPrecoM(o.precoAtual)}`}</div>
@@ -3246,6 +3251,11 @@
             ${emp.length ? `<div class="text-sm mt-2">➖ <b>Empatou</b><ul class="list-disc pl-5">${emp.map(item).join('')}</ul></div>` : ''}
             ${ruim.length ? `<div class="text-sm mt-2">❌ <b>Não funcionou</b><ul class="list-disc pl-5">${ruim.map(item).join('')}</ul></div>` : ''}
             ${obs.length ? `<div class="text-sm mt-2" style="color:var(--mudo)">⏳ Em observação: ${obs.map(x => `${nomeRegra(x.id)} (${x.r.n}/${SIM_MIN_OPS})`).join(' · ')}</div>` : ''}
+            ${E.fora.n ? (() => { const f = E.fora, d2 = E.dentro, pf = r => r.perdas > 0 ? fmtNumM(r.ganhos / r.perdas, 2) : '—', med = r => r.n ? fmtValorSim(r.resultado / r.n) : '—';
+                return `<div class="text-sm mt-3"><b>🔵 Controle: seguir as travas × ignorar</b><table class="rel-tabela mt-1"><thead><tr style="color:var(--mudo)"><th></th><th>Op.</th><th>Acerto</th><th>Média por op.</th><th>FL</th></tr></thead><tbody>
+                <tr><td>🟢 Dentro das travas</td><td>${d2.n}</td><td>${d2.n ? fmtNumM(d2.acertos / d2.n * 100, 0) + '%' : '—'}</td><td>${med(d2)}</td><td>${pf(d2)}</td></tr>
+                <tr><td>🔵 Fora das travas</td><td>${f.n}</td><td>${fmtNumM(f.acertos / f.n * 100, 0)}%</td><td>${med(f)}</td><td>${pf(f)}</td></tr></tbody></table>
+                <p class="text-xs mt-1" style="color:var(--mudo)">As entradas 🔵 não contam no selo das estratégias. ${f.n < SIM_MIN_OPS || d2.n < SIM_MIN_OPS ? `Conclusão só com ${SIM_MIN_OPS} operações encerradas em cada grupo.` : (f.resultado / f.n > d2.resultado / d2.n ? 'Até aqui, ignorar as travas rendeu mais: vale revisar as travas com mais dados.' : 'Até aqui, seguir as travas rendeu mais, como o teste previa.')}</p></div>`; })() : ''}
             <p class="text-xs mt-2" style="color:var(--mudo)">Critério fixo: funcionou = lucro e fator de lucro de pelo menos 1,2; não funcionou = fator abaixo de 1. O selo também aparece nos cartões do Relatório.</p></div>`;
     }
     function htmlSeloSimRelatorio(a) {
@@ -3254,9 +3264,10 @@
         return `<div class="text-xs mt-2">🧪 Na sua simulação, esta estratégia: ${s2.ico} ${s2.txt} · ${r.n} op. · ${fmtValorSim(r.resultado)}</div>`;
     }
     function htmlBotaoSeguir(a, v) {
-        if (!APP_MOVEL || !['entrar', 'atrasado'].includes(v.estado)) return '';
+        if (!APP_MOVEL || !['entrar', 'atrasado', 'ja'].includes(v.estado)) return '';
         const E = estadoSim(); const seguindo = E.ordens.some(o => o.t === a.t && (o.estado === 'aguardando' || o.estado === 'aberta'));
-        return seguindo ? `<div class="rel-seguir feito">✓ Seguindo na simulação</div>` : `<button type="button" class="rel-seguir" data-seguir="${a.t}">🧪 Seguir na simulação</button>`;
+        if (seguindo) return `<div class="rel-seguir feito">✓ Seguindo na simulação</div>`;
+        return v.estado === 'ja' ? `<button type="button" class="rel-seguir fora" data-seguir="${a.t}">🧪 Seguir mesmo assim (fora das travas, controle)</button>` : `<button type="button" class="rel-seguir" data-seguir="${a.t}">🧪 Seguir na simulação</button>`;
     }
     // ===== Análise da carteira: sugestões de rebalanceamento (só leitura; usa os mesmos sinais do app) =====
     // Regras (simples e explicáveis):
