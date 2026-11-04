@@ -2135,6 +2135,7 @@
                 ${d('Sai por', regraSaida)}
             </div>
             <div class="text-xs rel-mudo mt-2">Confirmado fora da amostra: fator de lucro ${fmtNumM(a.teste.pf, 2)} · acerto ${fmtNumM(a.teste.acerto * 100, 0)}% · ${a.teste.n} operações</div>
+            ${htmlSeloSimRelatorio(a)}
         </button>${htmlBotaoSeguir(a, vereditoEntrada(a))}`;
     }
     function htmlCalibracao(R) {
@@ -3140,7 +3141,24 @@
         gravarSim(sim); return { ok: true };
     }
     // Estado da simulação recalculado dos dados: preenche, dimensiona e fecha cada ordem em ordem de data.
+    let memoSim = null;
     function estadoSim(sim) {
+        if (!sim) { const chave = (() => { try { return localStorage.getItem(CHAVE_SIM) || ''; } catch (e) { return ''; } })() + '|' + mercadoCodigo() + '|' + ultimoPregaoDados() + '|' + Object.keys(allData).length;
+            if (memoSim && memoSim.chave === chave) return memoSim.E; const E = calcularEstadoSim(lerSim()); memoSim = { chave, E }; return E; }
+        return calcularEstadoSim(sim);
+    }
+    // Selo de cada estratégia na simulação. Critério fixo (decidido antes de ver os resultados): só conclui com
+    // 10 operações encerradas; funcionou = resultado positivo e fator de lucro ≥ 1,2; não funcionou = fator < 1.
+    const SIM_MIN_OPS = 10;
+    function seloSim(r) {
+        if (!r || !r.n) return null;
+        const pf = r.perdas > 0 ? r.ganhos / r.perdas : (r.ganhos > 0 ? 99 : 0);
+        if (r.n < SIM_MIN_OPS) return { ico: '⏳', txt: `em observação (${r.n} de ${SIM_MIN_OPS} operações)`, cor: 'cinza', pf };
+        if (r.resultado > 0 && pf >= 1.2) return { ico: '✅', txt: 'funcionou', cor: 'verde', pf };
+        if (pf < 1) return { ico: '❌', txt: 'não funcionou', cor: 'vermelho', pf };
+        return { ico: '➖', txt: 'empatou (lucro pequeno demais para o risco)', cor: 'amarelo', pf };
+    }
+    function calcularEstadoSim(sim) {
         sim = sim || lerSim(); const ini = sim ? sim.saldoInicial : SIM_SALDO_INICIAL;
         if (!sim) return { saldoInicial: ini, caixa: ini, emPapeis: 0, patrimonio: ini, ordens: [], fechadas: [], abertas: [], aguardando: [], canceladas: [], porRegra: {}, referencia: null };
         const ordens = sim.ordens.map(o => {
@@ -3206,16 +3224,34 @@
                 <div class="text-sm mt-1" ${cor(ret)}>${fmtPctM(ret)} · ${fmtValorSim(E.patrimonio - E.saldoInicial)} sobre ${fmtValorSim(E.saldoInicial)}${sim ? ` desde ${fmtDataBR(E.inicio)}` : ''}</div>
                 ${E.referencia !== null && sim ? `<div class="text-sm mt-1" ${mud}>Comprar todos os papéis do app e segurar no mesmo período: <b ${cor(E.referencia)}>${fmtPctM(E.referencia * 100)}</b></div>` : ''}
                 <div class="text-sm mt-1" ${mud}>Em caixa ${fmtValorSim(E.caixa)} · em papéis ${fmtValorSim(E.emPapeis)}</div></div>
+            ${sim ? htmlPlacarSim(E) : ''}
             ${!sim ? `<div class="am-card mt-3"><div class="font-bold">Como funciona</div><p class="text-sm mt-1" ${mud}>No Relatório (Mais → Relatório), os papéis 🟢 têm o botão "Seguir na simulação". A compra acontece na abertura seguinte, com o preço real; o tamanho arrisca ${getBacktestRiskParams().riskTrade}% do patrimônio até o stop (como no Backtest) e a saída é automática pela regra do papel. Assim dá para ver, com o tempo, qual estratégia rende mais de verdade.</p></div>` : ''}
             ${E.aguardando.length ? `<div class="rel-titulo">⏳ Aguardando a abertura <span class="rel-chip">${E.aguardando.length}</span></div><div class="space-y-3">${E.aguardando.map(linhaOp).join('')}</div>` : ''}
             ${E.abertas.length ? `<div class="rel-titulo">📈 Abertas <span class="rel-chip">${E.abertas.length}</span></div><div class="space-y-3">${E.abertas.map(linhaOp).join('')}</div>` : ''}
             ${regras.length ? `<div class="rel-titulo">🏆 Por estratégia (operações encerradas)</div><div class="am-card"><table class="rel-tabela"><thead><tr ${mud}><th>Estratégia</th><th>Op.</th><th>Acerto</th><th>Resultado</th><th>FL</th></tr></thead><tbody>
-                ${regras.map(([id, r]) => `<tr><td>${nomeRegra(id)}</td><td>${r.n}</td><td>${fmtNumM(r.acertos / r.n * 100, 0)}%</td><td ${cor(r.resultado)}>${fmtValorSim(r.resultado)}</td><td>${r.perdas > 0 ? fmtNumM(r.ganhos / r.perdas, 2) : '—'}</td></tr>`).join('')}
+                ${regras.map(([id, r]) => `<tr><td>${seloSim(r).ico} ${nomeRegra(id)}</td><td>${r.n}</td><td>${fmtNumM(r.acertos / r.n * 100, 0)}%</td><td ${cor(r.resultado)}>${fmtValorSim(r.resultado)}</td><td>${r.perdas > 0 ? fmtNumM(r.ganhos / r.perdas, 2) : '—'}</td></tr>`).join('')}
                 </tbody></table><p class="text-xs mt-2" ${mud}>Com poucas operações o resultado ainda é muito sorte. Compare com o Diário de sinais, que acompanha todos os sinais, não só os que você seguiu.</p></div>` : ''}
             ${E.fechadas.length ? `<div class="rel-titulo">✅ Encerradas <span class="rel-chip">${E.fechadas.length}</span></div><div class="space-y-3">${E.fechadas.slice(0, 20).map(linhaOp).join('')}</div>` : ''}
             ${E.canceladas.length ? `<div class="rel-titulo">✖️ Canceladas <span class="rel-chip">${E.canceladas.length}</span></div><div class="space-y-3">${E.canceladas.slice(-10).map(linhaOp).join('')}</div>` : ''}
             ${sim ? `<button type="button" class="am-botao sec mt-4" id="am-sim-zerar">Zerar a simulação</button>` : ''}
             <p class="am-aviso">Dinheiro fictício, salvo só neste aparelho. Os preços são os reais do fechamento e da abertura; na vida real pode haver diferença de preço na execução.</p>`;
+    }
+    function htmlPlacarSim(E) {
+        const lin = Object.entries(E.porRegra).map(([id, r]) => ({ id, r, s: seloSim(r) }));
+        const grupo = ico => lin.filter(x => x.s.ico === ico).sort((a, b) => b.r.resultado - a.r.resultado);
+        const item = x => `<li><b>${nomeRegra(x.id)}</b>: ${x.r.n} op., acerto ${fmtNumM(x.r.acertos / x.r.n * 100, 0)}%, fator de lucro ${x.s.pf >= 99 ? '—' : fmtNumM(x.s.pf, 2)}, ${fmtValorSim(x.r.resultado)}</li>`;
+        const ok = grupo('✅'), ruim = grupo('❌'), emp = grupo('➖'), obs = grupo('⏳');
+        return `<div class="am-card mt-3" style="border-color:rgba(34,197,94,0.45)"><div class="font-bold">📌 O que funcionou na simulação</div>
+            ${ok.length ? `<div class="text-sm mt-2">✅ <b>Funcionou</b><ul class="list-disc pl-5">${ok.map(item).join('')}</ul></div>` : `<p class="text-sm mt-1" style="color:var(--mudo)">Nenhuma estratégia chegou a uma conclusão ainda: o app só dá o selo com ${SIM_MIN_OPS} operações encerradas, para não confundir sorte com método.</p>`}
+            ${emp.length ? `<div class="text-sm mt-2">➖ <b>Empatou</b><ul class="list-disc pl-5">${emp.map(item).join('')}</ul></div>` : ''}
+            ${ruim.length ? `<div class="text-sm mt-2">❌ <b>Não funcionou</b><ul class="list-disc pl-5">${ruim.map(item).join('')}</ul></div>` : ''}
+            ${obs.length ? `<div class="text-sm mt-2" style="color:var(--mudo)">⏳ Em observação: ${obs.map(x => `${nomeRegra(x.id)} (${x.r.n}/${SIM_MIN_OPS})`).join(' · ')}</div>` : ''}
+            <p class="text-xs mt-2" style="color:var(--mudo)">Critério fixo: funcionou = lucro e fator de lucro de pelo menos 1,2; não funcionou = fator abaixo de 1. O selo também aparece nos cartões do Relatório.</p></div>`;
+    }
+    function htmlSeloSimRelatorio(a) {
+        if (!APP_MOVEL || !a.regra) return '';
+        const r = estadoSim().porRegra[a.regra]; const s2 = seloSim(r); if (!s2) return '';
+        return `<div class="text-xs mt-2">🧪 Na sua simulação, esta estratégia: ${s2.ico} ${s2.txt} · ${r.n} op. · ${fmtValorSim(r.resultado)}</div>`;
     }
     function htmlBotaoSeguir(a, v) {
         if (!APP_MOVEL || !['entrar', 'atrasado'].includes(v.estado)) return '';
@@ -3550,7 +3586,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { get graficos() { return graficos; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao };
+    window.investDebug = { get graficos() { return graficos; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).
