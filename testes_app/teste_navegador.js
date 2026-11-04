@@ -316,12 +316,22 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     // Vereditos: travas aplicadas em todos os papéis do relatório
     const vered = await cel.page.evaluate(() => {
         const I = window.investDebug, R = I.relatorio; const erros = []; const cont = {};
+        const noite = new Date(R.ultimoPregao + 'T23:30:00Z');   // a noite do último pregão, quando o relatório sai
         for (const a of R.ativos) {
-            const v = I.vereditoEntrada(a); cont[v.estado] = (cont[v.estado] || 0) + 1;
+            const v = I.vereditoEntrada(a, noite); cont[v.estado] = (cont[v.estado] || 0) + 1;
             const n = a.nTotal || 0;
             if (v.estado === 'entrar' && !(a.confirmada && n >= 15 && a.situacao === 'entrada' && (!a.resistencia || a.resistencia - a.entrada >= a.entrada - a.stop))) erros.push('entrar indevido ' + a.t);
             if ((!a.confirmada || n < 15) && a.regra && v.estado !== 'nao') erros.push('deveria ser não operar ' + a.t);
-            if (a.confirmada && n >= 15 && a.situacao === 'posicao' && v.estado !== 'ja') erros.push('deveria ser já em operação ' + a.t);
+            if (a.confirmada && n >= 15 && a.situacao === 'posicao' && !['ja', 'atrasado'].includes(v.estado)) erros.push('deveria ser já em operação ou atrasado ' + a.t);
+            if (v.estado === 'atrasado') {
+                const d = I.allData[a.t], preg = d.close.length - d.dates.indexOf(a.desde);
+                if (!(preg <= 2 && a.atrEntrada > 0 && (a.preco - a.entrada) / a.atrEntrada <= 0.5 && (!a.resistencia || a.resistencia - a.preco >= a.preco - a.stop))) erros.push('atrasado indevido ' + a.t);
+                if (!v.rr || !v.motivos.some(m => /risco até o stop/.test(m))) erros.push('atrasado sem risco/retorno ' + a.t);
+                // dias depois, a mesma operação deixa de ser "atrasado"
+                const x = new Date(a.desde + 'T12:00:00'); x.setDate(x.getDate() + 7); if (I.vereditoEntrada(a, x).estado !== 'ja') erros.push('atrasado velho ' + a.t);
+                cont.atrasadoOk = (cont.atrasadoOk || 0) + 1;
+            }
+            if (v.estado === 'ja' && !v.motivos.some(m => /risco até o stop|sem resistência/.test(m))) erros.push('já sem risco/retorno ' + a.t);
         }
         // sinal velho vira "esperar": simula uma consulta 3 dias úteis depois
         const e = R.ativos.find(a => a.situacao === 'entrada' && a.confirmada && (a.nTotal || 0) >= 15);

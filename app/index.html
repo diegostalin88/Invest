@@ -1631,7 +1631,7 @@
         const grossWin = wins.reduce((s,t)=>s+t.pnl,0); const grossLoss = Math.abs(losses.reduce((s,t)=>s+t.pnl,0));
         const profitFactor = grossLoss > 0 ? grossWin/grossLoss : (grossWin > 0 ? Infinity : 0);
         // Estado no último candle (só leitura, para o "Plano de operação"; não muda o resultado)
-        const aberta = position === 'long' ? { entrada: entryPrice, data: dataSubset.dates[entryIdx], stop: stopPrice, alvo: targetPrice, dias: dataSubset.close.length - entryIdx } : null;
+        const aberta = position === 'long' ? { entrada: entryPrice, data: dataSubset.dates[entryIdx], stop: stopPrice, alvo: targetPrice, dias: dataSubset.close.length - entryIdx, atr: pendingATR } : null;
         return { final: capital, returnPct, maxDD, winRate, expectancy, trades: trades.length, eq, profitFactor, aberta, sinalHoje: pendingEntry, atrHoje: pendingATR, saidas, retornosTrades: trades.map(t => t.pct), tradesDet: trades.map(t => ({ pct: t.pct, ent: t.ent, sai: t.sai, ret: t.ret })) };
     }
 
@@ -1873,7 +1873,7 @@
         let situacao = 'nada', niveis = {};
         if (res.aberta) {
             situacao = 'posicao';
-            niveis = { entrada: res.aberta.entrada, desde: res.aberta.data, stop: res.aberta.stop, alvo: res.aberta.alvo, restam: melhor.r.rp.saidaDias > 0 ? Math.max(1, melhor.r.rp.saidaDias - res.aberta.dias) : null };
+            niveis = { entrada: res.aberta.entrada, desde: res.aberta.data, stop: res.aberta.stop, alvo: res.aberta.alvo, atrEntrada: res.aberta.atr, restam: melhor.r.rp.saidaDias > 0 ? Math.max(1, melhor.r.rp.saidaDias - res.aberta.dias) : null };
         } else if (res.sinalHoje) {
             situacao = 'entrada'; const atr = res.atrHoje; const rp = melhor.r.rp;
             niveis = { entrada: fech, stop: Math.max(fech - atr * rp.atrMult, fech * (1 - rp.stopLossPct / 100)), alvo: rp.alvoAtr > 0 ? fech + atr * rp.alvoAtr : null, restam: rp.saidaDias > 0 ? rp.saidaDias : null };
@@ -2011,6 +2011,19 @@
     // confirmada fora da amostra, dados do último pregão, abertura ainda por vir e risco até o stop
     // não maior que o espaço até a resistência (gestão de risco; não faz parte do backtest).
     const CONF_MIN = 15, CONF_ALTA = 30;
+    // Entrada atrasada (medida nos dados reais em 04/11/2026, operações fora da amostra): quem compra 1 ou 2 pregões
+    // depois do sistema, com o preço até 0,5 ATR acima da entrada, teve fator de lucro igual ou melhor que o do dia certo
+    // nessas mesmas operações (EUA 1,50; Brasil 1,79). Mais longe que isso o resultado cai muito.
+    const ATRASO_MAX_PREGOES = 2, ATRASO_MAX_ATR = 0.5;
+    function riscoRetorno(preco, stop, resistencia) {   // ao preço de agora
+        const risco = preco - stop, espaco = resistencia ? resistencia - preco : null;
+        return { risco, espaco, riscoPct: risco / preco * 100, espacoPct: espaco !== null ? espaco / preco * 100 : null, relacao: espaco !== null && risco > 0 ? espaco / risco : null };
+    }
+    function textoRiscoRetorno(rr, preco, alvo) {
+        const txtAlvo = alvo ? `; até o alvo ${fmtPctM((alvo / preco - 1) * 100)} (${fmtNumM((alvo - preco) / rr.risco, 1)} para 1)` : '';
+        return (rr.espaco === null ? `ao preço de ${fmtPrecoM(preco)}: stop a ${fmtPctM(-rr.riscoPct)}; preço acima das máximas do ano, sem resistência próxima`
+            : `ao preço de ${fmtPrecoM(preco)}: risco até o stop ${fmtPctM(-rr.riscoPct)}, espaço até a resistência ${fmtPctM(rr.espacoPct)} (${rr.relacao !== null ? fmtNumM(rr.relacao, 1) + ' para 1' : '—'})`) + txtAlvo;
+    }
     function confiabilidade(n) {
         n = n || 0;
         return n >= CONF_ALTA ? { nivel: 'Alta', cor: 'verde', n } : n >= CONF_MIN ? { nivel: 'Média', cor: 'amarelo', n } : { nivel: 'Baixa', cor: 'vermelho', n };
@@ -2043,7 +2056,23 @@
         if (a.situacao === 'posicao') {
             const d = allData[a.t]; const idx = d ? d.dates.indexOf(a.desde) : -1; const preg = idx >= 0 ? d.close.length - idx : null;
             const r = a.entrada ? (a.preco / a.entrada - 1) * 100 : null;
-            return V('ja', 'Já em operação: não entrar agora', [`o sistema comprou em ${fmtDataBR(a.desde)} a ${fmtPrecoM(a.entrada)}${preg ? `, há ${preg} pregão(ões)` : ''}${r !== null ? ` (${fmtPctM(r)})` : ''}`, 'entrar agora é pegar o bonde andando: não foi o que o teste mediu. Quem já está dentro segue o plano de saída.'], { saidas });
+            const comprou = `o sistema comprou em ${fmtDataBR(a.desde)} a ${fmtPrecoM(a.entrada)}${preg ? `, há ${preg} pregão(ões)` : ''}${r !== null ? ` (${fmtPctM(r)})` : ''}`;
+            const rr = riscoRetorno(a.preco, a.stop, a.resistencia), txtRR = textoRiscoRetorno(rr, a.preco, a.alvo && a.alvo > a.preco ? a.alvo : null);
+            // Entrada atrasada: só com dados do último pregão e antes da próxima abertura (relógio da bolsa)
+            const hm = horaNoMercado(agora); const abertura = mercadoAtual === 'br' ? 600 : 570;
+            const idade = ultimo ? diasUteisEntre(ultimo, hm.data) : 0;
+            const aTempo = idade === 0 || (idade === 1 && !(hm.util && hm.min >= abertura));
+            const desvio = a.atrEntrada > 0 ? (a.preco - a.entrada) / a.atrEntrada : null;
+            const falta = [];
+            if (preg === null || preg > ATRASO_MAX_PREGOES) falta.push(`já são ${preg ?? 'vários'} pregões desde a compra (o teste de entrada atrasada vai até ${ATRASO_MAX_PREGOES})`);
+            if (desvio === null) falta.push('sem o ATR da entrada neste relatório (gere de novo para avaliar a entrada atrasada)');
+            else if (desvio > ATRASO_MAX_ATR) falta.push(`o preço já subiu ${fmtNumM(desvio, 1)} ATR desde a entrada (limite ${fmtNumM(ATRASO_MAX_ATR, 1)}): quem entra tão depois ganhou bem menos no teste`);
+            if (rr.relacao !== null && rr.espaco < rr.risco) falta.push(`ao preço de hoje o risco é maior que o espaço até a resistência`);
+            if (!aTempo) falta.push('a abertura seguinte a estes dados já passou');
+            if (!falta.length) return V('atrasado', 'Ainda dá para entrar (entrada atrasada)', [comprou,
+                `preço a ${fmtNumM(Math.max(0, desvio), 2)} ATR da entrada do sistema: no teste, entrar até ${ATRASO_MAX_PREGOES} pregões depois e até ${fmtNumM(ATRASO_MAX_ATR, 1)} ATR acima rendeu o mesmo que entrar no dia certo`,
+                txtRR, 'compra na próxima abertura e segue a mesma saída do sistema'], { saidas, rr });
+            return V('ja', 'Já em operação: não entrar agora', [comprou, ...falta, txtRR, 'quem já está dentro segue o plano de saída'], { saidas, rr });
         }
         if (a.situacao !== 'entrada') return V('sem', 'Sem sinal', ['a regra não deu sinal no último pregão'], { saidas: [] });
         const motivos = [];
@@ -2054,9 +2083,9 @@
         const risco = a.entrada - a.stop; const espaco = a.resistencia ? a.resistencia - a.entrada : null;
         if (espaco !== null && risco > 0 && espaco < risco) motivos.push(`resistência a ${fmtPctM(espaco / a.entrada * 100)} e stop a ${fmtPctM(-risco / a.entrada * 100)}: o risco é ${fmtNumM(risco / espaco, 1)} vezes o ganho até a resistência`);
         if (motivos.length) return V('esperar', 'Esperar', motivos, { saidas });
-        return V('entrar', 'Entrar na próxima abertura', [`sinal de ${fmtDataBR(a.dataSinal || ultimo)}, regra confirmada, confiabilidade ${conf.nivel.toLowerCase()} (${conf.n} operações)`, espaco !== null ? `espaço até a resistência (${fmtPctM(espaco / a.entrada * 100)}) maior que o risco até o stop (${fmtPctM(-risco / a.entrada * 100)})` : 'preço acima das máximas do ano: sem resistência próxima'], { saidas });
+        return V('entrar', 'Entrar na próxima abertura', [`sinal de ${fmtDataBR(a.dataSinal || ultimo)}, regra confirmada, confiabilidade ${conf.nivel.toLowerCase()} (${conf.n} operações)`, espaco !== null ? `risco até o stop ${fmtPctM(-risco / a.entrada * 100)}, espaço até a resistência ${fmtPctM(espaco / a.entrada * 100)} (${fmtNumM(espaco / risco, 1)} para 1)` : 'preço acima das máximas do ano: sem resistência próxima'], { saidas });
     }
-    const COR_VEREDITO = { entrar: ['verde', '🟢'], esperar: ['amarelo', '🟡'], ja: ['azul', '🔵'], nao: ['cinza', '⚪'], sem: ['cinza', '⚪'] };
+    const COR_VEREDITO = { entrar: ['verde', '🟢'], atrasado: ['verde', '🟢'], esperar: ['amarelo', '🟡'], ja: ['azul', '🔵'], nao: ['cinza', '⚪'], sem: ['cinza', '⚪'] };
     function htmlVeredito(v, compacto = false) {
         const [cor, ico] = COR_VEREDITO[v.estado];
         return `<div class="rel-veredito ${cor}${compacto ? ' compacto' : ''}">
@@ -2111,6 +2140,7 @@
             const entrar = comV.filter(x => x.v.estado === 'entrar').sort(porPf).map(x => x.a);
             const esperar = comV.filter(x => x.v.estado === 'esperar').sort(porPf).map(x => x.a);
             const abertas = comV.filter(x => x.v.estado === 'ja').sort(porPf).map(x => x.a);
+            const atrasadas = comV.filter(x => x.v.estado === 'atrasado').sort(porPf).map(x => x.a);
             const barrados = A.filter(a => (a.situacao === 'entrada' || a.situacao === 'posicao') && ['nao'].includes(vereditoEntrada(a).estado)).length;
             const squeeze = A.filter(a => a.squeeze).sort((x, y) => (y.vendido.dias || 0) - (x.vendido.dias || 0));
             const confirmados = A.filter(a => a.confirmada);
@@ -2129,6 +2159,9 @@
             </div>
             <div class="rel-titulo">🟢 Entrar na próxima abertura <span class="rel-chip verde">${entrar.length}</span></div>
             <div class="rel-lista">${entrar.length ? entrar.map(cartaoRelatorio).join('') : '<p class="text-sm rel-mudo">Nenhum papel passou em todas as travas hoje. Não entrar também é uma decisão.</p>'}</div>
+            ${atrasadas.length ? `<div class="rel-titulo">🟢 Ainda dá para entrar (atrasado) <span class="rel-chip verde">${atrasadas.length}</span></div>
+            <p class="text-sm rel-mudo mb-2">O sistema já comprou, mas há no máximo ${ATRASO_MAX_PREGOES} pregões e o preço ainda está perto da entrada (até ${fmtNumM(ATRASO_MAX_ATR, 1)} ATR). No teste, entrar assim rendeu o mesmo que no dia certo.</p>
+            <div class="rel-lista">${atrasadas.map(cartaoRelatorio).join('')}</div>` : ''}
             ${esperar.length ? `<div class="rel-titulo">🟡 Sinal hoje, mas esperar <span class="rel-chip amarelo">${esperar.length}</span></div>
             <div class="rel-lista">${esperar.map(cartaoRelatorio).join('')}</div>` : ''}
             ${barrados ? `<p class="text-xs rel-mudo mt-2">${barrados} papel(éis) com sinal ou operação ficaram de fora por regra não confirmada ou pouca confiabilidade (menos de ${CONF_MIN} operações).</p>` : ''}
@@ -2149,7 +2182,7 @@
                     <p>Para cada papel, o app testa ${R.regras.length} regras: ${R.regras.map(r => r.nome).join('; ')}.</p>
                     <p>A melhor é escolhida olhando só os primeiros ${Math.round(R.parametros.fracaoEscolha * 100)}% do histórico, pelo fator de lucro pesado pelo número de operações (mínimo de ${R.parametros.minTradesEscolha}). Ela só aparece nas listas se também tiver dado lucro nos ${100 - Math.round(R.parametros.fracaoEscolha * 100)}% finais, que ela "não viu" (mínimo de ${R.parametros.minTradesConfirma} operações). É o walk-forward de Fitschen e Kaufman, que evita escolher a regra que só deu certo por acaso.</p>
                     <p><b>Recalibragem mensal</b>: a cada ${CALIB_INTERVALO_DIAS} dias o servidor testa ${CALIB_ALVOS.length * CALIB_DIAS.length} combinações de alvo (${CALIB_ALVOS.join(', ')}×ATR) e saída por tempo (${CALIB_DIAS.join(', ')} pregões) na carteira inteira. Escolhe com o histórico até ${CALIB_MESES_TESTE} meses atrás e só troca se a escolha também for melhor nos últimos ${CALIB_MESES_TESTE} meses. Nunca ajusta papel a papel nem as travas.</p>
-                    <p><b>Veredito de cada papel</b> (travas fixas, que não se ajustam sozinhas): 🟢 entrar só se a regra foi confirmada, tem pelo menos ${CONF_MIN} operações (confiabilidade alta a partir de ${CONF_ALTA}), o sinal é do último pregão, a abertura em que a regra compra ainda não passou e o risco até o stop não é maior que o espaço até a resistência. Faltou uma condição: 🟡 esperar. Já comprado pelo sistema: 🔵 não entrar agora. A trava de resistência é gestão de risco e não faz parte do backtest.</p>
+                    <p><b>Veredito de cada papel</b> (travas fixas, que não se ajustam sozinhas): 🟢 entrar só se a regra foi confirmada, tem pelo menos ${CONF_MIN} operações (confiabilidade alta a partir de ${CONF_ALTA}), o sinal é do último pregão, a abertura em que a regra compra ainda não passou e o risco até o stop não é maior que o espaço até a resistência. Faltou uma condição: 🟡 esperar. Já comprado pelo sistema: 🟢 ainda dá para entrar se foram no máximo ${ATRASO_MAX_PREGOES} pregões, o preço está até ${fmtNumM(ATRASO_MAX_ATR, 1)} ATR acima da entrada e o risco ao preço de hoje não passa do espaço até a resistência (medido: rendeu o mesmo que entrar no dia certo); senão, 🔵 não entrar agora. A trava de resistência é gestão de risco e não faz parte do backtest.</p>
                     <p>Entrada na abertura do pregão seguinte ao sinal; stop inicial = o mais protetor entre ${fmtNumM(R.parametros.atrMult, 1)}×ATR e ${fmtNumM(R.parametros.stopLossPct, 1)}%; custo de ${fmtNumM(R.parametros.custoPct, 2)}% por perna. ${avisoSobrevivencia().replace(/<\/?b>/g, '')}</p>
                 </div></details>`;
         }
@@ -3080,7 +3113,7 @@
         const naCarteira = new Set(itens.map(x => x.t));
         const candidatos = filteredScreenerResults.filter(r => !naCarteira.has(r.ticker)).slice(0, CANDIDATOS_AVALIADOS)
             .map(r => ({ t: r.ticker, score: r.score, v: viesDoPapel(r.ticker), rel: relDe(r.ticker) }))
-            .map(c => ({ ...c, entrada: !!(c.rel && vereditoEntrada(c.rel).estado === 'entrar') }))
+            .map(c => ({ ...c, entrada: !!(c.rel && ['entrar', 'atrasado'].includes(vereditoEntrada(c.rel).estado)) }))
             .filter(c => c.v && c.v.vies === 'alta' && c.entrada)   // só troca por papel com entrada validada hoje
             .sort((a, b) => (b.v.pts - a.v.pts) || (b.score - a.score)).slice(0, 3);
         const fortes = posicoes.filter(p => p.acao === 'manter' && !p.concentrada && p.peso < PESO_ALVO)
