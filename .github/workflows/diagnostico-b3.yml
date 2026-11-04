@@ -11,9 +11,16 @@ permissions:
 jobs:
   diagnostico:
     runs-on: [self-hosted, brasil]
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v5
       - name: Testar endereços da B3
         run: bash coleta/diagnostico_b3.sh | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Ver o que a página da B3 chama (navegador sem tela)
+        run: |
+          V="$HOME/pw-venv"
+          [ -x "$V/bin/python" ] || python3 -m venv "$V"
+          "$V/bin/pip" install -q playwright
+          "$V/bin/python" -m playwright install --with-deps chromium > /dev/null
+          "$V/bin/python" coleta/diagnostico_b3_navegador.py | tee -a "$GITHUB_STEP_SUMMARY"
