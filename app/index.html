@@ -1591,6 +1591,8 @@
                 const atrStopPrice = entryPrice - (pendingATR * riskParams.atrMult);
                 const hardFloorPrice = entryPrice * (1 - (riskParams.stopLossPct || 0) / 100);
                 stopPrice = Math.max(atrStopPrice, hardFloorPrice);
+                // Variante em estudo (0 = desligado, que é o padrão): stop inicial a pelo menos N ATR da entrada
+                if (riskParams.stopMinAtr > 0 && entryPrice - stopPrice < pendingATR * riskParams.stopMinAtr) stopPrice = entryPrice - pendingATR * riskParams.stopMinAtr;
                 const stopDist = entryPrice - stopPrice;
                 const maxRiskCash = capital * (riskParams.riskTrade / 100);
                 positionSize = stopDist > 0 ? maxRiskCash / stopDist : 0;
