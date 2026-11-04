@@ -45,24 +45,29 @@ def main():
         print('nenhuma tabela de empréstimo; chaves do primeiro nível:', list(arv[0].keys()))
         print(txt[:3000])
 
-    print('### Endereços no código do site')
-    js = get(B + '/static/js/main.e591a35328ff179145c0.js')[1]
-    for m in sorted(set(re.findall(r'.{0,120}(?:/table/|serverUrl|relativeUrl).{0,160}', js)))[:40]:
-        if 'node_modules' not in m:
-            print('  ', m)
-
-    print('### Tentativas de dados')
-    for chave in achadas[:3]:
-        for url, met, corpo in [
-            (f'{B}/table/{chave}/{dia}/{dia}/1/20', 'GET', None),
-            (f'{B}/table/{chave}/{dia}/{dia}/1', 'GET', None),
-            (f'{B}/table/{chave}/{dia}/1', 'GET', None),
-            (f'{B}/table/{chave}/{dia}/{dia}/1/20', 'POST', {}),
-            (f'{B}/table/{chave}/{dia}/{dia}/1/20', 'POST', {'Name': chave, 'Date': dia, 'FinalDate': dia,
-                                                         'ClientId': '', 'Filters': {}}),
-        ]:
-            st, txt = get(url, met, corpo)
-            print(f'{met} {st} {url}\n      {txt[:400]}')
+    print('### Dados de posições em aberto (POST vazio)')
+    for take in (20, 1000, 5000):
+        url = f'{B}/table/BTBLendingOpenPosition/{dia}/{dia}/1/{take}'
+        st, txt = get(url, 'POST', {})
+        print(f'POST {st} take={take} tamanho={len(txt)}')
+        try:
+            obj = json.loads(txt)
+        except ValueError:
+            print('   não é JSON:', txt[:200]); continue
+        print('   chaves:', list(obj.keys()))
+        tab = obj.get('table') or {}
+        print('   table.chaves:', list(tab.keys()))
+        for k in ('pageCount', 'totalCount', 'count', 'total'):
+            for o in (obj, tab):
+                if k in o: print(f'   {k} =', o[k])
+        cols = tab.get('columns') or obj.get('columns')
+        if cols: print('   colunas:', [c.get('name') if isinstance(c, dict) else c for c in cols])
+        vals = obj.get('values') or tab.get('values') or []
+        print('   linhas:', len(vals))
+        for v in vals[:4]: print('     ', json.dumps(v, ensure_ascii=False)[:300])
+        if take == 20:
+            for k, v in obj.items():
+                if k not in ('table', 'values'): print(f'   {k}:', json.dumps(v, ensure_ascii=False)[:300])
 
 
 if __name__ == '__main__':
