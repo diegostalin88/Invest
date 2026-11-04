@@ -1,0 +1,78 @@
+name: Auditoria adversarial
+
+# Só leitura, disparado à mão: tenta derrubar a vantagem do sistema com o MESMO motor do app (copiado de app/index.html
+# por coleta/motor_node.js, sem navegador). Compara com comprar e segurar SPY/S&P 500 e BOVA11/IBOVESPA, sorteia entradas
+# aleatórias com a mesma saída, dobra/triplica custos, atrasa a entrada, mexe em parâmetros vizinhos e simula a carteira
+# com capital limitado. Também roda um universo sintético sem nenhuma vantagem, como controle. Não publica nada.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  medir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Baixar os dados já publicados
+        env:
+          BASE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data
+        run: |
+          baixar() {  # $1 = URL base, $2 = pasta de destino
+            mkdir -p "$2"
+            curl -fsSL "$1/manifest.json" -o "$2/manifest.json" || return 1
+            for f in $(python3 -c "import json,sys;m=json.load(open(sys.argv[1]));print(' '.join(m['arquivosPrecos']+[m.get('arquivoFundamentos','fundamentos.json')]))" "$2/manifest.json"); do
+              curl -fsSL "$1/$f" -o "$2/$f" || return 1
+            done
+            curl -fsSL "$1/calibracao.json" -o "$2/calibracao.json" || true
+          }
+          baixar "$BASE" site/data
+          baixar "$BASE/br" site/data/br || rm -rf site/data/br
+
+      - name: Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: coleta/requirements.txt
+
+      - name: Índices para comparar (SPY, S&P 500, BOVA11, IBOVESPA)
+        continue-on-error: true
+        run: |
+          pip install -r coleta/requirements.txt
+          python3 - <<'PY'
+          import json, yfinance as yf
+          for arq, tickers in (('indice_us.json', ['SPY', '^GSPC']), ('indice_br.json', ['BOVA11.SA', '^BVSP'])):
+              out = {}
+              for t in tickers:
+                  try:
+                      h = yf.Ticker(t).history(period='6y', auto_adjust=True)
+                      if len(h):
+                          out[t] = {'dates': h.index.strftime('%Y-%m-%d').tolist(), 'close': [round(float(x), 4) for x in h['Close']]}
+                  except Exception as e:
+                      print('falhou', t, e)
+              json.dump(out, open(arq, 'w'))
+              print(arq, {k: len(v['dates']) for k, v in out.items()})
+          PY
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Medir (EUA, Brasil e controle sintético)
+        run: |
+          node coleta/medir_adversarial.js --site site --mercado us --indice indice_us.json --saida adversarial_us.json
+          if [ -d site/data/br ]; then node coleta/medir_adversarial.js --site site --mercado br --indice indice_br.json --saida adversarial_br.json; fi
+          node coleta/medir_adversarial.js --sintetico alta --saida adversarial_sintetico.json
+          echo "JSON_INICIO"; for f in adversarial_*.json; do echo "== $f"; python3 -c "import json,sys;print(json.dumps(json.load(open(sys.argv[1]))))" "$f"; done; echo "JSON_FIM"
+
+      - name: Guardar os resultados
+        uses: actions/upload-artifact@v4
+        with:
+          name: auditoria-adversarial
+          path: adversarial_*.json

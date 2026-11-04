@@ -385,6 +385,26 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
         return { erros, cont, velho };
     });
     ok(vered.erros.length === 0 && (vered.velho === null || vered.velho === 'esperar'), `celular: vereditos seguem as travas ${JSON.stringify(vered.cont)}${vered.erros.length ? ' ' + vered.erros.slice(0, 3).join('; ') : ''} · sinal velho → ${vered.velho}`);
+    // Estratégia congelada (04/11/2026): aviso no Relatório e comparação com o índice nas mesmas datas
+    const cong = await cel.page.evaluate(() => {
+        const I = window.investDebug, R = I.relatorio;
+        const avisos = [...document.querySelectorAll('.relatorio-alvo')].map(el => !!el.querySelector('[data-congelada]'));
+        const t = R.ativos[0].t, d = I.allData[t], n = d.dates.length;
+        const antes = I.indice;
+        I.indice = { principal: 'IDX', series: { IDX: { nome: 'Índice teste', dates: d.dates.slice(), close: d.dates.map((_, k) => 100 * (1 + 0.001 * k)) } } };
+        const r = I.retornoIndice(d.dates[n - 11], d.dates[n - 1]), esperado = (100 * (1 + 0.001 * (n - 1))) / (100 * (1 + 0.001 * (n - 11))) - 1;
+        const fimDeSemana = I.retornoIndice('2000-01-01', d.dates[n - 1]);   // antes do início da série: sem dado
+        const c = I.comparacaoIndiceSim({ ordens: [{ estado: 'fechada', t, iEnt: n - 10, dataSai: d.dates[n - 3], custoTotal: 1000, resultado: 50 }, { estado: 'cancelada', t }] });
+        const rOp = I.retornoIndice(d.dates[n - 11], d.dates[n - 3]);
+        const dAntes = I.diario;
+        I.diario = { mercado: R.mercado, inicio: d.dates[n - 20], sinais: [{ id: 'x', t, regra: R.ativos[0].regra || 'stop', estado: 'fechado', dataSinal: d.dates[n - 11], dataEntrada: d.dates[n - 10], dataSaida: d.dates[n - 3], ret: 0.5 }], regras: {} };
+        const html = I.htmlDiario();
+        I.indice = antes; I.diario = dAntes;
+        return { avisos, r, esperado, fimDeSemana, c, ind: c && c.ind, indEsperado: 1000 * rOp, diarioOk: /data-diario-indice/.test(html) && /1 de 1 sinais venceram/.test(html) };
+    });
+    ok(cong.avisos.length > 0 && cong.avisos.every(Boolean), `celular: Relatório mostra o aviso de estratégia congelada (${cong.avisos.length} lugar(es))`);
+    ok(Math.abs(cong.r - cong.esperado) < 1e-9 && cong.fimDeSemana === null && cong.c && cong.c.n === 1 && Math.abs(cong.ind - cong.indEsperado) < 1e-6 && cong.diarioOk,
+        `celular: índice nas mesmas datas na simulação (${cong.c ? cong.c.n : 0} op., índice ${cong.ind && cong.ind.toFixed(2)}) e no diário`);
     // Diário de sinais: anota, acompanha com o mesmo motor e desliga regra que vai mal na vida real
     const diar = await cel.page.evaluate(() => {
         const I = window.investDebug, R = I.relatorio, D = I.allData;
@@ -481,6 +501,7 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     await cel.page.click('#am-cart-abas [data-cart-aba="sim"]');
     const simTxt = await cel.page.textContent('#am-simulacao');
     ok(await cel.page.isVisible('#am-simulacao') && /Patrimônio simulado/.test(simTxt) && /Abertas|Encerradas/.test(simTxt) && /Por estratégia|Abertas/.test(simTxt) && /O que funcionou na simulação/.test(simTxt) && /do caminho/.test(simTxt) && /Pregão \d+ de 30/.test(simTxt) && (await cel.page.$('#am-simulacao .sim-barra')) !== null, 'celular: aba Simulação mostra patrimônio, placar, progresso até o alvo (barra, status, pregões) e estratégias');
+    ok(/Estratégia congelada/.test(simTxt) && /Não use dinheiro real/.test(simTxt) && !/Comprar todos os papéis do app/.test(simTxt), 'celular: Simulação mostra o aviso de estratégia congelada e não usa mais a referência dos papéis de hoje');
     await cel.page.screenshot({ path: path.join(SHOTS, 'celular_simulacao.png'), fullPage: false });
     await cel.page.click('#am-sim-zerar'); await cel.page.click('#am-sim-zerar');
     ok(/Como funciona/.test(await cel.page.textContent('#am-simulacao')) && /100[.,]000/.test(await cel.page.textContent('#am-simulacao')), 'celular: zerar a simulação (com confirmação) volta aos 100 mil');

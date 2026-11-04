@@ -73,6 +73,10 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Índices de referência (SPY e BOVA11) para comparar a estratégia congelada
+        continue-on-error: true
+        run: python coleta/indices.py site/data
+
       - name: Aluguel B3 baixado pelo coletor no Brasil (se houver)
         continue-on-error: true
         uses: actions/cache/restore@v4
@@ -164,7 +168,7 @@ jobs:
           import json, sys, subprocess, os
           base, pasta = sys.argv[1], sys.argv[2]
           caminho = os.path.join(pasta, 'manifest.json'); m = json.load(open(caminho))
-          for chave in ('arquivoRelatorio', 'arquivoVendidos', 'arquivoDiario', 'arquivoCalibracao'):
+          for chave in ('arquivoRelatorio', 'arquivoVendidos', 'arquivoDiario', 'arquivoCalibracao', 'arquivoIndice'):
               nome = m.get(chave)
               if nome and subprocess.run(['curl', '-fsSL', f'{base}/{nome}', '-o', os.path.join(pasta, nome)]).returncode != 0:
                   m.pop(chave)
@@ -181,6 +185,10 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.13"
+
+      - name: Índices de referência (SPY e BOVA11) para comparar a estratégia congelada
+        continue-on-error: true
+        run: pip install -q -r coleta/requirements.txt && python coleta/indices.py site/data
 
       - name: Aluguel B3 baixado pelo coletor no Brasil (se houver)
         continue-on-error: true

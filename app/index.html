@@ -1194,12 +1194,13 @@
             atualizarProgresso('Preparando indicadores…', 1);
             await new Promise(r => setTimeout(r, 30)); // deixa a barra pintar 100% antes do cálculo pesado
             // Extras opcionais: só busca o que o manifesto diz que foi publicado (evita 404 no console)
-            const [rel, vend, diario, calib] = await Promise.all([manifest.arquivoRelatorio, manifest.arquivoVendidos, manifest.arquivoDiario, manifest.arquivoCalibracao].map(nome =>
+            const [rel, vend, diario, calib, indice] = await Promise.all([manifest.arquivoRelatorio, manifest.arquivoVendidos, manifest.arquivoDiario, manifest.arquivoCalibracao, manifest.arquivoIndice].map(nome =>
                 nome ? buscar(MERCADO.pasta + nome).then(r => r.json()).catch(() => null) : null));
             relatorioDados = rel && Array.isArray(rel.ativos) ? rel : null;
             vendidosDados = vend && vend.ativos ? vend : null;
             diarioDados = diario && Array.isArray(diario.sinais) ? diario : null;
             calibracaoDados = calib && calib.alvo ? calib : null;
+            indiceDados = indice && indice.series ? indice : null;
             inicializarComDados(precos, fundamentos, { manifest });
             if (!fundamentos) mostrarMensagem('Preços carregados, mas o arquivo de fundamentos não veio. O Módulo 6 fica sem dados até a próxima coleta.', 'aviso');
             esconderProgresso();
@@ -1806,7 +1807,31 @@
     // histórico e CONFIRMA nos 40% finais (walk-forward, Fitschen/Kaufman). Depois diz a situação de hoje com a
     // regra escolhida: entrada no próximo pregão, operação em andamento (com stop/alvo/tempo) ou nada.
     // Roda toda noite no GitHub (coleta/gerar_relatorio.js) e, se faltar, no próprio aparelho.
-    let relatorioDados = null, vendidosDados = null, diarioDados = null, poolRelatorio = null;
+    let relatorioDados = null, vendidosDados = null, diarioDados = null, poolRelatorio = null, indiceDados = null;
+    // ===== Estratégia congelada em 04/11/2026 (decisão do Diego depois da auditoria adversarial) =====
+    // As regras não mudam mais. O teste agora é só para frente: Simulação e Diário comparam cada operação com o índice
+    // (SPY nos EUA, BOVA11 no Brasil) nas mesmas datas. Critérios de reavaliação em docs/congelamento.md.
+    const CONGELADA_EM = '2026-11-04', REAVALIAR_EM = '2027-11-04', REAVALIAR_SINAIS = 100;
+    function serieIndice() {
+        const I = indiceDados; if (!I || !I.series) return null;
+        const s = I.series[I.principal] || Object.values(I.series)[0];
+        return s && Array.isArray(s.dates) && s.dates.length ? s : null;
+    }
+    function nomeIndice() { const s = serieIndice(); return s ? s.nome : (mercadoCodigo() === 'br' ? 'BOVA11' : 'SPY'); }
+    function fechIndiceAte(data) {   // último fechamento do índice com data ≤ a data pedida
+        const s = serieIndice(); if (!s || !data) return null;
+        let lo = 0, hi = s.dates.length - 1, r = -1;
+        while (lo <= hi) { const m = (lo + hi) >> 1; if (s.dates[m] <= data) { r = m; lo = m + 1; } else hi = m - 1; }
+        return r >= 0 ? s.close[r] : null;
+    }
+    function retornoIndice(de, ate) { const a = fechIndiceAte(de), b = fechIndiceAte(ate); return a > 0 && b > 0 && de <= ate ? b / a - 1 : null; }
+    function textoCongelada() {
+        const br = mercadoCodigo() === 'br';
+        return `Uma auditoria independente (04/11/2026) não encontrou vantagem sobre comprar o índice: no período fora da amostra, ${br ? 'o BOVA11 rendeu +28%, contra +10% a +27% do sistema, com risco igual ou maior' : 'o SPY rendeu +19% com queda máxima de 9%, contra +2% a +18% do sistema com quedas de 20% a 31%'}. Não use dinheiro real. As regras não mudam mais; a simulação e o diário comparam cada operação com o ${nomeIndice()} nas mesmas datas. Reavaliação em ${fmtDataBR(REAVALIAR_EM)} ou com ${REAVALIAR_SINAIS} sinais encerrados no diário.`;
+    }
+    function htmlCongelada() {
+        return `<div class="rel-card" data-congelada style="border-color:rgba(96,165,250,.55)"><div class="font-bold">🧊 Estratégia congelada em ${fmtDataBR(CONGELADA_EM)}: só para teste</div><p class="text-sm mt-1">${textoCongelada()}</p></div>`;
+    }
     const FRACAO_ESCOLHA = 0.6, MIN_TRADES_ESCOLHA = 5, MIN_TRADES_CONFIRMA = 3, LIMITE_RELATORIO = 400;
     // ===== Recalibragem mensal por Walk-Forward (Fitschen/Kaufman/Pardo) =====
     // Só o alvo (múltiplos de ATR) e a saída por tempo (pregões) das regras do Relatório são recalibrados, e
@@ -2038,9 +2063,13 @@
         const fech = D.sinais.filter(x => x.estado === 'fechado'), abert = D.sinais.filter(x => x.estado === 'aberto'), aguard = D.sinais.filter(x => x.estado === 'aguardando');
         const linhasRegra = Object.entries(D.regras || {}).filter(([, r]) => r.n || r.abertos).map(([id, r]) => `<tr><td>${nomeRegra(id)}</td><td>${r.n}${r.abertos ? ` + ${r.abertos} abertos` : ''}</td><td>${r.media === null ? '—' : fmtPctM(r.media * 100)}</td><td>${r.acerto === null ? '—' : fmtNumM(r.acerto * 100, 0) + '%'}</td><td>${r.desligada ? '⛔ desligada' : r.n >= DIARIO_MIN_FECHADOS ? '✅ dentro do esperado' : `⏳ ${r.n}/${DIARIO_MIN_FECHADOS}`}</td></tr>`).join('');
         const pv = D.porVeredito || {};
+        // Contra o índice: do fechamento do dia do sinal até o fechamento da saída (mesmas datas de cada sinal)
+        const vsInd = fech.map(x => ({ x, r: retornoIndice(x.dataSinal, x.dataSaida) })).filter(z => z.r !== null);
+        const htmlVsInd = vsInd.length ? `<p class="text-sm mt-2" data-diario-indice>Contra o ${nomeIndice()} nas mesmas datas: média real ${fmtPctM(vsInd.reduce((a, z) => a + z.x.ret, 0) / vsInd.length * 100)} por sinal, contra ${fmtPctM(vsInd.reduce((a, z) => a + z.r, 0) / vsInd.length * 100)} do índice · ${vsInd.filter(z => z.x.ret > z.r).length} de ${vsInd.length} sinais venceram o índice. Meta da reavaliação: ${REAVALIAR_SINAIS} sinais encerrados.</p>` : '';
         const ult = fech.slice(-8).reverse().map(x => `<tr data-ativo="${x.t}" style="cursor:pointer"><td><b>${x.t}</b></td><td>${fmtDataBR(x.dataEntrada)} → ${fmtDataBR(x.dataSaida)}</td><td style="color:${x.ret >= 0 ? '#4ade80' : '#f87171'}">${fmtPctM(x.ret * 100)}</td><td>${x.veredito === 'entrar' ? '🟢' : '🟡'}</td></tr>`).join('');
         return `<details class="rel-secao cinza" data-secao="diario"${secaoAberta('diario') ? ' open' : ''}><summary>📒 Diário de sinais desde ${fmtDataBR(D.inicio)}<span class="rel-esp"></span></summary>
             <p class="text-sm rel-mudo mt-1">${fech.length} sinais encerrados, ${abert.length} em andamento e ${aguard.length} aguardando a abertura. São resultados de depois do sinal, que o teste não conhecia. Uma regra é desligada sozinha se a média real ficar abaixo do pior cenário do teste (com ${DIARIO_MIN_FECHADOS}+ sinais) e volta quando se recupera.</p>
+            ${htmlVsInd}
             ${linhasRegra ? `<table class="rel-tabela mt-2"><thead><tr class="rel-mudo"><th>Regra</th><th>Sinais</th><th>Média real</th><th>Acerto</th><th>Situação</th></tr></thead><tbody>${linhasRegra}</tbody></table>` : ''}
             ${(pv.entrar && pv.entrar.n) || (pv.esperar && pv.esperar.n) ? `<p class="text-sm mt-2">Veredito na prática: 🟢 entrar ${pv.entrar.n ? `${fmtPctM(pv.entrar.media * 100)} em ${pv.entrar.n}` : '—'} · 🟡 esperar ${pv.esperar.n ? `${fmtPctM(pv.esperar.media * 100)} em ${pv.esperar.n}` : '—'} (média por operação).</p>` : ''}
             ${ult ? `<table class="rel-tabela mt-2"><thead><tr class="rel-mudo"><th>Papel</th><th>Entrada → saída</th><th>Resultado</th><th></th></tr></thead><tbody>${ult}</tbody></table>` : ''}
@@ -2310,7 +2339,7 @@
                     <p>Entrada na abertura do pregão seguinte ao sinal; stop inicial = o mais protetor entre ${fmtNumM(R.parametros.atrMult, 1)}×ATR e ${fmtNumM(R.parametros.stopLossPct, 1)}%; custo de ${fmtNumM(R.parametros.custoPct, 2)}% por perna. ${avisoSobrevivencia().replace(/<\/?b>/g, '')}</p>
                 </div></details>`;
         }
-        alvos.forEach(el => el.innerHTML = html);
+        alvos.forEach(el => el.innerHTML = htmlCongelada() + html);
     }
     // Diagnóstico: o navegador do aparelho (no Brasil) consegue ler os dados de aluguel da B3? Se sim, dá para
     // buscar o dado do próprio aparelho, já que o servidor de coleta (fora do Brasil) é bloqueado.
@@ -2392,6 +2421,7 @@
             linha(`Dados de ${fmtDataBR(R.ultimoPregao)} · teste rodado em ${new Date(R.geradoEm).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} · ${R.universo} papéis em ${R.regras.length} regras`, 9, 'normal', [90, 90, 90]);
             if (R.vendidos) linha(`Vendidos: ${R.vendidos.fonte}, posição de ${fmtDataBR(R.vendidos.data)}.`, 9, 'normal', [90, 90, 90]);
             linha('Material técnico gerado pelas regras do app (backtest fora da amostra). Não é recomendação de investimento.', 8, 'italic', [120, 120, 120]);
+            linha(`Estratégia congelada em ${fmtDataBR(CONGELADA_EM)}, só para teste. ${textoCongelada()}`, 9, 'bold', [30, 64, 175]);
             y += 3;
             secoesDoRelatorio().forEach(([titulo, itens]) => {
                 if (y + 20 > ALT) { doc.addPage(); y = M; }
@@ -3446,9 +3476,10 @@
                ${htmlProgressoSim(o)}`}
         </div>`;
         const regras = Object.entries(E.porRegra).sort((a, b) => b[1].resultado - a[1].resultado);
-        box.innerHTML = `<div class="am-card"><div class="text-sm" ${mud}>Patrimônio simulado ${mercadoCodigo() === 'br' ? 'no Brasil' : 'nos EUA'}</div><div class="am-preco-grande">${fmtValorSim(E.patrimonio)}</div>
+        box.innerHTML = htmlCongelada() + `<div class="am-card mt-3"><div class="text-sm" ${mud}>Patrimônio simulado ${mercadoCodigo() === 'br' ? 'no Brasil' : 'nos EUA'}</div><div class="am-preco-grande">${fmtValorSim(E.patrimonio)}</div>
                 <div class="text-sm mt-1" ${cor(ret)}>${fmtPctM(ret)} · ${fmtValorSim(E.patrimonio - E.saldoInicial)} sobre ${fmtValorSim(E.saldoInicial)}${sim ? ` desde ${fmtDataBR(E.inicio)}` : ''}</div>
-                ${E.referencia !== null && sim ? `<div class="text-sm mt-1" ${mud}>Comprar todos os papéis do app e segurar no mesmo período: <b ${cor(E.referencia)}>${fmtPctM(E.referencia * 100)}</b></div>` : ''}
+                ${sim && retornoIndice(E.inicio, ultimoPregaoDados()) !== null ? `<div class="text-sm mt-1" ${mud}>${nomeIndice()} no mesmo período: <b ${cor(retornoIndice(E.inicio, ultimoPregaoDados()))}>${fmtPctM(retornoIndice(E.inicio, ultimoPregaoDados()) * 100)}</b></div>` : ''}
+                ${(c => c ? `<div class="text-sm mt-1" data-sim-indice>Mesmo dinheiro, mesmas datas: suas ${c.n} operações <b ${cor(c.sist)}>${fmtValorSim(c.sist)}</b> · no ${nomeIndice()} <b ${cor(c.ind)}>${fmtValorSim(c.ind)}</b> <span ${mud}>(${c.sist > c.ind ? 'a estratégia está na frente' : 'o índice está na frente'})</span></div>` : '')(comparacaoIndiceSim(E))}
                 <div class="text-sm mt-1" ${mud}>Em caixa ${fmtValorSim(E.caixa)} · em papéis ${fmtValorSim(E.emPapeis)}</div></div>
             ${sim ? htmlPlacarSim(E) : ''}
             ${!sim ? `<div class="am-card mt-3"><div class="font-bold">Como funciona</div><p class="text-sm mt-1" ${mud}>No Relatório (Mais → Relatório), os papéis 🟢 têm o botão "Seguir na simulação". A compra acontece na abertura seguinte, com o preço real; o tamanho arrisca ${getBacktestRiskParams().riskTrade}% do patrimônio até o stop (como no Backtest) e a saída é automática pela regra do papel. Assim dá para ver, com o tempo, qual estratégia rende mais de verdade.</p></div>` : ''}
@@ -3461,6 +3492,17 @@
             ${E.canceladas.length ? `<div class="rel-titulo">✖️ Canceladas <span class="rel-chip">${E.canceladas.length}</span></div><div class="space-y-3">${E.canceladas.slice(-10).map(linhaOp).join('')}</div>` : ''}
             ${sim ? `<button type="button" class="am-botao sec mt-4" id="am-sim-zerar">Zerar a simulação</button>` : ''}
             <p class="am-aviso">Dinheiro fictício, salvo só neste aparelho. Os preços são os reais do fechamento e da abertura; na vida real pode haver diferença de preço na execução.</p>`;
+    }
+    // Cada operação feita (aberta ou encerrada) contra o índice: o mesmo valor aplicado no índice do fechamento anterior à
+    // entrada até a saída (ou até hoje, se ainda aberta)
+    function comparacaoIndiceSim(E) {
+        if (!serieIndice()) return null; let n = 0, sist = 0, ind = 0, aplicado = 0;
+        E.ordens.filter(o => o.estado === 'fechada' || o.estado === 'aberta').forEach(o => {
+            const d = allData[o.t]; if (!d || !(o.iEnt >= 1)) return;
+            const r = retornoIndice(d.dates[o.iEnt - 1], o.estado === 'fechada' ? o.dataSai : ultimoPregaoDados()); if (r === null) return;
+            n++; aplicado += o.custoTotal; sist += o.resultado; ind += o.custoTotal * r;
+        });
+        return n ? { n, aplicado, sist, ind } : null;
     }
     function htmlPlacarSim(E) {
         const lin = Object.entries(E.porRegra).map(([id, r]) => ({ id, r, s: seloSim(r) }));
@@ -3864,7 +3906,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio, get estrategiasConfluencia() { return confluenceStrategies; } };
+    window.investDebug = { get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio, get estrategiasConfluencia() { return confluenceStrategies; }, get indice() { return indiceDados; }, set indice(v) { indiceDados = v; }, retornoIndice, comparacaoIndiceSim, htmlDiario };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).
