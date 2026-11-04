@@ -100,3 +100,4 @@ module.exports = function carregar(caminhoApp, mercado = 'us') {
     ctx.CODIGO_EXTRAIDO = codigo;
     return ctx;
 };
+module.exports.fimDoBloco = fimDoBloco;

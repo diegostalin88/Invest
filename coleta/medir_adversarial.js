@@ -17,6 +17,17 @@ const APP = path.join(__dirname, '..', 'app', 'index.html');
 const M = require('./motor_node')(APP, MERCADO);
 const SEMENTES_ALEAT = +arg('sementes', 20);
 const rapido = process.argv.includes('--rapido');
+// --inicio-teste AAAA-MM-DD: o teste de cada papel começa no 1º pregão a partir dessa data (treino = tudo antes).
+// Serve para o critério 2 do docs/congelamento.md. As divisões 50/50 e 70/30 continuam por fração, de propósito.
+const INICIO_TESTE = arg('inicio-teste');
+if (INICIO_TESTE) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(INICIO_TESTE)) throw new Error('--inicio-teste precisa ser AAAA-MM-DD');
+    let f = M.avaliarPapelRelatorio.toString(); const de = 'const corte = Math.floor(n * FRACAO_ESCOLHA);';
+    if (!f.includes(de)) throw new Error('corte do avaliarPapelRelatorio não encontrado no app');
+    f = f.replace(de, 'const corte = CORTE_DATA ? corteNaData(d.dates, CORTE_DATA) : Math.floor(n * FRACAO_ESCOLHA);');
+    require('vm').runInContext('var CORTE_DATA = null; function corteNaData(datas, dia) { const k = datas.findIndex(x => x >= dia); return k < 0 ? datas.length : k; }\n' + f, M);
+}
+const corteDe = (d, fracao) => INICIO_TESTE && fracao === 0.6 ? M.corteNaData(d.dates, INICIO_TESTE) : Math.floor(d.close.length * fracao);
 
 // ---------- utilidades ----------
 function mulberry(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -83,14 +94,14 @@ const runOriginal = M.runCoreBacktest;
 // Roda o Relatório (6 regras por papel, escolha no treino, confirmação no teste) e devolve as operações FORA DA AMOSTRA
 // da regra escolhida, separadas em confirmados / aprovados só no treino / todos.
 function pipeline({ rp = {}, ganchos = null, fracao = 0.6, universo, calib }) {
-    M.FRACAO_ESCOLHA = fracao;
+    M.FRACAO_ESCOLHA = fracao; if (INICIO_TESTE) M.CORTE_DATA = fracao === 0.6 ? INICIO_TESTE : null;
     M.runCoreBacktest = ganchos ? (d, x) => M.runCoreBacktestVar(d, { ...x, ...ganchos }) : runOriginal;
     const base = { ...M.RP_PADRAO, ...rp }, regras = M.regrasRelatorio(base, calib || { alvo: 3, dias: 10 });
     const grupos = { confirmados: [], treinoOk: [], todos: [] }, papeis = { confirmados: 0, treinoOk: 0, todos: 0 }, detalhe = [];
     M.poolRelatorio = null;
     for (const t of universo) {
         const d = M.allData[t]; const a = M.avaliarPapelRelatorio(t, regras); if (!a.regra) continue;
-        const regra = regras.find(x => x.id === a.regra), corte = Math.floor(d.close.length * fracao);
+        const regra = regras.find(x => x.id === a.regra), corte = corteDe(d, fracao);
         const res = M.runCoreBacktest(d, regra.rp); if (!res) continue;
         const te = res.tradesDet.filter(x => x.ent >= corte).map(x => ({ ...x, t, regra: a.regra, prio: a.treino.pf, entD: d.dates[x.ent], saiD: d.dates[Math.min(x.sai, d.dates.length - 1)] }));
         const em = [['todos', true], ['treinoOk', a.treino.pf >= 1], ['confirmados', a.confirmada]];
@@ -180,7 +191,7 @@ function testeVazamento(universo, amostras = 300, seed = 11) {
     log('base'); const base = pipeline({ universo, calib }); R.base = enxuto(base);
     // Janela fora da amostra (o maior histórico define a data de corte de 60%)
     const maior = universo.reduce((m, t) => M.allData[t].dates.length > M.allData[m].dates.length ? t : m, universo[0]);
-    const dl = M.allData[maior].dates, inicioTeste = dl[Math.floor(dl.length * 0.6)], fim = dl[dl.length - 1]; R.janelaTeste = { de: inicioTeste, ate: fim };
+    const dl = M.allData[maior].dates, inicioTeste = INICIO_TESTE || dl[Math.floor(dl.length * 0.6)], fim = dl[dl.length - 1]; R.janelaTeste = { de: inicioTeste, ate: fim };
 
     // 1) Entradas aleatórias com o MESMO stop, tamanho, custo, filtro de regime e o MESMO processo de escolha/confirmação.
     //    A probabilidade é ajustada para dar o mesmo número de operações que o sistema (todos, fora da amostra).
