@@ -60,3 +60,16 @@ Esta hipótese não precisa render mais; o objetivo dela é cair menos.
 - **A: viés de sobrevivência.** Os dados de ações só têm as empresas que existem hoje, e as que quebraram ficam de fora. As carteiras sorteadas e a de pesos iguais usam o mesmo universo, então parte do viés se cancela na comparação, mas não com o índice.
 - **A: histórico curto.** Os EUA têm cerca de 3 anos de dados, ou seja, uns 2 anos de teste depois dos 12 meses de nota. O Brasil tem 5 anos, ou seja, uns 4 de teste, e inclui 2022.
 - **B: estudo já feito.** A regra B foi estudada com dados até 2008 na literatura. Os anos de 2009 a 2026 são, para ela, dados novos.
+
+## Resultado (04/11/2026, rodado depois do registro acima, sem nenhum ajuste)
+
+Execução: https://github.com/diegostalin88/Invest/actions/runs/41903112455
+
+| teste | resultado | critérios | veredito |
+|---|---|---|---|
+| A · EUA (nov/2024 a nov/2026, 24 meses) | momento +45,9% (queda 33,9%) × SPY +28,1% (queda 7,6%); acaso p95 37,6% | acima do acaso: sim · vence o índice com queda ≤ 1,5×: **não** · custo ×2: sim | REPROVADA |
+| A · Brasil (nov/2022 a nov/2026, 48 meses) | momento +28,5% (queda 17,1%) × BOVA11 +50,1% (queda 12%); acaso p95 49,8% | acaso: não · índice: não · custo ×2: não | REPROVADA |
+| B · EUA (SPY, 1993 a 2026) | período inteiro: Sharpe 0,71 × 0,60, queda 22% × 51%; 2010–2026: anual 7,8% × 13,9%, Sharpe 0,60 × 0,88 | inteiro: sim · segunda metade: **não** | REPROVADA |
+| B · Brasil (Ibovespa, 2000 a 2026, caixa no CDI) | Sharpe sobre o CDI −0,10 × 0,03; 2013–2026: −0,19 × 0,07 | inteiro: não · segunda metade: não | REPROVADA |
+
+Leitura: o momento nos EUA escolheu melhor que o acaso, mas com queda 4,5× maior que a do índice num período curto (24 meses, só empresas que existem hoje). A tendência no índice reduz a queda, como a literatura diz, mas nos últimos 16 anos dos EUA custou retorno e Sharpe; no Brasil o CDI alto faz o caixa ganhar quase sempre do índice, então nenhuma das duas formas vence o juro.
