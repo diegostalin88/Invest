@@ -1,0 +1,30 @@
+name: Testar o site publicado
+
+# Só leitura, disparado à mão: abre o app publicado no Pages como no celular, confere o Relatório da noite
+# (EUA e Brasil) e baixa o PDF; mostra o texto do PDF no resumo para conferência.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  testar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Testar
+        run: |
+          npm install --no-save --no-package-lock playwright@1.48.2
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y -qq poppler-utils > /dev/null
+          mkdir -p pdfs
+          node testes_app/teste_publicado.js "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/" pdfs | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Texto do PDF
+        if: always()
+        run: |
+          for f in pdfs/*.pdf; do echo "===== $f"; pdftotext -layout "$f" - | head -400; done
