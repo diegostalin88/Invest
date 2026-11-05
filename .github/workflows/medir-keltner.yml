@@ -1,7 +1,6 @@
 name: Medir estratégia Keltner
 
-# TEMPORÁRIO (branch de trabalho): roda coleta/balancos_cvm.py com os dados publicados do Brasil e mostra
-# amostras para conferir contra os resultados divulgados pelas empresas. Só leitura; não publica nada.
+# TEMPORÁRIO (branch de trabalho): diagnóstico do indice.json publicado. Só leitura.
 on:
   workflow_dispatch:
 
@@ -11,37 +10,18 @@ permissions:
 jobs:
   medir:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.13"
-      - name: Baixar os dados publicados do Brasil
-        env:
-          BASE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data/br
+      - name: indice.json publicado
         run: |
-          mkdir -p br
-          C="curl -fsSL --retry 6 --retry-delay 10 --retry-all-errors"
-          $C "$BASE/manifest.json" -o br/manifest.json
-          for f in $(python3 -c "import json;print(' '.join(json.load(open('br/manifest.json'))['arquivosPrecos']))"); do $C "$BASE/$f" -o "br/$f"; done
-      - name: Balanços da CVM
-        run: |
-          pip install -q requests
-          time python coleta/balancos_cvm.py br
-          python3 - <<'PY'
-          import json
-          d = json.load(open('br/balancos.json'))['ativos']
-          print('papéis:', len(d))
-          for t in ['PETR4', 'VALE3', 'ITUB4', 'BBAS3', 'WEGE3', 'ABEV3', 'MGLU3', 'B3SA3']:
-              if t not in d:
-                  print(t, 'SEM DADO'); continue
-              print('=====', t)
-              for x in d[t]['t'][-6:]:
-                  print('   ', x)
-              print('    bal', d[t]['b'][-2:])
-          cont = sum(1 for a in d.values() if len(a['t']) >= 12)
-          print('com 12+ trimestres:', cont)
-          semlucro = [t for t, a in d.items() if all(x[3] is None for x in a['t'])]
-          print('sem lucro:', semlucro[:30])
-          PY
+          B=https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data
+          for p in "" "/br"; do
+            echo "===== mercado '$p'"
+            curl -fsSL "$B$p/manifest.json" | python3 -c "import json,sys;m=json.load(sys.stdin);print({k:v for k,v in m.items() if k!='arquivosPrecos'})"
+            curl -fsSL "$B$p/indice.json" | python3 -c "
+          import json,sys
+          j=json.load(sys.stdin)
+          print('principal',j.get('principal'),'rendaFixa',j.get('rendaFixa'),'geradoEm',j.get('geradoEm'))
+          for t,s in j['series'].items(): print(t,s['nome'],len(s['dates']),s['dates'][:1],s['dates'][-1:],s['close'][:2],s['close'][-2:])
+          " || echo "sem indice.json"
+          done
