@@ -257,9 +257,14 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
 
     // Celular: casca nova (Início / Ranking / Testes / Mais), tela do ativo e gráfico em tela cheia
     const cel = await abrir(browser, BASE + '?mercado=br', false, { width: 390, height: 844 });
-    await cel.page.waitForSelector('#am-top .am-linha', { timeout: 120000 });
+    await cel.page.waitForSelector('#am-top .am-linha', { state: 'attached', timeout: 120000 });
     ok(await cel.page.isVisible('.am-nav') && await cel.page.isHidden('#tabs'), 'celular: barra de baixo com Início / Ranking / Testes / Mais');
     ok(/Brasil/.test(await cel.page.textContent('#am-sub')) && (await cel.page.$$('#am-melhores .am-opcao')).length > 0, 'celular: Início com data dos dados, clima e Melhores Opções');
+    const termo = await cel.page.textContent('#am-termometro');
+    ok(/Termômetro do BOVA11/.test(termo) && /média de 10 meses/.test(termo) && /Volatilidade/.test(termo) && /não prevê/.test(termo), 'celular: Início abre com o termômetro do índice (contexto, sem previsão)');
+    ok(await cel.page.isHidden('#am-melhores') && await cel.page.isVisible('#am-inicio-sinais summary'), 'celular: sinais técnicos recolhidos no Início');
+    const T = await cel.page.evaluate(() => { const t = window.investDebug.termometroIndice(); const s = window.investDebug.indice.series['BOVA11.SA']; const c = s.close, n = c.length; let m = 0; for (let i = n - 200; i < n; i++) m += c[i]; return { ok: Math.abs(t.distMM200 - (c[n - 1] / (m / 200) - 1)) < 1e-9 && Math.abs(t.quedaPico - (1 - c[n - 1] / Math.max(...c))) < 1e-9 && t.volPct > 0 && t.volPct <= 1 }; });
+    ok(T.ok, 'celular: termômetro confere com o cálculo à mão (MME200 e queda do topo)');
     const larg = await cel.page.evaluate(() => ({ doc: document.documentElement.scrollWidth, sw: document.getElementById('market-switch').getBoundingClientRect().right }));
     ok(larg.doc <= 390 && larg.sw <= 390, `celular: sem rolagem lateral (${JSON.stringify(larg)})`);
     await cel.page.screenshot({ path: path.join(SHOTS, 'celular_inicio.png'), fullPage: false });
@@ -545,6 +550,7 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     await cel.page.waitForFunction(() => /Último teste/.test(document.getElementById('am-relatorio').textContent), null, { timeout: 120000 });
     await cel.page.goBack(); await cel.page.waitForSelector('#am-sub-tela', { state: 'hidden', timeout: 5000 });
     await cel.page.click('.am-nav [data-ir-pagina="carteira"]');
+    await cel.page.evaluate(() => { const d = document.querySelector('[data-sinais-tecnicos]'); if (d) d.open = true; });
     await cel.page.waitForSelector('#am-cart-analise', { timeout: 15000 });
     const A = await cel.page.evaluate(() => { const a = window.investDebug.analisarCarteira(); return { pos: a.posicoes.map(p => ({ t: p.t, acao: p.acao, vies: p.v && p.v.vies, peso: p.peso, conc: p.concentrada, val: !!(p.rel && p.rel.confirmada), op: !!(p.rel && p.rel.confirmada && p.rel.situacao === 'posicao') })), cand: a.candidatos.map(c => c.t), candOk: a.candidatos.every(c => c.entrada && c.v.vies === 'alta'), veredito: a.veredito, reforcar: a.reforcar && a.reforcar.t }; });
     const regrasOk = A.pos.every(p => (p.vies === 'baixa' && p.val && !p.op) ? p.acao === 'trocar' : p.conc ? p.acao === 'reduzir' : p.acao === ({ alta: 'manter', neutro: 'neutro', baixa: 'neutro' }[p.vies] || 'neutro'));
@@ -561,6 +567,7 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
         const x = D.analisarCarteira(); return { t: alvo.t, acao: x.posicoes[0].acao, cand: x.candidatos.length };
     });
     if (troca) {
+        await cel.page.evaluate(() => { const d = document.querySelector('[data-sinais-tecnicos]'); if (d) d.open = true; });
         await cel.page.click('#am-cart-reanalisar');
         const tTxt = await cel.page.textContent('#am-cart-analise');
         ok(troca.acao === 'trocar' && /Trocar ou reduzir/.test(tTxt) && /(trocar por|ficar em caixa)/.test(tTxt), `celular: viés de baixa + regra validada fora → sugere trocar (${troca.t}, ${troca.cand} alternativa(s))`);
@@ -568,7 +575,38 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     await cel.page.evaluate(() => document.getElementById('am-cart-analise').scrollIntoView());
     await cel.page.waitForTimeout(300);
     await cel.page.screenshot({ path: path.join(SHOTS, 'celular_carteira_analise.png'), fullPage: false });
+    // Saúde da carteira: concentração, risco e o mesmo dinheiro no índice
+    const saude = await cel.page.evaluate(() => {
+        const D = window.investDebug; const ts = Object.keys(D.allData).filter(t => D.allData[t].close.length >= 260).slice(0, 4);
+        const datas = D.allData[ts[0]].dates; const dia = datas[datas.length - 120];
+        const lista = ts.map((t, k) => ({ t, m: 'br', qtd: k === 0 ? 100 : 10, pm: D.allData[t].close[D.allData[t].dates.indexOf(dia)], data: dia }));
+        localStorage.setItem('invest-carteira', JSON.stringify(lista));
+        const S = D.saudeCarteira(); const ult = t => D.allData[t].close.at(-1);
+        const atual = lista.reduce((s, x) => s + x.qtd * ult(x.t), 0), inv = lista.reduce((s, x) => s + x.qtd * x.pm, 0);
+        const esperado = inv * (1 + D.retornoIndice(dia, datas[datas.length - 1]));
+        return { conta: Math.abs(S.vsIndice.atual - atual) < 1e-6 && Math.abs(S.vsIndice.noIndice - esperado) < 1e-6, pesos: Math.abs(S.pos.reduce((s, p) => s + p.peso, 0) - 1) < 1e-9, nEf: S.nEfetivo, maior: S.maior.peso };
+    });
+    ok(saude.conta && saude.pesos && saude.nEf >= 1 && saude.nEf <= 4, `celular: saúde da carteira confere a conta contra o índice e os pesos (efetivos ${saude.nEf.toFixed(2)})`);
+    await cel.page.click('.am-nav [data-ir-pagina="inicio"]'); await cel.page.click('.am-nav [data-ir-pagina="carteira"]');
+    const sTxt = await cel.page.textContent('[data-saude-carteira]');
+    ok(/Saúde da carteira/.test(sTxt) && /Se o mesmo dinheiro de cada compra/.test(sTxt) && (saude.maior > 0.2 ? /⚠️/.test(sTxt) : true), 'celular: saúde da carteira aparece com a comparação e os alertas');
+    await cel.page.waitForTimeout(400); await cel.page.screenshot({ path: path.join(SHOTS, 'celular_saude_carteira.png'), fullPage: false });
     await cel.page.evaluate(() => localStorage.removeItem('invest-carteira'));
+    // Diário das minhas decisões e "O que já foi testado"
+    await cel.page.click('.am-nav [data-ir-pagina="mais"]'); await cel.page.click('[data-pagina="mais"] [data-sub="decisoes"]');
+    await cel.page.fill('#dec-t', 'PETR4'); await cel.page.fill('#dec-motivo', 'teste <b>');
+    const dia = await cel.page.evaluate(() => { const d = window.investDebug.allData.PETR4.dates; return d[d.length - 60]; });
+    await cel.page.fill('#dec-data', dia); await cel.page.click('#dec-salvar');
+    const decTxt = await cel.page.textContent('[data-sub-slot="decisoes"]');
+    const decOk = await cel.page.evaluate(dia => { const D = window.investDebug; const x = D.lerDecisoes()[0]; const a = D.avaliarDecisao(x); const d = D.allData.PETR4; const i0 = d.dates.indexOf(dia); return x.t === 'PETR4' && Math.abs(a.ret - (d.close.at(-1) / d.close[i0] - 1)) < 1e-9; }, dia);
+    ok(decOk && /Placar das suas decisões/.test(decTxt) && /teste &lt;b&gt;|teste <b>/.test(decTxt) && !(await cel.page.$('[data-sub-slot="decisoes"] b:text("teste")')), 'celular: diário de decisões grava, calcula contra o índice e escapa o texto');
+    await cel.page.click('[data-decisao-apagar="0"]');
+    ok(await cel.page.evaluate(() => window.investDebug.lerDecisoes().length === 0), 'celular: apagar decisão');
+    await cel.page.goBack(); await cel.page.waitForSelector('#am-sub-tela', { state: 'hidden', timeout: 5000 });
+    await cel.page.click('[data-pagina="mais"] [data-sub="testado"]');
+    const tsTxt = await cel.page.textContent('[data-sub-slot="testado"]');
+    ok(/REPROVADA/.test(tsTxt) && /Momento de 12 meses/.test(tsTxt) && /Mind the Gap/.test(tsTxt), 'celular: "O que já foi testado" lista os testes com veredito');
+    await cel.page.goBack(); await cel.page.waitForSelector('#am-sub-tela', { state: 'hidden', timeout: 5000 });
     // Testes e Mais
     await cel.page.click('.am-nav [data-ir-pagina="testes"]');
     await cel.page.click('#run-backtest-btn');

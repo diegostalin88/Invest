@@ -106,6 +106,17 @@ def main(destino):
     m['arquivoVendidos'] = 'vendidos.json'
     with open(mbr, 'w') as f:
         json.dump(m, f, indent=2)
+    # Índices de referência sintéticos (mesmo formato do coleta/indices.py)
+    for pasta, tk, nome in ((os.path.join(destino, 'data'), 'SPY', 'SPY'), (os.path.join(destino, 'data', 'br'), 'BOVA11.SA', 'BOVA11')):
+        s = passeio(rng, N_DIAS, 100, 0.0004, 0.01, 1)
+        with open(os.path.join(pasta, 'indice.json'), 'w') as f:
+            json.dump({'principal': tk, 'series': {tk: {'nome': nome, 'dates': datas, 'close': [round(x, 2) for x in s['close']]}}}, f)
+        mp = os.path.join(pasta, 'manifest.json')
+        with open(mp) as f:
+            m = json.load(f)
+        m['arquivoIndice'] = 'indice.json'
+        with open(mp, 'w') as f:
+            json.dump(m, f, indent=2)
     print(f"Site de exemplo em {destino}: {n_us} ativos EUA, {len(precos_br)} ativos Brasil.")
 
 

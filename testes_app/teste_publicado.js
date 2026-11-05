@@ -22,7 +22,7 @@ async function mercado(browser, m) {
     }
     const erros = []; page.on('console', x => { if (x.type() === 'error') erros.push(x.text()); }); page.on('pageerror', e => erros.push(String(e)));
     await page.goto(`${BASE}?mercado=${m}`);
-    await page.waitForSelector('#am-top .am-linha', { timeout: 180000 });
+    await page.waitForSelector('#am-top .am-linha', { state: 'attached', timeout: 180000 });
     await page.click('.am-nav [data-ir-pagina="mais"]'); await page.click('[data-sub="relatorio"]');
     await page.waitForFunction(() => /Último teste|Gerar agora/.test(document.getElementById('am-relatorio').textContent), null, { timeout: 120000 });
     if (await page.isVisible('#am-relatorio [data-gerar-relatorio]')) {

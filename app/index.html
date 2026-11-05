@@ -330,11 +330,19 @@
 
         <section class="am-pagina ativa" data-pagina="inicio">
             <div id="am-avisos"></div>
-            <div class="am-card" id="am-clima"><div class="text-sm" style="color:var(--mudo)">Clima do mercado</div><div class="am-clima-num">—</div></div>
+            <div id="am-termometro"></div>
+            <div class="am-card mt-3" id="am-clima"><div class="text-sm" style="color:var(--mudo)">Clima do mercado</div><div class="am-clima-num">—</div></div>
+            <div id="am-inicio-carteira"></div>
+            <div class="am-lista mt-3">
+                <button type="button" class="am-linha" data-sub="decisoes"><span class="am-avatar" style="background:#0e7490">✍️</span><span class="am-meio"><span class="am-tk block">Diário das minhas decisões</span><span class="am-nome block">Anote cada compra e venda e veja se vence o índice</span></span></button>
+                <button type="button" class="am-linha" data-sub="testado"><span class="am-avatar" style="background:#475569">🔬</span><span class="am-meio"><span class="am-tk block">O que já foi testado</span><span class="am-nome block">Ideias que passaram e que reprovaram, com números</span></span></button>
+            </div>
+            <details class="mt-4" id="am-inicio-sinais"><summary class="am-secao" style="cursor:pointer">Sinais técnicos <span class="text-xs font-normal" style="color:var(--mudo)">(estratégia congelada; sem vantagem comprovada)</span></summary>
             <div class="am-secao">Melhores opções <button type="button" data-ir-pagina="ranking">Ranking <svg class="am-ico" style="width:1.1rem;height:1.1rem"><use href="#i-dir"/></svg></button></div>
             <div class="am-carrossel" id="am-melhores"></div>
             <div class="am-secao">Top 10 do ranking técnico</div>
             <div class="am-lista" id="am-top"></div>
+            </details>
             <p class="am-aviso">Ferramenta de apoio à análise. Não é recomendação de investimento.</p>
         </section>
 
@@ -373,6 +381,11 @@
         </section>
 
         <section class="am-pagina" data-pagina="mais">
+            <div class="am-lista">
+                <button type="button" class="am-linha" data-sub="decisoes"><span class="am-avatar" style="background:#0e7490">✍️</span><span class="am-meio"><span class="am-tk block">Diário das minhas decisões</span><span class="am-nome block">Cada compra e venda contra o índice</span></span></button>
+                <button type="button" class="am-linha" data-sub="testado"><span class="am-avatar" style="background:#475569">🔬</span><span class="am-meio"><span class="am-tk block">O que já foi testado</span><span class="am-nome block">O que passou e o que reprovou</span></span></button>
+            </div>
+            <div class="am-secao mt-4">Avançado <span class="text-xs font-normal" style="color:var(--mudo)">(ferramentas técnicas e a estratégia congelada)</span></div>
             <div class="am-lista">
                 <button type="button" class="am-linha" data-sub="estrategias"><span class="am-avatar" style="background:#4338ca"><svg class="am-ico"><use href="#i-alvo"/></svg></span><span class="am-meio"><span class="am-tk block">Screener de Estratégias</span><span class="am-nome block">Ativos que dispararam uma estratégia hoje</span></span><svg class="am-ico" style="color:var(--mudo)"><use href="#i-dir"/></svg></button>
                 <button type="button" class="am-linha" data-sub="fundamentos"><span class="am-avatar" style="background:#7e22ce"><svg class="am-ico"><use href="#i-tabela"/></svg></span><span class="am-meio"><span class="am-tk block">Técnica × Fundamentos</span><span class="am-nome block">Tabela completa e limites de qualidade</span></span><svg class="am-ico" style="color:var(--mudo)"><use href="#i-dir"/></svg></button>
@@ -415,6 +428,8 @@
         <div class="am-tela" id="am-sub-tela" role="dialog" aria-modal="true">
             <div class="am-tela-topo"><button type="button" class="am-voltar" data-fechar-tela aria-label="Voltar"><svg class="am-ico"><use href="#i-esq"/></svg></button><div class="am-tela-titulo" id="am-sub-titulo"></div></div>
             <div class="am-tela-corpo">
+                <div data-sub-slot="decisoes" class="hidden"></div>
+                <div data-sub-slot="testado" class="hidden"></div>
                 <div data-sub-slot="estrategias" class="hidden space-y-4"></div>
                 <div data-sub-slot="fundamentos" class="hidden"></div>
                 <div data-sub-slot="correlacao" class="hidden"></div>
@@ -3063,6 +3078,8 @@
             document.getElementById('am-sub').textContent = `${MERCADO.nome} · dados de ${d}/${m}/${a} · ${Object.keys(allData).length.toLocaleString('pt-BR')} ativos`;
             document.getElementById('am-ponto').className = 'am-ponto' + (dias > 10 ? ' muito-velho' : dias > 4 ? ' velho' : '');
         }
+        { const box = document.getElementById('am-termometro'); if (box) box.innerHTML = htmlTermometro(termometroIndice()); }
+        { const box = document.getElementById('am-inicio-carteira'); const S = saudeCarteira(); if (box) box.innerHTML = S ? `<button type="button" class="am-card mt-3 w-full text-left" data-ir-pagina-carteira><div class="flex items-center justify-between"><span class="text-sm" style="color:var(--mudo)">Sua carteira</span><span class="text-sm" style="color:var(--acento)">Ver saúde ›</span></div><div class="text-sm mt-1">${S.pos.length} papéis · maior posição ${S.maior.t} (${fmtNumM(S.maior.peso * 100, 0)}%) · ${S.vsIndice ? `${S.vsIndice.atual >= S.vsIndice.noIndice ? 'vencendo' : 'perdendo para'} o ${nomeIndice()} desde as compras` : 'preencha as datas de compra para comparar com o índice'}</div></button>` : ''; }
         // Clima do mercado (mesma leitura do "Filtro de Regime")
         const usaveis = historicalRegimeData.filter(r => r.total >= 10); const ult = usaveis[usaveis.length - 1];
         if (ult) {
@@ -3318,6 +3335,179 @@
             <div class="flex gap-2 mt-3"><button type="button" class="am-botao sec" data-ativo="${t}">Abrir análise</button><button type="button" class="am-botao sec" data-cart-editar="${k}">Editar</button></div>
         </div>`;
     }
+    // =================== BÚSSOLA: termômetro, saúde da carteira, diário de decisões e o que já foi testado ===================
+    // Depois da auditoria de 04/11/2026, o app deixou de prometer previsão. Estas telas descrevem o ambiente e
+    // a carteira com números que se pode conferir (sem sinal de compra), e cobram cada decisão contra o índice.
+    const fracaoRet = (a, b) => a > 0 && b > 0 ? b / a - 1 : null;
+    const desvio = v => { if (v.length < 2) return null; const m = v.reduce((a, b) => a + b, 0) / v.length; return Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / (v.length - 1)); };
+    function termometroIndice() {
+        const s = serieIndice(); if (!s || s.close.length < 260) return null;
+        const c = s.close, d = s.dates, n = c.length, ult = c[n - 1];
+        let mm200 = 0; for (let i = n - 200; i < n; i++) mm200 += c[i]; mm200 /= 200;
+        const fimMes = []; for (let i = 0; i < n; i++) if (i === n - 1 || d[i].slice(0, 7) !== d[i + 1].slice(0, 7)) fimMes.push(c[i]);
+        const mm10 = fimMes.length >= 10 ? fimMes.slice(-10).reduce((a, b) => a + b, 0) / 10 : null;
+        let pico = 0; for (let i = 0; i < n; i++) pico = Math.max(pico, c[i]);
+        let pico52 = 0; for (let i = Math.max(0, n - 252); i < n; i++) pico52 = Math.max(pico52, c[i]);
+        const rets = []; for (let i = 1; i < n; i++) rets.push(c[i] / c[i - 1] - 1);
+        const vols = []; for (let i = 21; i <= rets.length; i++) vols.push(desvio(rets.slice(i - 21, i)) * Math.sqrt(252));
+        const volHoje = vols[vols.length - 1], volPct = vols.filter(v => v <= volHoje).length / vols.length;
+        const r = k => n > k ? fracaoRet(c[n - 1 - k], ult) : null;
+        return { nome: s.nome || nomeIndice(), data: d[n - 1], ult, distMM200: ult / mm200 - 1, mm10, acimaMM10: mm10 ? ult > mm10 : null, distMM10: mm10 ? ult / mm10 - 1 : null,
+            quedaPico: 1 - ult / pico, quedaPico52: 1 - ult / pico52, desde: d[0], ret1m: r(21), ret3m: r(63), ret12m: r(252), vol: volHoje, volPct, anos: (n / 252) };
+    }
+    function htmlTermometro(T) {
+        if (!T) return '';
+        const p = v => v === null ? '—' : fmtPctM(v * 100);
+        const cor = v => v === null ? '' : v >= 0 ? 'var(--alta)' : 'var(--baixa)';
+        const lin = (r, v, c, ajuda) => `<div class="flex items-start justify-between gap-3 py-1.5" style="border-top:1px solid rgba(148,163,184,.15)"><div><div class="text-sm">${r}</div>${ajuda ? `<div class="text-xs" style="color:var(--mudo)">${ajuda}</div>` : ''}</div><div class="font-semibold text-right"${c ? ` style="color:${c}"` : ''}>${v}</div></div>`;
+        const volTxt = T.volPct >= 0.8 ? 'alta' : T.volPct <= 0.3 ? 'baixa' : 'normal';
+        const ambiente = T.acimaMM10 === null ? null : T.acimaMM10 && T.quedaPico < 0.1 ? ['verde', 'Tendência de alta'] : !T.acimaMM10 && T.quedaPico >= 0.15 ? ['vermelho', 'Mercado em queda'] : ['amarelo', 'Misto'];
+        return `<div class="am-card mt-3" data-termometro>
+            <div class="flex items-center justify-between"><span class="text-sm" style="color:var(--mudo)">Termômetro do ${T.nome}</span>${ambiente ? `<span class="am-chip ${ambiente[0]}">${ambiente[1]}</span>` : ''}</div>
+            ${lin('Acima da média de 10 meses?', T.acimaMM10 === null ? '—' : `${T.acimaMM10 ? 'Sim' : 'Não'} (${p(T.distMM10)})`, T.acimaMM10 === null ? '' : T.acimaMM10 ? 'var(--alta)' : 'var(--baixa)', 'A regra clássica de tendência (Faber). Medimos aqui: fora dela, as quedas foram menores, mas o retorno também.')}
+            ${lin('Distância da média de 200 dias', p(T.distMM200), cor(T.distMM200))}
+            ${lin('Abaixo do topo', `${fmtNumM(T.quedaPico * 100, 1)}%`, T.quedaPico > 0.1 ? 'var(--baixa)' : '', `Topo de 52 semanas: ${fmtNumM(T.quedaPico52 * 100, 1)}% abaixo`)}
+            ${lin('Retorno 1 mês · 3 meses · 12 meses', `${p(T.ret1m)} · ${p(T.ret3m)} · ${p(T.ret12m)}`)}
+            ${lin('Volatilidade (21 pregões, ao ano)', `${fmtNumM(T.vol * 100, 1)}% · ${volTxt}`, T.volPct >= 0.8 ? 'var(--baixa)' : '', `Maior que ${fmtNumM(T.volPct * 100, 0)}% dos dias desde ${fmtDataBR(T.desde)}. Volatilidade alta costuma vir junto com quedas.`)}
+            <p class="text-xs mt-2" style="color:var(--mudo)">Descreve o ambiente; não prevê o próximo movimento. Nos testes (1993–2026), ficar fora do índice abaixo da média de 10 meses reduziu as quedas, mas rendeu menos que ficar comprado desde 2010.</p>
+        </div>`;
+    }
+    // ----- Saúde da carteira: diversificação, risco e comparação com o índice (só números, sem "compre/venda") -----
+    const LIMITE_PAPEL = 0.20;
+    function saudeCarteira() {
+        const merc = mercadoCodigo(); const itens = lerCarteira().filter(x => x.m === merc && allData[x.t]); if (!itens.length) return null;
+        const ult = t => { const c = allData[t].close; return c[c.length - 1]; };
+        const total = itens.reduce((s, x) => s + x.qtd * ult(x.t), 0); if (!(total > 0)) return null;
+        const pos = itens.map(x => ({ t: x.t, peso: x.qtd * ult(x.t) / total })).sort((a, b) => b.peso - a.peso);
+        const hhi = pos.reduce((s, x) => s + x.peso ** 2, 0);
+        // série diária de 1 ano da carteira com os pesos de hoje (risco "como está agora")
+        const datas = [...new Set(itens.flatMap(x => allData[x.t].dates.slice(-253)))].sort().slice(-253);
+        const mapa = {}; itens.forEach(x => { const d = allData[x.t]; const m = new Map(); d.dates.forEach((dt, i) => m.set(dt, d.close[i])); mapa[x.t] = m; });
+        const retsCart = [], retsIdx = [], retsPapel = {}; pos.forEach(p => retsPapel[p.t] = []);
+        for (let i = 1; i < datas.length; i++) {
+            let r = 0, ok = true; const rp = {};
+            for (const p of pos) { const a = mapa[p.t].get(datas[i - 1]), b = mapa[p.t].get(datas[i]); if (!(a > 0 && b > 0)) { ok = false; break; } rp[p.t] = b / a - 1; r += p.peso * rp[p.t]; }
+            const ia = fechIndiceAte(datas[i - 1]), ib = fechIndiceAte(datas[i]);
+            if (!ok || !(ia > 0 && ib > 0)) continue;
+            retsCart.push(r); retsIdx.push(ib / ia - 1); pos.forEach(p => retsPapel[p.t].push(rp[p.t]));
+        }
+        const vol = desvio(retsCart), volIdx = desvio(retsIdx);
+        let beta = null; if (retsCart.length > 30 && volIdx > 0) { const mc = retsCart.reduce((a, b) => a + b, 0) / retsCart.length, mi = retsIdx.reduce((a, b) => a + b, 0) / retsIdx.length; let cov = 0; for (let i = 0; i < retsCart.length; i++) cov += (retsCart[i] - mc) * (retsIdx[i] - mi); beta = cov / (retsCart.length - 1) / volIdx ** 2; }
+        const queda = rets => { let v = 1, pico = 1, dd = 0; rets.forEach(r => { v *= 1 + r; pico = Math.max(pico, v); dd = Math.max(dd, 1 - v / pico); }); return dd; };
+        const acum = rets => rets.reduce((v, r) => v * (1 + r), 1) - 1;
+        let corrSoma = 0, corrN = 0; const tk = pos.map(p => p.t);
+        for (let a = 0; a < tk.length; a++) for (let b = a + 1; b < tk.length; b++) { const x = retsPapel[tk[a]], y = retsPapel[tk[b]]; const sx = desvio(x), sy = desvio(y); if (!(sx > 0 && sy > 0)) continue; const mx = x.reduce((s, v) => s + v, 0) / x.length, my = y.reduce((s, v) => s + v, 0) / y.length; let cv = 0; for (let i = 0; i < x.length; i++) cv += (x[i] - mx) * (y[i] - my); corrSoma += cv / (x.length - 1) / sx / sy; corrN++; }
+        // contra o índice desde a compra: o mesmo dinheiro de cada compra aplicado no índice na mesma data
+        let investido = 0, noIndice = 0, comData = 0, semData = 0, atualComData = 0;
+        const hoje = ultimoPregaoDados();
+        itens.forEach(x => { const v = x.qtd * x.pm; const r = x.data ? retornoIndice(x.data, hoje) : null; if (r === null) { semData++; return; } comData++; investido += v; noIndice += v * (1 + r); atualComData += x.qtd * ult(x.t); });
+        return { total, pos, nEfetivo: 1 / hhi, maior: pos[0], top3: pos.slice(0, 3).reduce((s, x) => s + x.peso, 0), dias: retsCart.length,
+            vol: vol === null ? null : vol * Math.sqrt(252), volIdx: volIdx === null ? null : volIdx * Math.sqrt(252), beta, quedaCart: queda(retsCart), quedaIdx: queda(retsIdx),
+            ret1a: acum(retsCart), ret1aIdx: acum(retsIdx), corrMedia: corrN ? corrSoma / corrN : null,
+            vsIndice: comData ? { investido, noIndice, atual: atualComData, n: comData } : null, semData };
+    }
+    function htmlSaudeCarteira(S) {
+        if (!S) return '';
+        const alertas = [];
+        if (S.maior.peso > LIMITE_PAPEL) alertas.push(`<b>${S.maior.t}</b> é ${fmtNumM(S.maior.peso * 100, 0)}% da carteira. Uma queda forte dele pesa muito no total; muitos gestores limitam cada papel a ${fmtNumM(LIMITE_PAPEL * 100, 0)}%.`);
+        if (S.nEfetivo < 5) alertas.push(`Na prática, a carteira equivale a só ${fmtNumM(S.nEfetivo, 1)} papéis de mesmo peso. Pouca diversificação aumenta o risco sem aumentar o retorno esperado.`);
+        if (S.vol && S.volIdx && S.vol > 1.5 * S.volIdx) alertas.push(`A carteira oscila ${fmtNumM(S.vol / S.volIdx, 1)} vezes mais que o ${nomeIndice()}.`);
+        if (S.corrMedia !== null && S.corrMedia > 0.6 && S.pos.length > 2) alertas.push(`Os papéis andam muito juntos (correlação média ${fmtNumM(S.corrMedia, 2)}): na queda, tendem a cair juntos.`);
+        const lin = (r, v, c) => `<div class="am-dado"><div class="r">${r}</div><div class="v"${c ? ` style="color:${c}"` : ''}>${v}</div></div>`;
+        const V = S.vsIndice; const dif = V ? V.atual - V.noIndice : null;
+        return `<div class="am-card mt-3" data-saude-carteira>
+            <div class="font-bold">🧭 Saúde da carteira</div>
+            <div class="am-grade mt-2">
+                ${lin('Maior posição', `${S.maior.t} · ${fmtNumM(S.maior.peso * 100, 0)}%`, S.maior.peso > LIMITE_PAPEL ? 'var(--baixa)' : '')}
+                ${lin('3 maiores juntas', `${fmtNumM(S.top3 * 100, 0)}%`)}
+                ${lin('Papéis "efetivos"', fmtNumM(S.nEfetivo, 1), S.nEfetivo < 5 ? 'var(--baixa)' : '')}
+                ${lin('Correlação média', S.corrMedia === null ? '—' : fmtNumM(S.corrMedia, 2))}
+                ${lin(`Oscilação ao ano (carteira × ${nomeIndice()})`, S.vol ? `${fmtNumM(S.vol * 100, 0)}% × ${fmtNumM(S.volIdx * 100, 0)}%` : '—')}
+                ${lin('Beta', S.beta === null ? '—' : fmtNumM(S.beta, 2))}
+                ${lin('Maior queda em 1 ano (pesos de hoje)', `${fmtNumM(S.quedaCart * 100, 1)}% × ${fmtNumM(S.quedaIdx * 100, 1)}%`, S.quedaCart > S.quedaIdx * 1.5 ? 'var(--baixa)' : '')}
+                ${lin('Retorno em 1 ano (pesos de hoje)', `${fmtPctM(S.ret1a * 100)} × ${fmtPctM(S.ret1aIdx * 100)}`, S.ret1a >= S.ret1aIdx ? 'var(--alta)' : 'var(--baixa)')}
+            </div>
+            ${V ? `<div class="mt-3 text-sm">Se o mesmo dinheiro de cada compra tivesse ido para o <b>${nomeIndice()}</b> na mesma data: <b>${fmtPrecoM(V.noIndice)}</b> hoje, contra <b>${fmtPrecoM(V.atual)}</b> nos papéis. <span style="color:${dif >= 0 ? 'var(--alta)' : 'var(--baixa)'}">${dif >= 0 ? 'Os papéis estão ganhando' : 'O índice está ganhando'} por ${fmtPrecoM(Math.abs(dif))}.</span>${S.semData ? ` <span style="color:var(--mudo)">(${S.semData} papel(éis) sem data de compra ficaram de fora; edite e preencha a data.)</span>` : ''}</div>` : `<div class="mt-3 text-sm" style="color:var(--mudo)">Preencha a data de compra dos papéis para comparar com o ${nomeIndice()}.</div>`}
+            ${alertas.length ? `<div class="mt-3 text-sm space-y-1">${alertas.map(a => `<div>⚠️ ${a}</div>`).join('')}</div>` : `<div class="mt-3 text-sm" style="color:var(--alta)">Sem alerta de concentração ou de risco.</div>`}
+            <p class="text-xs mt-2" style="color:var(--mudo)">Dados dos últimos ${S.dias} pregões, com os pesos de hoje. Não é recomendação: mostra quanto risco a carteira carrega e se ela está valendo a pena contra o índice.</p>
+        </div>`;
+    }
+    // ----- Diário das minhas decisões (salvo só neste aparelho) -----
+    const CHAVE_DECISOES = 'invest-decisoes';
+    function lerDecisoes() { try { const v = JSON.parse(localStorage.getItem(CHAVE_DECISOES) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+    function gravarDecisoes(l) { try { localStorage.setItem(CHAVE_DECISOES, JSON.stringify(l)); return true; } catch (e) { return false; } }
+    function avaliarDecisao(x) {
+        const d = allData[x.t]; if (!d) return null;
+        let i0 = d.dates.findIndex(dt => dt >= x.data); if (i0 < 0) return null;
+        const fimData = x.saidaData && x.saidaData > x.data ? x.saidaData : d.dates[d.dates.length - 1];
+        let i1 = d.dates.length - 1; while (i1 > i0 && d.dates[i1] > fimData) i1--;
+        const precoIni = x.preco > 0 ? x.preco : d.close[i0];
+        const precoFim = x.saidaPreco > 0 && x.saidaData ? x.saidaPreco : d.close[i1];
+        const sinal = x.tipo === 'venda' ? -1 : 1;   // venda: "acertou" se o papel caiu depois
+        const ret = sinal * (precoFim / precoIni - 1), idx = retornoIndice(x.data, d.dates[i1]);
+        return { ret, idx: idx === null ? null : sinal * idx, ate: d.dates[i1], encerrada: !!(x.saidaData && x.saidaPreco > 0) };
+    }
+    function htmlDecisoes() {
+        const merc = mercadoCodigo(); const lista = lerDecisoes().map((x, k) => ({ x, k })).filter(o => o.x.m === merc);
+        const av = lista.map(o => ({ ...o, a: avaliarDecisao(o.x) }));
+        const comp = av.filter(o => o.a && o.a.idx !== null);
+        const venceu = comp.filter(o => o.a.ret > o.a.idx).length;
+        const media = comp.length ? comp.reduce((s, o) => s + o.a.ret - o.a.idx, 0) / comp.length : null;
+        const placar = comp.length ? `<div class="am-card"><div class="font-bold">Placar das suas decisões</div><div class="text-sm mt-1">${comp.length} decisões · <b>${venceu}</b> venceram o ${nomeIndice()} (${fmtNumM(venceu / comp.length * 100, 0)}%) · em média ${fmtPctM(media * 100)} contra o índice nas mesmas datas.</div>
+            <p class="text-xs mt-2" style="color:var(--mudo)">${comp.length < 30 ? `Com menos de 30 decisões, o placar ainda é quase só sorte. ` : ''}Para uma venda, "acertar" é o papel cair depois; o índice entra com sinal trocado.</p></div>` : '';
+        const cartoes = av.slice().reverse().map(({ x, k, a }) => `<div class="am-card"><div class="flex items-center justify-between gap-2"><span><span class="am-tk">${x.t}</span> <span class="am-chip ${x.tipo === 'venda' ? 'vermelho' : 'verde'}">${x.tipo === 'venda' ? 'Venda' : 'Compra'}</span></span><span class="text-sm" style="color:var(--mudo)">${fmtDataBR(x.data)}</span></div>
+            ${x.motivo ? `<div class="text-sm mt-2">“${escapeHtmlM(x.motivo)}”</div>` : ''}
+            ${a ? `<div class="text-sm mt-2">${a.encerrada ? 'Resultado' : `Até ${fmtDataBR(a.ate)}`}: <b style="color:${a.ret >= 0 ? 'var(--alta)' : 'var(--baixa)'}">${fmtPctM(a.ret * 100)}</b>${a.idx !== null ? ` · ${nomeIndice()} ${fmtPctM(a.idx * 100)} · <b>${a.ret > a.idx ? 'venceu' : 'perdeu para'} o índice</b>` : ''}</div>` : `<div class="text-sm mt-2" style="color:var(--mudo)">Sem preços deste papel nos dados.</div>`}
+            <div class="flex gap-2 mt-3">${!x.saidaData ? `<button type="button" class="am-botao sec" data-decisao-encerrar="${k}">Registrar saída</button>` : ''}<button type="button" class="am-botao sec" data-decisao-apagar="${k}">Apagar</button></div></div>`).join('');
+        return `<div class="space-y-3" data-decisoes>
+            <div class="am-card"><div class="font-bold">Nova decisão</div><p class="text-xs mt-1" style="color:var(--mudo)">Anote no momento da decisão, antes de saber o resultado. Em um ano, o placar mostra se o seu método acerta mais que o índice.</p>
+                <div class="grid grid-cols-2 gap-2 mt-2">
+                    <label class="block"><span class="text-xs" style="color:var(--mudo)">Papel</span><input id="dec-t" type="text" list="am-cart-lista" autocapitalize="characters" class="w-full mt-1"></label>
+                    <label class="block"><span class="text-xs" style="color:var(--mudo)">Tipo</span><select id="dec-tipo" class="w-full mt-1"><option value="compra">Compra</option><option value="venda">Venda</option></select></label>
+                    <label class="block"><span class="text-xs" style="color:var(--mudo)">Data</span><input id="dec-data" type="date" class="w-full mt-1"></label>
+                    <label class="block"><span class="text-xs" style="color:var(--mudo)">Preço (vazio = fechamento do dia)</span><input id="dec-preco" type="number" inputmode="decimal" step="any" class="w-full mt-1"></label>
+                </div>
+                <label class="block mt-2"><span class="text-xs" style="color:var(--mudo)">Por que (o que você viu)</span><input id="dec-motivo" type="text" maxlength="200" class="w-full mt-1"></label>
+                <p class="text-sm mt-2" style="color:#fca5a5" id="dec-erro"></p>
+                <button type="button" class="am-botao mt-1" id="dec-salvar">Registrar decisão</button></div>
+            ${placar}${cartoes || '<p class="text-sm" style="color:var(--mudo)">Nenhuma decisão registrada neste mercado ainda.</p>'}</div>`;
+    }
+    function desenharDecisoes() { const box = document.querySelector('[data-sub-slot="decisoes"]'); if (box) box.innerHTML = htmlDecisoes(); }
+    function prepararDecisoes() {
+        const box = document.querySelector('[data-sub-slot="decisoes"]'); if (!box || box.dataset.pronto) return; box.dataset.pronto = '1';
+        box.addEventListener('click', e => {
+            const l = lerDecisoes();
+            if (e.target.id === 'dec-salvar') {
+                const t = (document.getElementById('dec-t').value || '').trim().toUpperCase(), data = document.getElementById('dec-data').value || ultimoPregaoDados();
+                const erro = document.getElementById('dec-erro');
+                if (!allData[t]) { erro.textContent = 'Papel não encontrado nos dados deste mercado.'; return; }
+                l.push({ t, m: mercadoCodigo(), tipo: document.getElementById('dec-tipo').value, data, preco: +document.getElementById('dec-preco').value || null, motivo: (document.getElementById('dec-motivo').value || '').trim(), criadoEm: new Date().toISOString() });
+                gravarDecisoes(l); desenharDecisoes(); return;
+            }
+            const enc = e.target.closest('[data-decisao-encerrar]');
+            if (enc) { const x = l[+enc.dataset.decisaoEncerrar]; const d = x && allData[x.t]; if (!d) return; const ult = d.dates.length - 1; x.saidaData = d.dates[ult]; x.saidaPreco = d.close[ult]; gravarDecisoes(l); desenharDecisoes(); return; }
+            const ap = e.target.closest('[data-decisao-apagar]');
+            if (ap) { l.splice(+ap.dataset.decisaoApagar, 1); gravarDecisoes(l); desenharDecisoes(); }
+        });
+    }
+    const escapeHtmlM = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    // ----- O que já foi testado (registro honesto; números em docs/ no GitHub) -----
+    const TESTES_FEITOS = [
+        ['Estratégia do app (Score + 6 regras do Relatório)', 'REPROVADA', 'Não bateu o índice: EUA +2% a +18% contra SPY +19%; Brasil +10% a +27% contra BOVA11 +28%, com quedas maiores. Entradas sorteadas dão quase o mesmo. Está congelada e em teste para frente até 04/11/2027.', 'docs/congelamento.md'],
+        ['Momento de 12 meses (carteira dos que mais subiram)', 'REPROVADA', 'EUA: +45,9% contra SPY +28,1%, acima do acaso, mas com queda de 33,9% contra 7,6%. Brasil: +28,5% contra BOVA11 +50,1%.', 'docs/hipotese-momento-tendencia.md'],
+        ['Tendência no índice (média de 10 meses)', 'REPROVADA', 'Reduz as quedas, mas desde 2010 rendeu 7,8% ao ano contra 13,9% de ficar comprado no S&P 500. No Brasil perdeu para o CDI.', 'docs/hipotese-momento-tendencia.md'],
+        ['Queda forte (≥30%) + sinal Otimista', 'REPROVADA', 'Média de +2% por operação, mas mediana negativa e acerto de 1 em 3. O sinal não acrescenta nada a comprar a queda em dia sorteado.', 'docs/cenario-queda-reversao.md'],
+        ['Stop mais curto, zero a zero, limite por setor, trava de resistência', 'REPROVADAS', 'Nenhuma melhorou o resultado de forma consistente fora da amostra.', null],
+        ['Carteira por fundamentos (valor + qualidade) e deriva depois do balanço', 'EM TESTE', 'Registrada antes de rodar. O resultado entra aqui quando sair.', 'docs/hipotese-fundamentos.md'],
+    ];
+    function htmlTestado() {
+        const cor = v => v.startsWith('REPROV') ? 'vermelho' : v === 'APROVADA' ? 'verde' : 'amarelo';
+        return `<div class="space-y-3" data-testado>
+            <div class="am-card"><div class="font-bold">Como ler</div><p class="text-sm mt-1">Cada ideia foi escrita com regras e critérios <b>antes</b> de ver o resultado e comparada com o índice e com escolhas sorteadas. "Reprovada" quer dizer que não mostrou vantagem real, mesmo que tenha dado lucro.</p></div>
+            ${TESTES_FEITOS.map(([nome, v, txt, doc]) => `<div class="am-card"><div class="flex items-start justify-between gap-2"><div class="font-semibold">${nome}</div><span class="am-chip ${cor(v)}">${v}</span></div><p class="text-sm mt-1">${txt}</p>${doc ? `<a class="text-xs underline" style="color:var(--acento)" href="https://github.com/diegostalin88/Invest/blob/main/${doc}" target="_blank" rel="noopener">Ver o registro e os números</a>` : ''}</div>`).join('')}
+            <div class="am-card"><div class="font-bold">O que os estudos mostram</div><p class="text-sm mt-1">Para quem não tem vantagem comprovada, o que mais melhora o resultado é: custo baixo, diversificação, rebalancear com regra fixa e evitar operar por impulso. Em média, investidores perdem cerca de 1 ponto percentual por ano só por comprar e vender na hora errada (Morningstar, "Mind the Gap").</p></div>
+        </div>`;
+    }
     function desenharCarteira() {
         const box = document.getElementById('am-carteira'); if (!box) return;
         const todos = lerCarteira(); const merc = mercadoCodigo();
@@ -3333,7 +3523,8 @@
         box.innerHTML = `<div class="am-card"><div class="text-sm" style="color:var(--mudo)">Patrimônio ${merc === 'br' ? 'no Brasil' : 'nos EUA'}</div><div class="am-preco-grande">${fmtPrecoM(atual)}</div>
                 <div class="text-sm mt-1" style="color:${res >= 0 ? 'var(--alta)' : 'var(--baixa)'}">${fmtPctM(res)} · ${fmtPrecoM(atual - invest)} sobre ${fmtPrecoM(invest)} investidos</div>
                 ${outros ? `<div class="text-xs mt-2" style="color:var(--mudo)">+ ${outros} papel(éis) no outro mercado (troque no topo para ver).</div>` : ''}</div>
-            ${htmlAnaliseCarteira(analisarCarteira())}
+            ${htmlSaudeCarteira(saudeCarteira())}
+            <details class="am-card mt-3" data-sinais-tecnicos><summary class="font-semibold">Sinais técnicos por papel <span class="text-xs" style="color:var(--mudo)">(sem vantagem comprovada nos testes)</span></summary>${htmlAnaliseCarteira(analisarCarteira())}</details>
             <div class="space-y-3 mt-3">${daqui.map(({ x, k }) => cartaoCarteira(x, k)).join('')}</div>`;
     }
     // ===== Simulação com dinheiro fictício ("incubação" de Kaufman/Fitschen) =====
@@ -3742,9 +3933,12 @@
         document.querySelectorAll('[data-fechar-tela]').forEach(b => b.addEventListener('click', () => history.back()));
         document.getElementById('app-movel').addEventListener('click', e => {
             const linha = e.target.closest('[data-ativo]'); if (linha) { abrirAtivo(linha.dataset.ativo); return; }
+            if (e.target.closest('[data-ir-pagina-carteira]')) { mostrarPagina('carteira'); return; }
             const sub = e.target.closest('[data-sub]');
             if (sub) {
-                const titulos = { estrategias: 'Screener de Estratégias', fundamentos: 'Técnica × Fundamentos', correlacao: 'Correlação (Pearson)', relatorio: 'Relatório' };
+                if (sub.dataset.sub === 'decisoes') { prepararDecisoes(); desenharDecisoes(); }
+                if (sub.dataset.sub === 'testado') document.querySelector('[data-sub-slot="testado"]').innerHTML = htmlTestado();
+                const titulos = { decisoes: 'Diário das minhas decisões', testado: 'O que já foi testado', estrategias: 'Screener de Estratégias', fundamentos: 'Técnica × Fundamentos', correlacao: 'Correlação (Pearson)', relatorio: 'Relatório' };
                 document.querySelectorAll('[data-sub-slot]').forEach(sl => sl.classList.toggle('hidden', sl.dataset.subSlot !== sub.dataset.sub));
                 document.getElementById('am-sub-titulo').textContent = titulos[sub.dataset.sub];
                 abrirTela('am-sub-tela');
@@ -3906,7 +4100,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio, get estrategiasConfluencia() { return confluenceStrategies; }, get indice() { return indiceDados; }, set indice(v) { indiceDados = v; }, retornoIndice, comparacaoIndiceSim, htmlDiario };
+    window.investDebug = { get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio, get estrategiasConfluencia() { return confluenceStrategies; }, get indice() { return indiceDados; }, set indice(v) { indiceDados = v; }, retornoIndice, comparacaoIndiceSim, htmlDiario, termometroIndice, saudeCarteira, avaliarDecisao, htmlTestado, htmlDecisoes, lerDecisoes, gravarDecisoes };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).
