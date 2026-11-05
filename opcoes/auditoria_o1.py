@@ -1,4 +1,5 @@
-"""Auditoria adversarial da hipótese O1 (docs/opcoes/auditoria-o1.md). Tenta derrubar o resultado de travas.py.
+"""Auditoria adversarial das hipóteses O1 (travas.py) e O2 (debito.py). Tenta derrubar o resultado.
+Registros: docs/opcoes/auditoria-o1.md e docs/opcoes/auditoria-o2.md.
 
 Uso: python auditoria_o1.py --sorteios 100 --saida ../opcoes_resultado
 """
@@ -50,8 +51,11 @@ def conferencia(dados, ops, n=5, semente=1):
     return linhas
 
 
+SIMULADOR = travas.simular
+
+
 def rodar(dados, p):
-    res = travas.simular(dados, p, *FORA)
+    res = SIMULADOR(dados, p, *FORA)
     return res, travas.metricas(res, travas.retorno_bova(dados[1], *FORA))
 
 
@@ -60,7 +64,15 @@ def main(argv=None):
     ap.add_argument('--anos', default='2018-2026')
     ap.add_argument('--sorteios', type=int, default=100)
     ap.add_argument('--saida', default='../opcoes_resultado')
+    ap.add_argument('--hipotese', default='o1', choices=['o1', 'o2'])
     args = ap.parse_args(argv)
+    global SIMULADOR
+    if args.hipotese == 'o2':
+        import debito
+        SIMULADOR = debito.simular
+        versoes = {'simples': debito.BASE, 'técnica': {**debito.BASE, **debito.TECNICO}}
+    else:
+        versoes = {'simples': travas.BASE, 'técnica': {**travas.BASE, **travas.TECNICO}}
     a0, a1 = (int(x) for x in args.anos.split('-'))
     os.makedirs(args.saida, exist_ok=True)
     try:
@@ -68,7 +80,6 @@ def main(argv=None):
     except Exception as e:  # noqa: BLE001
         print(f'CDI indisponível ({e})', flush=True)
     dados = travas.carregar(range(a0, a1 + 1))
-    versoes = {'simples': travas.BASE, 'técnica': {**travas.BASE, **travas.TECNICO}}
     rel = {}
     for nome, p in versoes.items():
         res, m = rodar(dados, p)
@@ -106,10 +117,10 @@ def main(argv=None):
         }
         rel[nome] = r
         print(f'{nome}: auditado', flush=True)
-    with open(os.path.join(args.saida, 'auditoria_o1.json'), 'w') as f:
+    with open(os.path.join(args.saida, f'auditoria_{args.hipotese}.json'), 'w') as f:
         json.dump(rel, f, indent=2, ensure_ascii=False)
     pct = lambda x: '–' if x is None else f'{x * 100:.1f}%'
-    t = ['## Auditoria adversarial da hipótese O1', '']
+    t = [f'## Auditoria adversarial da hipótese {args.hipotese.upper()}', '']
     for nome, r in rel.items():
         m = r['original']
         t += [f'### Versão {nome}', '',
@@ -122,7 +133,7 @@ def main(argv=None):
               f"acerto {pct(r['saidaMeio']['acerto'])}",
               f"- Limite otimista, tudo no meio das ofertas: P&L/risco {pct(r['execMeio']['pnlPorRisco'])}, "
               f"retorno {pct(r['execMeio']['retorno'])}, acerto {pct(r['execMeio']['acerto'])}, fator de lucro {r['execMeio']['fatorLucro']}",
-              f"- Diferença entre ofertas (ida e volta) ÷ crédito na entrada: mediana {r['spreadSobreCredito']['mediana']} "
+              f"- Diferença entre ofertas (ida e volta) ÷ prêmio na entrada: mediana {r['spreadSobreCredito']['mediana']} "
               f"(p25 {r['spreadSobreCredito']['p25']}, p75 {r['spreadSobreCredito']['p75']})",
               f"- Custo × 4: P&L/risco {pct(r['custo4x']['pnlPorRisco'])}, retorno {pct(r['custo4x']['retorno'])}",
               f"- Placebo ({r['placebo']['n']} sorteios, frequência {pct(r['frequencia'])}): P&L/risco mediano "

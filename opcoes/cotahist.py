@@ -80,7 +80,7 @@ def filtrar(linhas, universo=UNIVERSO, ohlc=None):
             spot[(r['data'], r['codneg'])] = r['preult'] / max(r['fatcot'], 1)
             if ohlc is not None:
                 f = max(r['fatcot'], 1)
-                ohlc[(r['data'], r['codneg'])] = (r['premax'] / f, r['premin'] / f)
+                ohlc[(r['data'], r['codneg'])] = (r['premax'] / f, r['premin'] / f, r['voltot'])
             classes[r['codneg']] = classe(r['especi'])
         elif r['tpmerc'] in ('070', '080') and r['codneg'][:4] in raizes:
             r['ativo'] = raizes[r['codneg'][:4]]

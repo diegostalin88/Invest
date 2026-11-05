@@ -65,9 +65,20 @@ class Indicadores:
         self.fechs = []                    # últimos 20 fechamentos (Bollinger)
         self.larguras = []                 # largura de Bollinger dos últimos 252 pregões
         self.minima = None
+        self.janela_max, self.janela_min, self.janela_vol = [], [], []
+        self.max20 = self.min20 = self.vol20 = None
+        self.volume = 0.0
 
-    def atualizar(self, maxima, minima, fech):
+    def atualizar(self, maxima, minima, fech, volume=0.0):
         self.contagem += 1
+        # rompimento (O2): máxima/mínima dos 20 pregões anteriores e volume médio de 20, antes de incluir hoje
+        self.max20 = max(self.janela_max) if len(self.janela_max) == 20 else None
+        self.min20 = min(self.janela_min) if len(self.janela_min) == 20 else None
+        self.vol20 = sum(self.janela_vol) / 20 if len(self.janela_vol) == 20 else None
+        self.volume = volume
+        self.janela_max = (self.janela_max + [maxima])[-20:]
+        self.janela_min = (self.janela_min + [minima])[-20:]
+        self.janela_vol = (self.janela_vol + [volume])[-20:]
         self.mme = fech if self.mme is None else self.mme + self.k * (fech - self.mme)
         self.mme20 = fech if self.mme20 is None else self.mme20 + 2 / 21 * (fech - self.mme20)
         self.minima = minima
@@ -287,8 +298,8 @@ def simular(dados, p, inicio, fim):
             if (d, a) not in spot:
                 continue
             s = spot[(d, a)]
-            mx, mn = ohlc[(d, a)]
-            ind[a].atualizar(mx, mn, s)
+            mx, mn = ohlc[(d, a)][:2]
+            ind[a].atualizar(mx, mn, s, *ohlc[(d, a)][2:3])
             if (d, a) in ivs:
                 hist_iv[a].append(ivs[(d, a)])
             if not ativo_no_periodo:
@@ -383,7 +394,7 @@ def metricas(res, bova):
         'porAtivo': {k: round(v, 2) for k, v in sorted(por_ativo.items())},
         'melhorAtivo': melhor,
         'retornoSemMelhor': round(retorno - por_ativo.get(melhor, 0) / CAPITAL, 4) if melhor else None,
-        'porEstrutura': {e: sum(1 for o in ops if o['estrutura'] == e) for e in ('trava_alta_put', 'trava_baixa_call', 'condor')},
+        'porEstrutura': {e: sum(1 for o in ops if o['estrutura'] == e) for e in sorted({o['estrutura'] for o in ops})},
         'motivos': {m: sum(1 for o in ops if o['motivo'] == m) for m in ('alvo', 'stop', 'prazo', 'vencimento')},
         'abertasNoFim': res['abertas'],
     }
