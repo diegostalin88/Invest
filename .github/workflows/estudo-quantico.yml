@@ -1,0 +1,31 @@
+name: Estudo volatilidade quântica
+
+# Só leitura: estudo exploratório da volatilidade intradiária de IONQ, RGTI, QBTS e QUBT
+# (coleta/estudo_quantico.py). Não publica nada nem mexe no app.
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/project-thread-2grfnv]
+    paths: [coleta/estudo_quantico.py, .github/workflows/estudo-quantico.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  estudo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Estudo
+        run: |
+          pip install -q yfinance pandas numpy
+          python coleta/estudo_quantico.py
+          cat estudo_quantico.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: estudo-quantico
+          path: estudo_quantico.md
