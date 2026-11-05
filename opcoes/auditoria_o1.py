@@ -83,6 +83,13 @@ def main(argv=None):
         r['atraso3'] = rodar(dados, {**p, 'atraso': 3})[1]
         # 2b) saída decidida pelo preço médio das ofertas (incluída depois do 1º resultado: ver o doc)
         r['saidaMeio'] = rodar(dados, {**p, 'saida_meio': True})[1]
+        # 2c) limite otimista: entrada e saída no meio das ofertas (incluído depois do 1º resultado)
+        r['execMeio'] = rodar(dados, {**p, 'exec_meio': True, 'saida_meio': True})[1]
+        # 2d) quanto a diferença entre as ofertas pesa: ida e volta ÷ crédito, na entrada
+        razoes = sorted(o['spread'] / o['credito'] for o in res['operacoes'] if o['credito'] > 0)
+        r['spreadSobreCredito'] = {'mediana': round(statistics.median(razoes), 3) if razoes else None,
+                                   'p25': round(razoes[len(razoes) // 4], 3) if razoes else None,
+                                   'p75': round(razoes[3 * len(razoes) // 4], 3) if razoes else None}
         # 3) custos mais altos
         r['custo4x'] = rodar(dados, {**p, 'custo': p['custo'] * 4})[1]
         # 4) placebo: mesma frequência de entrada, dias sorteados (sem IV Rank e sem gatilho técnico)
@@ -113,6 +120,10 @@ def main(argv=None):
               f"- Execução 3 pregões depois: P&L/risco {pct(r['atraso3']['pnlPorRisco'])}, retorno {pct(r['atraso3']['retorno'])}",
               f"- Saída decidida pelo preço médio: P&L/risco {pct(r['saidaMeio']['pnlPorRisco'])}, retorno {pct(r['saidaMeio']['retorno'])}, "
               f"acerto {pct(r['saidaMeio']['acerto'])}",
+              f"- Limite otimista, tudo no meio das ofertas: P&L/risco {pct(r['execMeio']['pnlPorRisco'])}, "
+              f"retorno {pct(r['execMeio']['retorno'])}, acerto {pct(r['execMeio']['acerto'])}, fator de lucro {r['execMeio']['fatorLucro']}",
+              f"- Diferença entre ofertas (ida e volta) ÷ crédito na entrada: mediana {r['spreadSobreCredito']['mediana']} "
+              f"(p25 {r['spreadSobreCredito']['p25']}, p75 {r['spreadSobreCredito']['p75']})",
               f"- Custo × 4: P&L/risco {pct(r['custo4x']['pnlPorRisco'])}, retorno {pct(r['custo4x']['retorno'])}",
               f"- Placebo ({r['placebo']['n']} sorteios, frequência {pct(r['frequencia'])}): P&L/risco mediano "
               f"{pct(r['placebo']['pnlPorRiscoMediana'])}, retorno mediano {pct(r['placebo']['retornoMediana'])}; "

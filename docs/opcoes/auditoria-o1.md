@@ -23,6 +23,12 @@ Script: `opcoes/auditoria_o1.py` (mesmo motor de `opcoes/travas.py`, mesmos dado
    registro da O1). O stop e o alvo passam a olhar o meio entre as ofertas, e a execução continua na oferta. Mede
    quanto do resultado depende de ofertas largas ou desatualizadas no fechamento. Informativo: não entra no critério.
 
+8. **Limite otimista: tudo no meio das ofertas** (incluído depois da 2ª execução). Entrada, saída e marcação pelo
+   preço médio entre compra e venda, como se a diferença entre as ofertas não custasse nada. Se nem assim a
+   estratégia ganha, a reprovação não é culpa do custo de execução. Informativo.
+9. **Peso da diferença entre ofertas:** quanto custa montar e desmontar na hora (ida e volta pelas ofertas),
+   dividido pelo crédito recebido. Informativo.
+
 ## Critério (para cada versão aprovada no backtest)
 
 O resultado **resiste à auditoria** se todos valerem:

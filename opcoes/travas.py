@@ -191,12 +191,16 @@ def montar_trava(tipo, cadeia_dia, s, d, p, iv_atm):
         if not mais_longe:
             continue
         compra = min(mais_longe, key=lambda c: abs(c[2] - alvo))
-        credito = venda[4] - compra[5] - 2 * p['custo']
+        spread = (venda[5] - venda[4]) + (compra[5] - compra[4])        # ida e volta pelas ofertas, por opção
+        if p.get('exec_meio'):   # auditoria: limite otimista, executa no meio das ofertas
+            credito = (venda[4] + venda[5]) / 2 - (compra[4] + compra[5]) / 2 - 2 * p['custo']
+        else:
+            credito = venda[4] - compra[5] - 2 * p['custo']
         largura = abs(venda[2] - compra[2])
         if credito <= 0 or credito >= largura:
             continue
         return {'pernas': [(venda[0], venda[3], -1), (compra[0], compra[3], +1)], 'credito': credito,
-                'largura': largura, 'vencimento': venc}
+                'largura': largura, 'vencimento': venc, 'spread': spread}
     return None
 
 
@@ -207,6 +211,7 @@ def montar(estrutura, cadeia_dia, s, d, p, iv_atm):
         if not a or not b or a['vencimento'] != b['vencimento']:
             return None
         return {'pernas': a['pernas'] + b['pernas'], 'credito': a['credito'] + b['credito'],
+                'spread': a['spread'] + b['spread'],
                 'largura': max(a['largura'], b['largura']), 'vencimento': a['vencimento']}
     return montar_trava('put' if estrutura == 'trava_alta_put' else 'call', cadeia_dia, s, d, p, iv_atm)
 
@@ -308,7 +313,7 @@ def simular(dados, p, inicio, fim):
             if a in posicoes and posicoes[a]['entrada'] != d:
                 pos = posicoes[a]
                 dte = (ch._dia(pos['vencimento']) - ch._dia(d)).days
-                rec = custo_recompra(pos, cad, p['custo'])
+                rec = custo_recompra(pos, cad, p['custo'], meio=bool(p.get('exec_meio')))
                 # auditoria: decidir pelo preço médio das ofertas (a execução continua na oferta)
                 gat = custo_recompra(pos, cad, p['custo'], meio=True) if p.get('saida_meio') else rec
                 motivo = None
@@ -328,7 +333,8 @@ def simular(dados, p, inicio, fim):
                     travado -= pos['qtd'] * pos['risco_un']
                     operacoes.append({'ativo': a, 'estrutura': pos['estrutura'], 'entrada': pos['entrada'],
                                       'saida': d, 'motivo': motivo, 'pnl': round(pnl, 2),
-                                      'risco': round(pos['qtd'] * pos['risco_un'], 2)})
+                                      'risco': round(pos['qtd'] * pos['risco_un'], 2),
+                                      'credito': round(pos['credito'], 4), 'spread': round(pos['spread'], 4)})
                     del posicoes[a]
             # 3) sinal para amanhã
             if a not in posicoes and a not in pendentes and ind[a].pronto() and len(hist_iv[a]) >= ch.JANELA_RANK \
@@ -346,7 +352,7 @@ def simular(dados, p, inicio, fim):
         if ativo_no_periodo:
             aberto = 0.0
             for a, pos in posicoes.items():
-                rec = custo_recompra(pos, cadeia.get((d, a), []), p['custo'])
+                rec = custo_recompra(pos, cadeia.get((d, a), []), p['custo'], meio=bool(p.get('exec_meio')))
                 if rec is not None:
                     aberto += (pos['credito'] - min(rec, pos['largura'])) * pos['qtd']
             valor = caixa + aberto

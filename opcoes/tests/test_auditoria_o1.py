@@ -41,5 +41,8 @@ def test_atraso_e_placebo(monkeypatch):
     p1 = au.rodar(dados, {**travas.BASE, 'sorteio': (freq, 1)})[0]
     p2 = au.rodar(dados, {**travas.BASE, 'sorteio': (freq, 1)})[0]
     assert p1['operacoes'] == p2['operacoes']           # mesma semente, mesmo resultado
+    _, mm = au.rodar(dados, {**travas.BASE, 'exec_meio': True, 'saida_meio': True})
+    assert mm['operacoes'] > 0
+    assert all('spread' in o and o['spread'] >= 0 for o in res['operacoes'])
     assert au.por_ano(res['operacoes']) and au.pior_mes(res)
     assert len(au.conferencia(dados, res['operacoes'], n=2)) == min(2, len(res['operacoes']))
