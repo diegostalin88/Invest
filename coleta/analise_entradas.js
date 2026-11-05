@@ -38,7 +38,7 @@ function servir() {
         });
         await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, rt => rt.fulfill({ status: 200, contentType: 'text/css', body: '' }));
     }
-    await page.goto(`http://127.0.0.1:${srv.address().port}/index.html?mercado=${process.env.MERCADO || 'us'}`);
+    await page.goto(`http://127.0.0.1:${srv.address().port}/index.html?classico=1&mercado=${process.env.MERCADO || 'us'}`);
     await page.waitForFunction(() => window.investDebug && Object.keys(window.investDebug.allData || {}).length > 0, null, { timeout: 15 * 60 * 1000 });
     await page.waitForTimeout(5000);   // dá tempo de o relatório publicado carregar
     const r = await page.evaluate(async () => {

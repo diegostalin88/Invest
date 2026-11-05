@@ -28,6 +28,9 @@ let falhas = 0;
 function ok(cond, msg) { console.log(`${cond ? '✅' : '❌'} ${msg}`); if (!cond) falhas++; }
 
 async function abrir(browser, url, bloquearManifesto = false, viewport = { width: 1440, height: 1000 }) {
+    // Desde 05/11/2026 a bússola é a tela de qualquer tamanho; os testes de computador usam o app antigo (?classico=1)
+    if (viewport.width >= 1024 && !/[?&]bussola/.test(url)) url += (url.includes('?') ? '&' : '?') + 'classico=1';
+    url = url.replace(/[?&]bussola=1/, '');
     const page = await browser.newPage({ viewport });
     const erros = [];
     page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') erros.push(`${m.type()}: ${m.text()}`); });
@@ -245,7 +248,7 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     await br.page.click('.grafico-modo-btn[data-modo="tv"]');
     await br.page.waitForFunction(() => /TV:BMFBOVESPA:PETR4/.test(document.getElementById('tv-widget').textContent), null, { timeout: 15000 });
     ok(true, 'Brasil: TradingView com BMFBOVESPA:PETR4');
-    await br.page.goto(BASE);   // sem ?mercado: lembra a última escolha
+    await br.page.goto(BASE + '?classico=1');   // sem ?mercado: lembra a última escolha
     await br.page.waitForFunction(() => /Brasil \(IBOVESPA\)/.test(document.getElementById('data-freshness-banner').textContent), null, { timeout: 120000 });
     ok(/Brasil \(IBOVESPA\)/.test(await br.page.textContent('#data-freshness-banner')), 'lembra o mercado escolhido ao reabrir');
     await Promise.all([br.page.waitForURL(/mercado=us/), br.page.click('.mercado-btn[data-mercado="us"]')]);
@@ -254,6 +257,15 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     const errosBr = br.erros.filter(e => !IGNORAR.some(r => r.test(e)));
     ok(errosBr.length === 0, `console sem erros na troca de mercado${errosBr.length ? ': ' + errosBr.join(' | ') : ''}`);
     await br.page.close();
+
+    // Computador: a bússola também é a tela padrão (coluna central); o app antigo fica em ?classico=1
+    const pc = await abrir(browser, BASE + '?mercado=us&bussola=1');
+    await pc.page.waitForSelector('#am-termometro [data-termometro]', { timeout: 120000 });
+    const pcL = await pc.page.evaluate(() => { const a = document.getElementById('app-movel').getBoundingClientRect(), n = document.querySelector('.am-nav').getBoundingClientRect(); return { w: a.width, nav: Math.abs((n.left + n.right) / 2 - window.innerWidth / 2), classico: document.querySelector('.max-w-screen-2xl').offsetParent !== null }; });
+    ok(pcL.w <= 562 && pcL.nav < 2 && !pcL.classico, `computador: abre a bússola numa coluna central (${JSON.stringify(pcL)})`);
+    ok((await pc.page.getAttribute('#am-link-classico', 'href')) === '?classico=1', 'computador: Mais tem o atalho para o app antigo');
+    await pc.page.screenshot({ path: path.join(SHOTS, 'computador_bussola.png'), fullPage: false });
+    await pc.page.close();
 
     // Celular: casca nova (Início / Ranking / Testes / Mais), tela do ativo e gráfico em tela cheia
     const cel = await abrir(browser, BASE + '?mercado=br', false, { width: 390, height: 844 });

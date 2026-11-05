@@ -52,7 +52,7 @@ function resumo(linhas) {
             await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
         }
         try {
-            await page.goto(`${base}index.html?mercado=${mercado}`);
+            await page.goto(`${base}index.html?classico=1&mercado=${mercado}`);
             await page.waitForFunction(() => window.investDebug && Object.keys(window.investDebug.allData || {}).length > 0
                 && document.querySelector('#screener-results-container table'), null, { timeout: 15 * 60 * 1000 });
             // Diário de sinais: continua o da publicação anterior (baixado pelo workflow) e acompanha os sinais

@@ -162,7 +162,7 @@
         /* =================== APP DO CELULAR (casca nova, < 1024 px) =================== */
         #app-movel { display: none; }
         .am-ico { width: 1.4rem; height: 1.4rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
-        @media (max-width: 1023px) {
+        @media all {   /* desde 05/11/2026 a casca nova vale em qualquer tela; ?classico=1 abre o app antigo */
             body.com-app-movel { padding: 0 !important; background: #0b0d12; }
             body.com-app-movel > .max-w-screen-2xl { display: none !important; }
             body.com-app-movel #app-movel { display: block; }
@@ -210,7 +210,7 @@
             .am-filtros::-webkit-scrollbar { display: none; }
             .am-pilula { flex-shrink: 0; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.95rem; border-radius: 999px; border: 1px solid var(--borda); background: var(--sup); color: var(--txt); font-size: 0.9rem; font-weight: 600; }
             .am-pilula.ativa { background: #eef0ff; color: #111827; border-color: #eef0ff; }
-            .am-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: repeat(5, 1fr);
+            .am-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: repeat(4, 1fr);
                 background: rgba(11,13,18,0.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--borda); padding: 0.45rem 0.5rem calc(0.45rem + env(safe-area-inset-bottom)); }
             .am-nav button { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; padding: 0.35rem 0; color: var(--mudo); font-size: 0.75rem; font-weight: 600; }
             .am-nav button.ativa { color: var(--txt); }
@@ -298,6 +298,11 @@
             #am-grafico .periodo-btn { border-radius: 999px; }
             #am-grafico #grafico-app .flex.flex-wrap.gap-2.mt-2 > span { display: none; }
         }
+        @media (min-width: 1024px) {   /* computador: a casca do celular numa coluna central */
+            body.com-app-movel { background: #07090d; }
+            body.com-app-movel #app-movel { max-width: 560px; margin: 0 auto; border-left: 1px solid #1c212c; border-right: 1px solid #1c212c; }
+            body.com-app-movel .am-nav, body.com-app-movel .am-tela, body.com-app-movel .am-folha, body.com-app-movel .am-folha-fundo { left: calc(50% - 280px); right: calc(50% - 280px); }
+        }
         /* Tabelas largas rolam de lado dentro do cartão, sem estourar a página */
         .overflow-x-auto { -webkit-overflow-scrolling: touch; }
     </style>
@@ -333,7 +338,7 @@
         <section class="am-pagina ativa" data-pagina="inicio">
             <div id="am-avisos"></div>
             <div id="am-termometro"></div>
-            <div class="am-card mt-3" id="am-clima"><div class="text-sm" style="color:var(--mudo)">Clima do mercado</div><div class="am-clima-num">—</div></div>
+            <div class="am-card mt-3" id="am-clima"><div class="text-sm" style="color:var(--mudo)">Amplitude do mercado</div><div class="am-clima-num">—</div></div>
             <div id="am-inicio-carteira"></div>
             <div class="am-lista mt-3">
                 <button type="button" class="am-linha" data-sub="decisoes"><span class="am-avatar" style="background:#0e7490">✍️</span><span class="am-meio"><span class="am-tk block">Diário das minhas decisões</span><span class="am-nome block">Anote cada compra e venda e veja se vence o índice</span></span></button>
@@ -389,6 +394,7 @@
                 <button type="button" class="am-linha" data-sub="correlacao"><span class="am-avatar" style="background:#047857"><svg class="am-ico"><use href="#i-rede"/></svg></span><span class="am-meio"><span class="am-tk block">Correlação (Pearson)</span><span class="am-nome block">Evite comprar ativos que andam juntos</span></span><svg class="am-ico" style="color:var(--mudo)"><use href="#i-dir"/></svg></button>
                 <button type="button" class="am-linha" data-sub="relatorio"><span class="am-avatar" style="background:#b45309"><svg class="am-ico"><use href="#i-relatorio"/></svg></span><span class="am-meio"><span class="am-tk block">Relatório</span><span class="am-nome block">Melhor regra por papel, entradas e short squeeze</span></span><svg class="am-ico" style="color:var(--mudo)"><use href="#i-dir"/></svg></button>
             </div>
+            <p class="am-aviso"><a href="?classico=1" class="underline" id="am-link-classico">Abrir o app antigo (módulos técnicos, para computador)</a></p>
             <p class="am-aviso">Ferramenta de apoio à análise. Não é recomendação de investimento.<br>Gráficos: <a href="https://www.tradingview.com/" target="_blank" rel="noopener" class="underline">TradingView Lightweight Charts</a>.</p>
         </section>
 
@@ -812,7 +818,8 @@
     document.addEventListener('DOMContentLoaded', () => {
     
     // NAVEGAÇÃO DE ABAS
-    const APP_MOVEL = window.matchMedia('(max-width: 1023px)').matches; // celular/tablet: usa a casca nova (#app-movel)
+    const MODO_CLASSICO = new URLSearchParams(location.search).has('classico');
+    const APP_MOVEL = !MODO_CLASSICO; // casca nova (bússola) em qualquer tela; ?classico=1 abre os módulos antigos (usado pelos scripts da estratégia congelada)
     const tabs = document.getElementById('tabs');
     const tabContents = document.getElementById('tab-contents');
     tabs.addEventListener('click', (e) => {
@@ -1100,7 +1107,7 @@
         updateMarketThermometerUI();
         if (fundamentos) carregarFundamentos(fundamentos);
         updateDataFreshnessBanner(allData, meta);
-        mostrarMensagem(`${tickers.length.toLocaleString('pt-BR')} ativos prontos para Screener, Backtest e Walk-Forward.`, 'sucesso');
+        if (!APP_MOVEL) mostrarMensagem(`${tickers.length.toLocaleString('pt-BR')} ativos prontos para Screener, Backtest e Walk-Forward.`, 'sucesso');
     }
 
     fileInput.addEventListener('change', (e) => {
@@ -3100,10 +3107,11 @@
         const usaveis = historicalRegimeData.filter(r => r.total >= 10); const ult = usaveis[usaveis.length - 1];
         if (ult) {
             const fav = ult.pct >= 50;
-            document.getElementById('am-clima').innerHTML = `<div class="flex items-center justify-between"><span class="text-sm" style="color:var(--mudo)">Clima do mercado</span><span class="am-chip ${fav ? 'verde' : 'vermelho'}">${fav ? 'Favorável' : 'Adverso'}</span></div>
+            document.getElementById('am-clima').innerHTML = `<div class="flex items-center justify-between"><span class="text-sm" style="color:var(--mudo)">Amplitude do mercado</span><span class="am-chip ${fav ? 'verde' : 'vermelho'}">${fav ? 'Maioria em alta' : 'Maioria em baixa'}</span></div>
                 <div class="am-clima-num">${fmtNumM(ult.pct, 1)}%</div>
                 <div class="am-barra"><div style="width:${ult.pct}%;background:${fav ? 'var(--alta)' : 'var(--baixa)'}"></div></div>
-                <div class="text-sm" style="color:var(--mudo)">dos ${ult.total.toLocaleString('pt-BR')} ativos estão acima da média de 200 dias</div>`;
+                <div class="text-sm" style="color:var(--mudo)">dos ${ult.total.toLocaleString('pt-BR')} ativos estão acima da média de 200 dias</div>
+                <div class="text-xs mt-1" style="color:var(--mudo)">Mostra se a alta ou a queda é geral ou de poucos papéis. Descreve; não prevê.</div>`;
         }
         // Melhores opções
         const top = melhoresOpcoesMovel(); const medalhas = ['🥇', '🥈', '🥉', '4º', '5º'];
