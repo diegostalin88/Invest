@@ -337,23 +337,17 @@
                 <button type="button" class="am-linha" data-sub="decisoes"><span class="am-avatar" style="background:#0e7490">✍️</span><span class="am-meio"><span class="am-tk block">Diário das minhas decisões</span><span class="am-nome block">Anote cada compra e venda e veja se vence o índice</span></span></button>
                 <button type="button" class="am-linha" data-sub="testado"><span class="am-avatar" style="background:#475569">🔬</span><span class="am-meio"><span class="am-tk block">O que já foi testado</span><span class="am-nome block">Ideias que passaram e que reprovaram, com números</span></span></button>
             </div>
-            <details class="mt-4" id="am-inicio-sinais"><summary class="am-secao" style="cursor:pointer">Sinais técnicos <span class="text-xs font-normal" style="color:var(--mudo)">(estratégia congelada; sem vantagem comprovada)</span></summary>
-            <div class="am-secao">Melhores opções <button type="button" data-ir-pagina="ranking">Ranking <svg class="am-ico" style="width:1.1rem;height:1.1rem"><use href="#i-dir"/></svg></button></div>
-            <div class="am-carrossel" id="am-melhores"></div>
-            <div class="am-secao">Top 10 do ranking técnico</div>
-            <div class="am-lista" id="am-top"></div>
-            </details>
             <p class="am-aviso">Ferramenta de apoio à análise. Não é recomendação de investimento.</p>
         </section>
 
         <section class="am-pagina" data-pagina="ranking">
             <label class="am-busca"><svg class="am-ico"><use href="#i-busca"/></svg><input id="am-busca" type="search" placeholder="Buscar ativo (ex.: PETR4, AAPL)" autocomplete="off"></label>
             <div class="am-filtros" id="am-ordem">
-                <button type="button" class="am-pilula" id="am-abrir-filtros"><svg class="am-ico" style="width:1.1rem;height:1.1rem"><use href="#i-filtro"/></svg>Filtros</button>
-                <button type="button" class="am-pilula ativa" data-ordem="score">Score técnico</button>
-                <button type="button" class="am-pilula" data-ordem="combinado">Score combinado</button>
-                <button type="button" class="am-pilula" data-ordem="variacao">Variação do dia</button>
-                <button type="button" class="am-pilula" data-ordem="volatilidade">Volatilidade</button>
+                <button type="button" class="am-pilula ativa" data-ordem="liquidez">Mais negociados</button>
+                <button type="button" class="am-pilula" data-ordem="variacao">Altas do dia</button>
+                <button type="button" class="am-pilula" data-ordem="queda">Quedas do dia</button>
+                <button type="button" class="am-pilula" data-ordem="topo">Longe do topo</button>
+                <button type="button" class="am-pilula" data-ordem="volatilidade">Mais voláteis</button>
             </div>
             <div class="text-sm mb-2" style="color:var(--mudo)" id="am-ranking-info"></div>
             <div class="am-lista" id="am-ranking"></div>
@@ -361,13 +355,11 @@
         </section>
 
         <section class="am-pagina" data-pagina="carteira">
-            <div class="flex gap-2 mb-3" id="am-cart-abas"><button type="button" class="am-pilula ativa" data-cart-aba="minha">Minha carteira</button><button type="button" class="am-pilula" data-cart-aba="sim">🧪 Simulação</button></div>
             <div id="am-cart-minha">
                 <div id="am-carteira"></div>
                 <button type="button" class="am-botao mt-4" id="am-carteira-add">+ Adicionar papel</button>
                 <p class="am-aviso">A carteira fica salva só neste aparelho. Ferramenta de apoio à análise; não é recomendação de investimento.</p>
             </div>
-            <div id="am-simulacao" class="hidden"></div>
         </section>
 
         <section class="am-pagina" data-pagina="testes">
@@ -385,8 +377,11 @@
                 <button type="button" class="am-linha" data-sub="decisoes"><span class="am-avatar" style="background:#0e7490">✍️</span><span class="am-meio"><span class="am-tk block">Diário das minhas decisões</span><span class="am-nome block">Cada compra e venda contra o índice</span></span></button>
                 <button type="button" class="am-linha" data-sub="testado"><span class="am-avatar" style="background:#475569">🔬</span><span class="am-meio"><span class="am-tk block">O que já foi testado</span><span class="am-nome block">O que passou e o que reprovou</span></span></button>
             </div>
-            <div class="am-secao mt-4">Avançado <span class="text-xs font-normal" style="color:var(--mudo)">(ferramentas técnicas e a estratégia congelada)</span></div>
+            <div class="am-secao mt-4">Avançado <span class="text-xs font-normal" style="color:var(--mudo)">(estratégia técnica congelada em 04/11/2026: perdeu para o índice nos testes)</span></div>
             <div class="am-lista">
+                <button type="button" class="am-linha" data-sub="sinais"><span class="am-avatar" style="background:#334155">📈</span><span class="am-meio"><span class="am-tk block">Ranking técnico</span><span class="am-nome block">Melhores opções e Top 10 pelo score (sem vantagem comprovada)</span></span></button>
+                <button type="button" class="am-linha" data-sub="simulacao"><span class="am-avatar" style="background:#334155">🧪</span><span class="am-meio"><span class="am-tk block">Simulação da estratégia</span><span class="am-nome block">Carteira de mentira seguindo os sinais</span></span></button>
+                <button type="button" class="am-linha" data-ir-pagina="testes"><span class="am-avatar" style="background:#334155">⚗️</span><span class="am-meio"><span class="am-tk block">Backtest de um papel</span><span class="am-nome block">Backtest e walk-forward da regra técnica</span></span></button>
                 <button type="button" class="am-linha" data-sub="estrategias"><span class="am-avatar" style="background:#4338ca"><svg class="am-ico"><use href="#i-alvo"/></svg></span><span class="am-meio"><span class="am-tk block">Screener de Estratégias</span><span class="am-nome block">Ativos que dispararam uma estratégia hoje</span></span><svg class="am-ico" style="color:var(--mudo)"><use href="#i-dir"/></svg></button>
                 <button type="button" class="am-linha" data-sub="fundamentos"><span class="am-avatar" style="background:#7e22ce"><svg class="am-ico"><use href="#i-tabela"/></svg></span><span class="am-meio"><span class="am-tk block">Técnica × Fundamentos</span><span class="am-nome block">Tabela completa e limites de qualidade</span></span><svg class="am-ico" style="color:var(--mudo)"><use href="#i-dir"/></svg></button>
                 <button type="button" class="am-linha" data-sub="correlacao"><span class="am-avatar" style="background:#047857"><svg class="am-ico"><use href="#i-rede"/></svg></span><span class="am-meio"><span class="am-tk block">Correlação (Pearson)</span><span class="am-nome block">Evite comprar ativos que andam juntos</span></span><svg class="am-ico" style="color:var(--mudo)"><use href="#i-dir"/></svg></button>
@@ -397,9 +392,8 @@
 
         <nav class="am-nav" aria-label="Navegação">
             <button type="button" data-ir-pagina="inicio" class="ativa"><svg class="am-ico"><use href="#i-inicio"/></svg>Início</button>
-            <button type="button" data-ir-pagina="ranking"><svg class="am-ico"><use href="#i-ranking"/></svg>Ranking</button>
+            <button type="button" data-ir-pagina="ranking"><svg class="am-ico"><use href="#i-busca"/></svg>Ativos</button>
             <button type="button" data-ir-pagina="carteira"><svg class="am-ico"><use href="#i-carteira"/></svg>Carteira</button>
-            <button type="button" data-ir-pagina="testes"><svg class="am-ico"><use href="#i-testes"/></svg>Testes</button>
             <button type="button" data-ir-pagina="mais"><svg class="am-ico"><use href="#i-mais"/></svg>Mais</button>
         </nav>
 
@@ -413,7 +407,7 @@
                     <button type="button" data-meses="1">1M</button><button type="button" data-meses="3">3M</button><button type="button" data-meses="6" class="ativa">6M</button><button type="button" data-meses="12">1A</button><button type="button" data-meses="0">Tudo</button>
                     <button type="button" class="am-cheia" id="am-abrir-grafico"><svg class="am-ico" style="width:1.1rem;height:1.1rem"><use href="#i-cheia"/></svg>Tela cheia</button>
                 </div>
-                <div class="am-abas" id="am-abas"><button type="button" class="ativa" data-aba="resumo">Resumo</button><button type="button" data-aba="plano">Plano</button><button type="button" data-aba="tecnica">Técnica</button><button type="button" data-aba="fundamentos">Fundamentos</button></div>
+                <div class="am-abas" id="am-abas"><button type="button" class="ativa" data-aba="resumo">Resumo</button><button type="button" data-aba="fundamentos">Fundamentos</button><button type="button" data-aba="tecnica">Técnica</button><button type="button" data-aba="plano">Plano</button></div>
                 <div id="am-aba-conteudo"></div>
             </div>
         </div>
@@ -430,6 +424,16 @@
             <div class="am-tela-corpo">
                 <div data-sub-slot="decisoes" class="hidden"></div>
                 <div data-sub-slot="testado" class="hidden"></div>
+                <div data-sub-slot="sinais" class="hidden">
+                    <p class="text-sm mb-3" style="color:var(--mudo)">Score da estratégia técnica congelada. Nos testes de 04/11/2026 ela perdeu para o índice; serve só para acompanhar o teste até 11/2027.</p>
+                    <button type="button" class="am-pilula mb-3" id="am-abrir-filtros"><svg class="am-ico" style="width:1.1rem;height:1.1rem"><use href="#i-filtro"/></svg>Filtros</button>
+                    <div class="text-sm mb-2" style="color:var(--mudo)" id="am-sinais-info"></div>
+                    <div class="am-secao">Melhores opções</div>
+                    <div class="am-carrossel" id="am-melhores"></div>
+                    <div class="am-secao">Top 10 do ranking técnico</div>
+                    <div class="am-lista" id="am-top"></div>
+                </div>
+                <div data-sub-slot="simulacao" class="hidden"><div id="am-simulacao"></div></div>
                 <div data-sub-slot="estrategias" class="hidden space-y-4"></div>
                 <div data-sub-slot="fundamentos" class="hidden"></div>
                 <div data-sub-slot="correlacao" class="hidden"></div>
@@ -3020,7 +3024,7 @@
     }
     function linhaAtivo(t, r) {
         const vd = variacaoDia(t);
-        const chips = (r ? `<span class="am-chip">Score ${fmtNumM(r.score, 1)}</span> ` : '') + chipFund(notaFundamentalista(t));
+        const chips = r ? `<span class="am-chip">Score ${fmtNumM(r.score, 1)}</span> ` + chipFund(notaFundamentalista(t)) : '';
         return `<button type="button" class="am-linha" data-ativo="${t}">
             <span class="am-avatar" style="background:${corAvatar(t)}">${t.slice(0, 2)}</span>
             <span class="am-meio"><span class="am-tk block">${t}</span><span class="am-nome block">${nomeAtivo(t) || '&nbsp;'}</span><span class="flex gap-1 mt-1">${chips}</span></span>
@@ -3036,36 +3040,35 @@
             .sort((a, b) => b.comb - a.comb).slice(0, 5);
     }
 
-    const estadoRanking = { ordem: 'score', busca: '', limite: 30 };
+    const estadoRanking = { ordem: 'liquidez', busca: '', limite: 30 };
+    function volFinanceiro(t) { const d = allData[t]; if (!d || !d.volume) return 0; const n = d.close.length; let v = 0, k = 0; for (let j = Math.max(0, n - 20); j < n; j++) { v += d.close[j] * (d.volume[j] || 0); k++; } return k ? v / k : 0; }
+    function volAnual(t) { const c = allData[t] && allData[t].close; if (!c || c.length < 64) return null; const r = []; for (let j = c.length - 63; j < c.length; j++) r.push(Math.log(c[j] / c[j - 1])); const m = r.reduce((a, b) => a + b, 0) / r.length; return Math.sqrt(r.reduce((a, b) => a + (b - m) ** 2, 0) / (r.length - 1) * 252); }
+    function quedaDoTopo(t) { const c = allData[t] && allData[t].close; if (!c || !c.length) return null; const u = c.slice(-252); return 1 - c[c.length - 1] / Math.max(...u); }
     function listaRanking() {
         const termo = estadoRanking.busca.trim().toUpperCase();
-        const porTicker = Object.fromEntries(filteredScreenerResults.map(r => [r.ticker, r]));
-        let itens;
-        if (termo) {
-            itens = Object.keys(allData).filter(t => t.includes(termo) || nomeAtivo(t).toUpperCase().includes(termo))
-                .sort((a, b) => (a.startsWith(termo) ? 0 : 1) - (b.startsWith(termo) ? 0 : 1) || a.localeCompare(b))
-                .map(t => ({ t, r: porTicker[t] || null }));
-        } else {
-            itens = filteredScreenerResults.map(r => ({ t: r.ticker, r }));
-        }
+        let itens = Object.keys(allData);
+        if (termo) itens = itens.filter(t => t.includes(termo) || nomeAtivo(t).toUpperCase().includes(termo));
         const chave = {
-            score: x => x.r ? x.r.score : -1,
-            combinado: x => (x.r ? x.r.score : 0) + ((notaFundamentalista(x.t) || { ok: 0 }).ok),
-            variacao: x => variacaoDia(x.t) ?? -999,
-            volatilidade: x => (x.r && x.r.atrPct) || 0,
-        }[estadoRanking.ordem];
-        if (!termo || estadoRanking.ordem !== 'score') itens.sort((a, b) => chave(b) - chave(a));
-        return itens;
+            liquidez: volFinanceiro,
+            variacao: t => variacaoDia(t) ?? -999,
+            queda: t => -(variacaoDia(t) ?? 999),
+            topo: t => quedaDoTopo(t) ?? -1,
+            volatilidade: t => volAnual(t) ?? -1,
+        }[estadoRanking.ordem] || volFinanceiro;
+        const v = Object.fromEntries(itens.map(t => [t, chave(t)]));
+        itens.sort((a, b) => termo && (a.startsWith(termo) !== b.startsWith(termo)) ? (a.startsWith(termo) ? -1 : 1) : v[b] - v[a]);
+        return itens.map(t => ({ t, r: null }));
     }
     function desenharRanking() {
         const itens = listaRanking();
-        const nomes = { score: 'Score técnico', combinado: 'Score combinado', variacao: 'Variação do dia', volatilidade: 'Volatilidade' };
+        const nomes = { liquidez: 'mais negociados (volume financeiro de 20 dias)', variacao: 'maiores altas do dia', queda: 'maiores quedas do dia', topo: 'mais longe da máxima de 1 ano', volatilidade: 'maior oscilação (3 meses, anualizada)' };
         document.getElementById('am-ranking-info').textContent = estadoRanking.busca
             ? `${itens.length} ativo(s) encontrados`
-            : `${filteredScreenerResults.length} ativos aprovados nos filtros · ordem: ${nomes[estadoRanking.ordem]}`;
+            : `${itens.length} ativos · ${nomes[estadoRanking.ordem]}`;
         document.getElementById('am-ranking').innerHTML = itens.slice(0, estadoRanking.limite).map(x => linhaAtivo(x.t, x.r)).join('')
-            || '<div class="p-5 text-center" style="color:var(--mudo)">Nenhum ativo. Ajuste os filtros.</div>';
+            || '<div class="p-5 text-center" style="color:var(--mudo)">Nenhum ativo.</div>';
         document.getElementById('am-ranking-mais').classList.toggle('hidden', itens.length <= estadoRanking.limite);
+        const info = document.getElementById('am-sinais-info'); if (info) info.textContent = `${filteredScreenerResults.length} ativos aprovados nos filtros técnicos`;
     }
 
     function atualizarAppMovel() {
@@ -3154,6 +3157,18 @@
         const el = document.getElementById('am-var-periodo');
         if (el) { el.textContent = `${fmtPctM(varPer)} no período`; el.className = `am-var ${varPer >= 0 ? 'alta' : 'baixa'}`; }
     }
+    // Resumo do papel para quem já tem ou pensa em ter: retorno contra o índice, oscilação, queda do topo e peso na carteira
+    function resumoBussola(t) {
+        const d = allData[t], n = d.close.length, ult = d.dates[n - 1];
+        const i12 = Math.max(0, n - 253), r12 = d.close[n - 1] / d.close[i12] - 1, ri = retornoIndice(d.dates[i12], ult);
+        const vol = volAnual(t), q = quedaDoTopo(t);
+        const cart = lerCarteira().filter(x => x.m === mercadoCodigo() && allData[x.t]);
+        const tot = cart.reduce((s, x) => s + x.qtd * (ultimoPreco(x.t) || 0), 0), meu = cart.filter(x => x.t === t).reduce((s, x) => s + x.qtd * (ultimoPreco(x.t) || 0), 0);
+        const dado = (rot, val) => `<div class="am-dado"><div class="r">${rot}</div><div class="v">${val}</div></div>`;
+        return dado('Retorno em 1 ano', fmtPctM(r12 * 100)) + dado(`${nomeIndice()} em 1 ano`, ri === null ? '—' : fmtPctM(ri * 100))
+            + dado('Oscilação ao ano (3 meses)', vol === null ? '—' : fmtNumM(vol * 100, 0) + '%') + dado('Abaixo da máxima de 1 ano', q === null ? '—' : fmtNumM(q * 100, 1) + '%')
+            + (tot > 0 ? dado('Peso na minha carteira', fmtNumM(meu / tot * 100, 1) + '%') : '');
+    }
     function abaAtivo(t, aba) {
         document.querySelectorAll('#am-abas button').forEach(b => b.classList.toggle('ativa', b.dataset.aba === aba));
         const box = document.getElementById('am-aba-conteudo');
@@ -3168,7 +3183,7 @@
         const r = filteredScreenerResults.find(x => x.ticker === t); const pos = filteredScreenerResults.indexOf(r);
         const dado = (rot, val) => `<div class="am-dado"><div class="r">${rot}</div><div class="v">${val}</div></div>`;
         box.innerHTML = `<div class="am-grade">
-                ${dado('Score técnico', fmtNumM(ex.scoreTec, 2))}${dado('Fundamentos', f ? `${ex.notaFund}/5` : '—')}
+                ${resumoBussola(t)}
                 ${dado('Abertura', fmtPrecoM(d.open[n - 1]))}${dado('Fechamento', fmtPrecoM(d.close[n - 1]))}
                 ${dado('Máxima do dia', fmtPrecoM(d.high[n - 1]))}${dado('Mínima do dia', fmtPrecoM(d.low[n - 1]))}
                 ${dado('Máx. 52 semanas', fmtPrecoM(Math.max(...ult)))}${dado('Mín. 52 semanas', fmtPrecoM(Math.min(...ult)))}
@@ -3176,10 +3191,7 @@
                 ${dado('P/L', f ? fmtNumM(Number(f.pe), 1) : '—')}${dado('ROE', f && Number.isFinite(Number(f.roe)) ? fmtNumM(f.roe * 100, 1) + '%' : '—')}
             </div>
             ${f ? `<div class="mt-3">${eventBadge(f)}</div>` : ''}
-            <div class="text-sm mt-3" style="color:var(--mudo)">${pos >= 0 ? `${pos + 1}º de ${filteredScreenerResults.length} no ranking técnico de hoje.` : 'Fora do ranking técnico de hoje (não passou nos filtros ou não teve sinal).'}</div>
             <div class="space-y-2 mt-4">
-                <button type="button" class="am-botao" data-acao-ativo="porque">Por que foi selecionado?</button>
-                <button type="button" class="am-botao sec" data-acao-ativo="backtest">Testar no Backtest</button>
                 <button type="button" class="am-botao sec" data-acao-ativo="tv">Abrir no TradingView</button>
             </div>`;
     }
@@ -3878,12 +3890,6 @@
             if (e.target.closest('#am-cart-reanalisar')) desenharCarteira();
         });
         document.querySelector('.am-nav [data-ir-pagina="carteira"]').addEventListener('click', () => { desenharCarteira(); desenharSimulacao(); });
-        document.getElementById('am-cart-abas').addEventListener('click', e => {
-            const b = e.target.closest('[data-cart-aba]'); if (!b) return; const sim = b.dataset.cartAba === 'sim';
-            document.querySelectorAll('#am-cart-abas [data-cart-aba]').forEach(x => x.classList.toggle('ativa', x === b));
-            document.getElementById('am-cart-minha').classList.toggle('hidden', sim); document.getElementById('am-simulacao').classList.toggle('hidden', !sim);
-            if (sim) desenharSimulacao();
-        });
         document.getElementById('am-simulacao').addEventListener('click', e => {
             if (!e.target.closest('#am-sim-zerar')) return;
             const b = e.target.closest('#am-sim-zerar');
@@ -3938,7 +3944,8 @@
             if (sub) {
                 if (sub.dataset.sub === 'decisoes') { prepararDecisoes(); desenharDecisoes(); }
                 if (sub.dataset.sub === 'testado') document.querySelector('[data-sub-slot="testado"]').innerHTML = htmlTestado();
-                const titulos = { decisoes: 'Diário das minhas decisões', testado: 'O que já foi testado', estrategias: 'Screener de Estratégias', fundamentos: 'Técnica × Fundamentos', correlacao: 'Correlação (Pearson)', relatorio: 'Relatório' };
+                if (sub.dataset.sub === 'simulacao') desenharSimulacao();
+                const titulos = { sinais: 'Ranking técnico', simulacao: 'Simulação da estratégia congelada', decisoes: 'Diário das minhas decisões', testado: 'O que já foi testado', estrategias: 'Screener de Estratégias', fundamentos: 'Técnica × Fundamentos', correlacao: 'Correlação (Pearson)', relatorio: 'Relatório' };
                 document.querySelectorAll('[data-sub-slot]').forEach(sl => sl.classList.toggle('hidden', sl.dataset.subSlot !== sub.dataset.sub));
                 document.getElementById('am-sub-titulo').textContent = titulos[sub.dataset.sub];
                 abrirTela('am-sub-tela');
@@ -3978,7 +3985,7 @@
         fundo.addEventListener('click', () => abrirFolha(false));
         document.getElementById('am-aplicar-filtros').addEventListener('click', async () => {
             abrirFolha(false);
-            document.getElementById('am-ranking-info').textContent = 'Atualizando ranking…';
+            document.getElementById('am-sinais-info').textContent = 'Atualizando ranking…';
             await executarScreener();
             if (fundamentalsData && Object.keys(fundamentalsData).length) executarCruzamento();
             atualizarAppMovel();
@@ -4100,7 +4107,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio, get estrategiasConfluencia() { return confluenceStrategies; }, get indice() { return indiceDados; }, set indice(v) { indiceDados = v; }, retornoIndice, comparacaoIndiceSim, htmlDiario, termometroIndice, saudeCarteira, avaliarDecisao, htmlTestado, htmlDecisoes, lerDecisoes, gravarDecisoes };
+    window.investDebug = { volFinanceiro, quedaDoTopo, volAnual, resumoBussola, get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio, get estrategiasConfluencia() { return confluenceStrategies; }, get indice() { return indiceDados; }, set indice(v) { indiceDados = v; }, retornoIndice, comparacaoIndiceSim, htmlDiario, termometroIndice, saudeCarteira, avaliarDecisao, htmlTestado, htmlDecisoes, lerDecisoes, gravarDecisoes };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).

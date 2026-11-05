@@ -258,11 +258,12 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     // Celular: casca nova (Início / Ranking / Testes / Mais), tela do ativo e gráfico em tela cheia
     const cel = await abrir(browser, BASE + '?mercado=br', false, { width: 390, height: 844 });
     await cel.page.waitForSelector('#am-top .am-linha', { state: 'attached', timeout: 120000 });
-    ok(await cel.page.isVisible('.am-nav') && await cel.page.isHidden('#tabs'), 'celular: barra de baixo com Início / Ranking / Testes / Mais');
+    const navTxt = await cel.page.textContent('.am-nav');
+    ok(await cel.page.isVisible('.am-nav') && await cel.page.isHidden('#tabs') && /Ativos/.test(navTxt) && !/Testes|Ranking/.test(navTxt), 'celular: barra de baixo com Início / Ativos / Carteira / Mais');
     ok(/Brasil/.test(await cel.page.textContent('#am-sub')) && (await cel.page.$$('#am-melhores .am-opcao')).length > 0, 'celular: Início com data dos dados, clima e Melhores Opções');
     const termo = await cel.page.textContent('#am-termometro');
     ok(/Termômetro do BOVA11/.test(termo) && /média de 10 meses/.test(termo) && /Volatilidade/.test(termo) && /não prevê/.test(termo), 'celular: Início abre com o termômetro do índice (contexto, sem previsão)');
-    ok(await cel.page.isHidden('#am-melhores') && await cel.page.isVisible('#am-inicio-sinais summary'), 'celular: sinais técnicos recolhidos no Início');
+    ok(!(await cel.page.$('[data-pagina="inicio"] #am-melhores')) && !/Score/.test(await cel.page.textContent('[data-pagina="inicio"]')), 'celular: Início sem ranking técnico (foi para o Avançado)');
     const T = await cel.page.evaluate(() => { const t = window.investDebug.termometroIndice(); const s = window.investDebug.indice.series['BOVA11.SA']; const c = s.close, n = c.length; let m = 0; for (let i = n - 200; i < n; i++) m += c[i]; return { ok: Math.abs(t.distMM200 - (c[n - 1] / (m / 200) - 1)) < 1e-9 && Math.abs(t.quedaPico - (1 - c[n - 1] / Math.max(...c))) < 1e-9 && t.volPct > 0 && t.volPct <= 1 }; });
     ok(T.ok, 'celular: termômetro confere com o cálculo à mão (MME200 e queda do topo)');
     const larg = await cel.page.evaluate(() => ({ doc: document.documentElement.scrollWidth, sw: document.getElementById('market-switch').getBoundingClientRect().right }));
@@ -270,20 +271,33 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     await cel.page.screenshot({ path: path.join(SHOTS, 'celular_inicio.png'), fullPage: false });
     await cel.page.click('.am-nav [data-ir-pagina="ranking"]');
     const nRank = await cel.page.$$eval('#am-ranking .am-linha', l => l.length);
-    ok(nRank > 0, `celular: Ranking com ${nRank} linhas`);
+    ok(nRank > 0 && !(await cel.page.$('#am-ranking .am-chip')), `celular: Ativos com ${nRank} linhas, sem score`);
+    const ordemAtivos = await cel.page.evaluate(() => { const D = window.investDebug; const ts = [...document.querySelectorAll('#am-ranking .am-linha')].map(x => x.dataset.ativo); const v = ts.map(D.volFinanceiro); return v.every((x, k) => k === 0 || v[k - 1] >= x); });
+    ok(ordemAtivos, 'celular: Ativos começa pelos mais negociados');
+    await cel.page.click('#am-ordem [data-ordem="topo"]');
+    const topoOk = await cel.page.evaluate(() => { const D = window.investDebug; const v = [...document.querySelectorAll('#am-ranking .am-linha')].map(x => D.quedaDoTopo(x.dataset.ativo)); return v.length > 0 && v.every((x, k) => k === 0 || v[k - 1] >= x); });
+    ok(topoOk, 'celular: "Longe do topo" ordena pela queda da máxima de 1 ano');
+    await cel.page.click('#am-ordem [data-ordem="liquidez"]');
     await cel.page.fill('#am-busca', 'PETR');
     ok((await cel.page.$$eval('#am-ranking .am-linha', l => l.map(x => x.dataset.ativo))).includes('PETR4'), 'celular: busca acha PETR4');
     await cel.page.fill('#am-busca', '');
+    await cel.page.click('.am-nav [data-ir-pagina="mais"]');
+    await cel.page.click('[data-pagina="mais"] [data-sub="sinais"]');
+    ok((await cel.page.$$('#am-melhores .am-opcao')).length > 0 && (await cel.page.$$('#am-top .am-linha')).length > 0, 'celular: Avançado → Ranking técnico com Melhores opções e Top 10');
     await cel.page.click('#am-abrir-filtros');
     ok(await cel.page.isVisible('#filter-adtv'), 'celular: filtros num painel que sobe de baixo');
     await cel.page.fill('#filter-adtv', '0');
     await cel.page.click('#am-aplicar-filtros');
-    await cel.page.waitForFunction(() => /aprovados/.test(document.getElementById('am-ranking-info').textContent), null, { timeout: 60000 });
+    await cel.page.waitForFunction(() => /aprovados/.test(document.getElementById('am-sinais-info').textContent), null, { timeout: 60000 });
     ok(true, 'celular: "Aplicar" roda o ranking de novo');
+    await cel.page.goBack(); await cel.page.waitForSelector('#am-sub-tela', { state: 'hidden', timeout: 5000 });
     // Tela do ativo
+    await cel.page.click('.am-nav [data-ir-pagina="ranking"]');
     await cel.page.click('#am-ranking .am-linha');
     await cel.page.waitForSelector('#am-ativo.aberta #am-mini canvas', { timeout: 15000 });
     ok(/R\$/.test(await cel.page.textContent('#am-ativo-cab')), 'celular: tela do ativo com preço em R$');
+    const resumo = await cel.page.textContent('#am-aba-conteudo');
+    ok(/Retorno em 1 ano/.test(resumo) && /BOVA11 em 1 ano/.test(resumo) && /Abaixo da máxima/.test(resumo) && !/Score técnico/.test(resumo) && !/Por que foi selecionado/.test(resumo), 'celular: Resumo do papel compara com o índice, sem score');
     const toque = await cel.page.evaluate(() => { const r = document.getElementById('am-mini-toque').getBoundingClientRect(); const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return el && el.id; });
     ok(toque === 'am-mini-toque', 'celular: gráfico compacto não prende o dedo (camada de toque por cima)');
     await cel.page.waitForTimeout(400);
@@ -503,14 +517,16 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     // Carteira: adicionar, ver o viés, editar, persistir e remover
     await cel.page.click('.am-nav [data-ir-pagina="carteira"]');
     ok(/está vazia/.test(await cel.page.textContent('[data-pagina="carteira"]')), 'celular: Carteira vazia convida a adicionar');
-    await cel.page.click('#am-cart-abas [data-cart-aba="sim"]');
+    await cel.page.click('.am-nav [data-ir-pagina="mais"]');
+    await cel.page.click('[data-pagina="mais"] [data-sub="simulacao"]');
     const simTxt = await cel.page.textContent('#am-simulacao');
     ok(await cel.page.isVisible('#am-simulacao') && /Patrimônio simulado/.test(simTxt) && /Abertas|Encerradas/.test(simTxt) && /Por estratégia|Abertas/.test(simTxt) && /O que funcionou na simulação/.test(simTxt) && /do caminho/.test(simTxt) && /Pregão \d+ de 30/.test(simTxt) && (await cel.page.$('#am-simulacao .sim-barra')) !== null, 'celular: aba Simulação mostra patrimônio, placar, progresso até o alvo (barra, status, pregões) e estratégias');
     ok(/Estratégia congelada/.test(simTxt) && /Não use dinheiro real/.test(simTxt) && !/Comprar todos os papéis do app/.test(simTxt), 'celular: Simulação mostra o aviso de estratégia congelada e não usa mais a referência dos papéis de hoje');
     await cel.page.screenshot({ path: path.join(SHOTS, 'celular_simulacao.png'), fullPage: false });
     await cel.page.click('#am-sim-zerar'); await cel.page.click('#am-sim-zerar');
     ok(/Como funciona/.test(await cel.page.textContent('#am-simulacao')) && /100[.,]000/.test(await cel.page.textContent('#am-simulacao')), 'celular: zerar a simulação (com confirmação) volta aos 100 mil');
-    await cel.page.click('#am-cart-abas [data-cart-aba="minha"]');
+    await cel.page.goBack(); await cel.page.waitForSelector('#am-sub-tela', { state: 'hidden', timeout: 5000 });
+    await cel.page.click('.am-nav [data-ir-pagina="carteira"]');
     const papelCart = await cel.page.evaluate(() => Object.keys(window.investDebug.allData)[0]);
     await cel.page.click('#am-carteira-add');
     await cel.page.fill('#am-cart-ticker', 'NAOEXISTE9');
@@ -608,7 +624,8 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     ok(/REPROVADA/.test(tsTxt) && /Momento de 12 meses/.test(tsTxt) && /Mind the Gap/.test(tsTxt), 'celular: "O que já foi testado" lista os testes com veredito');
     await cel.page.goBack(); await cel.page.waitForSelector('#am-sub-tela', { state: 'hidden', timeout: 5000 });
     // Testes e Mais
-    await cel.page.click('.am-nav [data-ir-pagina="testes"]');
+    await cel.page.click('.am-nav [data-ir-pagina="mais"]');
+    await cel.page.click('[data-pagina="mais"] [data-ir-pagina="testes"]');
     await cel.page.click('#run-backtest-btn');
     await cel.page.waitForSelector('#backtest-results-container .result-metric', { timeout: 30000 });
     ok(true, 'celular: Backtest roda na aba Testes');
