@@ -87,8 +87,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: balancos-cache
-          key: balancos-us-${{ steps.semana.outputs.s }}
-          restore-keys: balancos-us-
+          key: balancos-v2-${{ steps.semana.outputs.s }}
+          restore-keys: balancos-v2-
 
       - name: Balanços trimestrais dos EUA (SEC, 1.000 mais negociados; uma vez por semana)
         if: steps.cache-bal.outputs.cache-hit != 'true'
@@ -101,17 +101,33 @@ jobs:
           cd coleta && python balancos_sec.py ../site/data ../balancos-cache/novo.json --limite 1000 | tail -2
           mv ../balancos-cache/novo.json ../balancos-cache/balancos_us.json
 
+      - name: Balanços trimestrais do Brasil (CVM; uma vez por semana)
+        if: steps.cache-bal.outputs.cache-hit != 'true'
+        continue-on-error: true
+        timeout-minutes: 30
+        run: |
+          mkdir -p balancos-cache/br
+          cp site/data/br/manifest.json balancos-cache/br/ 2>/dev/null || true
+          for f in $(python3 -c "import json;print(' '.join(json.load(open('site/data/br/manifest.json'))['arquivosPrecos']))"); do cp "site/data/br/$f" balancos-cache/br/; done
+          python coleta/balancos_cvm.py balancos-cache/br
+          rm -f balancos-cache/br/precos_*.json
+
       - name: Guardar os balanços da semana
         if: steps.cache-bal.outputs.cache-hit != 'true'
         continue-on-error: true
         uses: actions/cache/save@v4
         with:
           path: balancos-cache
-          key: balancos-us-${{ steps.semana.outputs.s }}
+          key: balancos-v2-${{ steps.semana.outputs.s }}
 
       - name: Histórico de balanços para o app
         continue-on-error: true
-        run: python coleta/balancos_app.py balancos-cache/balancos_us.json site/data
+        run: |
+          python coleta/balancos_app.py balancos-cache/balancos_us.json site/data
+          if [ -f balancos-cache/br/balancos.json ] && [ -f site/data/br/manifest.json ]; then
+            cp balancos-cache/br/balancos.json site/data/br/
+            python3 -c "import json;p='site/data/br/manifest.json';m=json.load(open(p));m['arquivoBalancos']='balancos.json';json.dump(m,open(p,'w'),ensure_ascii=False,indent=2)"
+          fi
 
       - name: Aluguel B3 baixado pelo coletor no Brasil (se houver)
         continue-on-error: true
