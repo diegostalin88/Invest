@@ -64,3 +64,43 @@ Ela também registra a **deriva depois do balanço**: o preço continua andando 
 - **XBRL só a partir de 2009–2011:** o período é de cerca de 15 anos, com um mercado de alta longo.
 - **Etiquetas do XBRL variam entre empresas** (por exemplo, `Revenues` ou `RevenueFromContractWithCustomerExcludingAssessedTax`). Se o número não existir, a empresa fica de fora naquela data, nunca é estimada.
 - **Brasil:** vem numa etapa separada (balanços da CVM), com as mesmas regras e um registro próprio antes de rodar.
+
+## Resultado (rodado em 05/11/2026, 00:31 UTC, depois do registro acima)
+
+Dados: 999 papéis dos EUA com balanço na SEC e preço desde 2009 (execução 41940350930 do GitHub Actions).
+
+### C: valor + qualidade, **REPROVADA**
+
+De 28/02/2011 a 04/11/2026: 63 rebalanceamentos, cerca de 155 elegíveis por data.
+
+| carteira | retorno total | ao ano | queda máxima | Sharpe |
+|---|---|---|---|---|
+| valor + qualidade (30 papéis) | 609% | 13,2% | 21,2% | 1,10 |
+| SPY | 659% | 13,7% | 12,3% | 1,34 |
+| todos os elegíveis, pesos iguais | 741% | 14,5% | 14,8% | 1,28 |
+| acaso (200 carteiras de 30) | p5 464% · mediana 663% · p95 966% | | | |
+
+Robustez (todas abaixo do SPY): só valor 10,0% ao ano; só qualidade 13,3%; 15 papéis 12,8%; 60 papéis 13,5%; custo ×2 13,0%; semestral 12,9%.
+
+Metades: 2011–2018, carteira 188% × pesos iguais 183% × SPY 142%. 2018–2026, carteira 146% × pesos iguais 197% × SPY 214%.
+
+Os quatro critérios falharam: ficou abaixo da mediana do acaso, perdeu para o SPY com quase o dobro da queda, perdeu para os pesos iguais na 2ª metade e, com custo ×2, continuou abaixo do SPY. Valor e qualidade venceram de 2011 a 2018 e perderam muito de 2018 a 2026, a fase das grandes empresas de tecnologia.
+
+### D: deriva depois do balanço, **APROVADA nos critérios registrados, com ressalvas**
+
+De 2009T3 a 2026T3, 25.940 balanços.
+
+- **Reação** (de 2 pregões antes a 1 depois): quintil alto +1,48%, baixo −0,33%.
+- **Deriva de 60 pregões:**
+  - alto +4,68%, baixo +3,71%;
+  - diferença **0,96 ponto**, contra p50 0,01 e p95 0,64 de 500 embaralhamentos;
+  - metades: **0,06** e **1,69** ponto.
+- **Quintil alto menos SPY, depois de 0,2% de custo:** +1,03 ponto. A média de todos os balanços rendeu 3,74%, contra 3,46% do SPY nas mesmas datas.
+
+Os três critérios passaram. Mas, antes de chamar de vantagem, ficam as ressalvas:
+
+1. **A 1ª metade quase não tem efeito (0,06 ponto).** Tudo vem de 2018 a 2026. A literatura registra que essa deriva enfraqueceu nas grandes empresas depois dos anos 2000. Aqui ela some e volta, o que pede confirmação.
+2. **O viés de sobrevivência infla a comparação com o SPY.** Mesmo a média de todos os balanços venceu o SPY (+0,28 ponto). O ganho do quintil alto sobre a média do próprio universo é de cerca de 0,9 ponto em 60 pregões, antes do custo.
+3. **O efeito é pequeno e exige muitas operações:** cerca de 1 ponto a cada 3 meses, comprando dezenas de papéis por temporada de balanços. No Brasil, com corretagem, emolumentos e 15% de IR sobre o ganho, sobra menos.
+
+**Próximo passo:** uma confirmação registrada antes de rodar (`docs/hipotese-deriva-confirmacao.md`), com o quintil alto contra o próprio universo, ano a ano, só grandes empresas e uma carteira contínua. Enquanto ela não passar, o app só **mostra** a surpresa do balanço como informação, sem sinal de compra.
