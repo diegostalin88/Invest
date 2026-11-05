@@ -44,4 +44,37 @@ erro do simulador (testes 1, 5 e 6).
 
 ## Resultado
 
-(preenchido depois da execução)
+Execução de 05/11/2026 ([run 42109978654](https://github.com/diegostalin88/Invest/actions/runs/42109978654)),
+sobre a 2ª execução do backtest. As duas versões foram reprovadas no backtest, então a auditoria serve para
+confirmar que a reprovação é real.
+
+| Teste | Simples | Técnica |
+| --- | --- | --- |
+| Reproduz o mesmo número | sim | sim |
+| P&L ÷ risco original | −22,4% | −20,7% |
+| Execução 2 pregões depois | −21,1% | −19,5% |
+| Execução 3 pregões depois | −20,2% | −21,9% |
+| Custo × 4 | −22,9% | −21,4% |
+| Saída decidida pelo preço médio | −24,1% | −24,7% |
+| **Tudo no meio das ofertas (limite otimista)** | **+0,5%**, fator de lucro 1,04, acerto 61%, retorno 60,5% (CDI 59,7%) | **+0,3%**, fator de lucro 1,03, acerto 70%, retorno 59,9% |
+| Ida e volta pelas ofertas ÷ crédito (mediana) | 1,88 | 1,87 |
+| Placebo: percentil do original entre 100 sorteios | 0% | 2% |
+| P&L ÷ risco por ano (2024, 2025, 2026) | −16%, −21%, −28% | −17%, −15%, −25% |
+
+**Conclusões**
+
+1. **Não é erro do simulador.** O resultado se reproduz, é parecido em todos os anos e não muda com 1 ou 2 dias
+   de atraso. As operações sorteadas para conferência mostram o padrão: entra, e o stop dispara 1 a 4 pregões
+   depois, perdendo de 10% a 35% do risco.
+2. **A causa é o custo de atravessar as ofertas.** Na mediana, montar e desmontar a trava na hora custa 1,9 vez o
+   crédito recebido. Com isso, o stop de 2× o crédito dispara com qualquer oscilação, e o alvo de 50% quase nunca
+   chega.
+3. **Mesmo sem esse custo, não há vantagem.** No limite otimista (tudo no meio das ofertas, custo de execução
+   zero), as travas acertam 61% a 70%, mas o fator de lucro fica em 1,03 a 1,04 e o retorno total empata com o
+   CDI. O prêmio de volatilidade, se existe nesses papéis, não sobra depois de pagar o risco.
+4. **O filtro de IV Rank escolhe dias piores que o acaso.** Os dias com IV alta são dias de mercado agitado, com
+   ofertas mais largas e movimentos que disparam o stop. Entradas em dias sorteados perderam menos.
+
+**Ressalva:** as ofertas do COTAHIST são as que sobram no fechamento, provavelmente mais largas que as do meio
+do pregão. Isso explica parte da perda, mas não salva a estratégia: o limite otimista, que ignora esse custo,
+também não bate o CDI.

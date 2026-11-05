@@ -95,7 +95,21 @@ IV Rank mínimo 40 e 60; delta 0,20 e 0,30; largura 3% e 8%; custo × 2; saída 
 
 ## Resultado
 
-(preenchido depois da execução)
+**Veredito: as duas versões REPROVADAS.** Execução válida: 2ª, de 05/11/2026
+([run 42107033516](https://github.com/diegostalin88/Invest/actions/runs/42107033516)).
+
+Fora da amostra (01/2023 a 10/2026), capital de R$ 100 mil, caixa livre rendendo CDI:
+
+| Versão | Operações | Acerto | Fator de lucro | P&L ÷ risco por operação | Retorno total | CDI | BOVA11 | Queda máx. |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Simples | 226 | 15% | 0,02 | −22% | 0,6% | 59,7% | 60,6% | 13,8% |
+| Técnica | 65 | 15% | 0,03 | −21% | 42,1% | 59,7% | 60,6% | 2,6% |
+
+O retorno da técnica é maior só porque ela opera menos e deixa mais dinheiro no CDI; por operação, perde tanto
+quanto a simples. Critérios que falharam nas duas: acima do CDI, fator de lucro ≥ 1,2, sem o melhor ativo acima do
+CDI, e o filtro de IV Rank melhorando o resultado. Dentro da amostra (2019 a 2022) o quadro foi o mesmo.
+
+A auditoria adversarial (`docs/opcoes/auditoria-o1.md`) confirma que a reprovação é real e mostra a causa.
 
 ### 1ª execução (05/11/2026, run 42104514625): descartada por erro do simulador
 
