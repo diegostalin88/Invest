@@ -107,10 +107,13 @@ def main(destino):
     with open(mbr, 'w') as f:
         json.dump(m, f, indent=2)
     # Índices de referência sintéticos (mesmo formato do coleta/indices.py)
-    for pasta, tk, nome in ((os.path.join(destino, 'data'), 'SPY', 'SPY'), (os.path.join(destino, 'data', 'br'), 'BOVA11.SA', 'BOVA11')):
+    for pasta, tk, nome, rf, nrf, taxa in ((os.path.join(destino, 'data'), 'SPY', 'SPY', '^IRX', 'T-bill de 3 meses', 0.00016),
+                                           (os.path.join(destino, 'data', 'br'), 'BOVA11.SA', 'BOVA11', 'CDI', 'CDI', 0.0005)):
         s = passeio(rng, N_DIAS, 100, 0.0004, 0.01, 1)
+        acum = [round((1 + taxa) ** k, 8) for k in range(len(datas))]
         with open(os.path.join(pasta, 'indice.json'), 'w') as f:
-            json.dump({'principal': tk, 'series': {tk: {'nome': nome, 'dates': datas, 'close': [round(x, 2) for x in s['close']]}}}, f)
+            json.dump({'principal': tk, 'rendaFixa': rf, 'series': {tk: {'nome': nome, 'dates': datas, 'close': [round(x, 2) for x in s['close']]},
+                                                                  rf: {'nome': nrf, 'dates': datas, 'close': acum}}}, f)
         mp = os.path.join(pasta, 'manifest.json')
         with open(mp) as f:
             m = json.load(f)

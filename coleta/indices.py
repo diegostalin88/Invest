@@ -2,7 +2,11 @@
 
 Grava `indice.json` em cada pasta de mercado (EUA: SPY e ^GSPC; Brasil: BOVA11 e ^BVSP) com o fechamento
 ajustado dos últimos anos, e acrescenta `arquivoIndice` ao manifest.json daquela pasta. O app usa isso para
-mostrar, na Simulação e no Diário de sinais, quanto o mesmo dinheiro teria rendido no índice nas mesmas datas.
+mostrar quanto o mesmo dinheiro teria rendido no índice nas mesmas datas.
+
+Também grava a renda fixa sem risco como uma série acumulada (começa em 1): o CDI no Brasil (Banco Central,
+série SGS 12) e a T-bill de 3 meses nos EUA (^IRX do Yahoo). É o custo de oportunidade: o que o dinheiro
+rende parado, sem risco de bolsa.
 
 Uso: python coleta/indices.py site/data
 """
@@ -12,10 +16,57 @@ import sys
 from datetime import datetime, timezone
 
 INDICES = {
-    '': [('SPY', 'SPY (ETF do S&P 500)'), ('^GSPC', 'S&P 500')],
-    'br': [('BOVA11.SA', 'BOVA11 (ETF do Ibovespa)'), ('^BVSP', 'Ibovespa')],
+    '': [('SPY', 'SPY (ETF do S&P 500)'), ('^GSPC', 'S&P 500'), ('^IRX', 'T-bill de 3 meses')],
+    'br': [('BOVA11.SA', 'BOVA11 (ETF do Ibovespa)'), ('^BVSP', 'Ibovespa'), ('CDI', 'CDI')],
 }
+RENDA_FIXA = {'^IRX', 'CDI'}
 ANOS = '6y'
+
+
+def acumular(datas, taxas_dia):
+    """Série acumulada: valor[0] = 1 e valor[k] = valor[k-1] × (1 + taxa do dia k-1)."""
+    v, out = 1.0, []
+    for k in range(len(datas)):
+        if k:
+            v *= 1 + taxas_dia[k - 1]
+        out.append(round(v, 8))
+    return list(datas), out
+
+
+def baixar_cdi():
+    """CDI diário do Banco Central (% ao dia) → série acumulada. A API aceita no máximo 10 anos por pedido."""
+    import requests
+    from datetime import date, timedelta
+    ini = (date.today() - timedelta(days=6 * 365)).strftime('%d/%m/%Y')
+    fim = date.today().strftime('%d/%m/%Y')
+    r = requests.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados',
+                     params={'formato': 'json', 'dataInicial': ini, 'dataFinal': fim}, timeout=60)
+    r.raise_for_status()
+    linhas = [(datetime.strptime(x['data'], '%d/%m/%Y').strftime('%Y-%m-%d'), float(x['valor']) / 100) for x in r.json()]
+    linhas.sort()
+    return acumular([d for d, _ in linhas], [t for _, t in linhas])
+
+
+def baixar_tbill():
+    """^IRX = juro anual (%) da T-bill de 3 meses; rende pelos dias corridos entre um pregão e o seguinte."""
+    import yfinance as yf
+    from datetime import date
+    h = yf.Ticker('^IRX').history(period=ANOS, auto_adjust=False)
+    if h is None or not len(h):
+        return None
+    datas = h.index.strftime('%Y-%m-%d').tolist()
+    y = [float(x) / 100 for x in h['Close']]
+    taxas = [(1 + y[k]) ** ((date.fromisoformat(datas[k + 1]) - date.fromisoformat(datas[k])).days / 365) - 1
+             for k in range(len(datas) - 1)] + [0.0]
+    return acumular(datas, taxas)
+
+
+def baixar_padrao(ticker):
+    if ticker == 'CDI':
+        return baixar_cdi()
+    if ticker == '^IRX':
+        return baixar_tbill()
+    return baixar_yahoo(ticker)
 
 
 def baixar_yahoo(ticker):
@@ -41,7 +92,7 @@ def montar(lista, baixar):
     return series
 
 
-def main(argv=None, baixar=baixar_yahoo):
+def main(argv=None, baixar=baixar_padrao):
     argv = argv if argv is not None else sys.argv
     raiz = argv[1] if len(argv) > 1 else 'site/data'
     gravados = 0
@@ -51,11 +102,13 @@ def main(argv=None, baixar=baixar_yahoo):
         if not os.path.exists(manifesto):
             continue
         series = montar(lista, baixar)
-        if not series:
+        fixa = next((t for t in series if t in RENDA_FIXA), None)
+        if not any(t not in RENDA_FIXA for t in series):
             print(f'{pasta}: nenhum índice baixado; mantém o que houver', file=sys.stderr)
             continue
         saida = {'geradoEm': datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace('+00:00', 'Z'),
-                 'principal': lista[0][0] if lista[0][0] in series else next(iter(series)), 'series': series}
+                 'principal': lista[0][0] if lista[0][0] in series else next(t for t in series if t not in RENDA_FIXA),
+                 'rendaFixa': fixa, 'series': series}
         with open(os.path.join(pasta, 'indice.json'), 'w', encoding='utf-8') as f:
             json.dump(saida, f, separators=(',', ':'))
         with open(manifesto, encoding='utf-8') as f:

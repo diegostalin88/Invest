@@ -1837,6 +1837,16 @@
         return s && Array.isArray(s.dates) && s.dates.length ? s : null;
     }
     function nomeIndice() { const s = serieIndice(); return s ? s.nome : (mercadoCodigo() === 'br' ? 'BOVA11' : 'SPY'); }
+    // Renda fixa sem risco (CDI no Brasil, T-bill de 3 meses nos EUA), gravada como série acumulada pela coleta
+    function serieRendaFixa() { const I = indiceDados; const s = I && I.series && I.rendaFixa && I.series[I.rendaFixa]; return s && Array.isArray(s.dates) && s.dates.length ? s : null; }
+    function nomeRendaFixa() { const s = serieRendaFixa(); return s ? s.nome : (mercadoCodigo() === 'br' ? 'CDI' : 'T-bill'); }
+    function valorRendaFixaAte(data) {
+        const s = serieRendaFixa(); if (!s || !data || data < s.dates[0]) return null;
+        let lo = 0, hi = s.dates.length - 1, r = -1;
+        while (lo <= hi) { const m = (lo + hi) >> 1; if (s.dates[m] <= data) { r = m; lo = m + 1; } else hi = m - 1; }
+        return r >= 0 ? s.close[r] : null;
+    }
+    function retornoRendaFixa(de, ate) { const a = valorRendaFixaAte(de), b = valorRendaFixaAte(ate); return a > 0 && b > 0 && de <= ate ? b / a - 1 : null; }
     function fechIndiceAte(data) {   // último fechamento do índice com data ≤ a data pedida
         const s = serieIndice(); if (!s || !data) return null;
         let lo = 0, hi = s.dates.length - 1, r = -1;
@@ -3365,7 +3375,8 @@
         const volHoje = vols[vols.length - 1], volPct = vols.filter(v => v <= volHoje).length / vols.length;
         const r = k => n > k ? fracaoRet(c[n - 1 - k], ult) : null;
         return { nome: s.nome || nomeIndice(), data: d[n - 1], ult, distMM200: ult / mm200 - 1, mm10, acimaMM10: mm10 ? ult > mm10 : null, distMM10: mm10 ? ult / mm10 - 1 : null,
-            quedaPico: 1 - ult / pico, quedaPico52: 1 - ult / pico52, desde: d[0], ret1m: r(21), ret3m: r(63), ret12m: r(252), vol: volHoje, volPct, anos: (n / 252) };
+            quedaPico: 1 - ult / pico, quedaPico52: 1 - ult / pico52, desde: d[0], ret1m: r(21), ret3m: r(63), ret12m: r(252), vol: volHoje, volPct, anos: (n / 252),
+            rf12m: n > 252 ? retornoRendaFixa(d[n - 253], d[n - 1]) : null, nomeRF: nomeRendaFixa() };
     }
     function htmlTermometro(T) {
         if (!T) return '';
@@ -3380,6 +3391,7 @@
             ${lin('Distância da média de 200 dias', p(T.distMM200), cor(T.distMM200))}
             ${lin('Abaixo do topo', `${fmtNumM(T.quedaPico * 100, 1)}%`, T.quedaPico > 0.1 ? 'var(--baixa)' : '', `Topo de 52 semanas: ${fmtNumM(T.quedaPico52 * 100, 1)}% abaixo`)}
             ${lin('Retorno 1 mês · 3 meses · 12 meses', `${p(T.ret1m)} · ${p(T.ret3m)} · ${p(T.ret12m)}`)}
+            ${T.rf12m !== null ? lin(`${T.nomeRF} em 12 meses`, p(T.rf12m), T.ret12m !== null && T.ret12m < T.rf12m ? 'var(--baixa)' : '', `O que o dinheiro rendeu parado, sem risco de bolsa. ${T.ret12m === null ? '' : T.ret12m >= T.rf12m ? `A bolsa pagou ${fmtNumM((T.ret12m - T.rf12m) * 100, 1)} pontos a mais pelo risco.` : `A bolsa rendeu ${fmtNumM((T.rf12m - T.ret12m) * 100, 1)} pontos a menos que a renda fixa: o risco não foi pago neste ano.`}`) : ''}
             ${lin('Volatilidade (21 pregões, ao ano)', `${fmtNumM(T.vol * 100, 1)}% · ${volTxt}`, T.volPct >= 0.8 ? 'var(--baixa)' : '', `Maior que ${fmtNumM(T.volPct * 100, 0)}% dos dias desde ${fmtDataBR(T.desde)}. Volatilidade alta costuma vir junto com quedas.`)}
             <p class="text-xs mt-2" style="color:var(--mudo)">Descreve o ambiente; não prevê o próximo movimento. Nos testes (1993–2026), ficar fora do índice abaixo da média de 10 meses reduziu as quedas, mas rendeu menos que ficar comprado desde 2010.</p>
         </div>`;
@@ -3410,13 +3422,13 @@
         let corrSoma = 0, corrN = 0; const tk = pos.map(p => p.t);
         for (let a = 0; a < tk.length; a++) for (let b = a + 1; b < tk.length; b++) { const x = retsPapel[tk[a]], y = retsPapel[tk[b]]; const sx = desvio(x), sy = desvio(y); if (!(sx > 0 && sy > 0)) continue; const mx = x.reduce((s, v) => s + v, 0) / x.length, my = y.reduce((s, v) => s + v, 0) / y.length; let cv = 0; for (let i = 0; i < x.length; i++) cv += (x[i] - mx) * (y[i] - my); corrSoma += cv / (x.length - 1) / sx / sy; corrN++; }
         // contra o índice desde a compra: o mesmo dinheiro de cada compra aplicado no índice na mesma data
-        let investido = 0, noIndice = 0, comData = 0, semData = 0, atualComData = 0;
+        let investido = 0, noIndice = 0, comData = 0, semData = 0, atualComData = 0, noRF = 0, comRF = 0;
         const hoje = ultimoPregaoDados();
-        itens.forEach(x => { const v = x.qtd * x.pm; const r = x.data ? retornoIndice(x.data, hoje) : null; if (r === null) { semData++; return; } comData++; investido += v; noIndice += v * (1 + r); atualComData += x.qtd * ult(x.t); });
+        itens.forEach(x => { const v = x.qtd * x.pm; const r = x.data ? retornoIndice(x.data, hoje) : null; if (r === null) { semData++; return; } comData++; investido += v; noIndice += v * (1 + r); atualComData += x.qtd * ult(x.t); const rf = retornoRendaFixa(x.data, hoje); if (rf !== null) { noRF += v * (1 + rf); comRF++; } });
         return { total, pos, nEfetivo: 1 / hhi, maior: pos[0], top3: pos.slice(0, 3).reduce((s, x) => s + x.peso, 0), dias: retsCart.length,
             vol: vol === null ? null : vol * Math.sqrt(252), volIdx: volIdx === null ? null : volIdx * Math.sqrt(252), beta, quedaCart: queda(retsCart), quedaIdx: queda(retsIdx),
             ret1a: acum(retsCart), ret1aIdx: acum(retsIdx), corrMedia: corrN ? corrSoma / corrN : null,
-            vsIndice: comData ? { investido, noIndice, atual: atualComData, n: comData } : null, semData };
+            vsIndice: comData ? { investido, noIndice, atual: atualComData, n: comData, noRF: comRF === comData ? noRF : null } : null, semData };
     }
     function htmlSaudeCarteira(S) {
         if (!S) return '';
@@ -3439,7 +3451,7 @@
                 ${lin('Maior queda em 1 ano (pesos de hoje)', `${fmtNumM(S.quedaCart * 100, 1)}% × ${fmtNumM(S.quedaIdx * 100, 1)}%`, S.quedaCart > S.quedaIdx * 1.5 ? 'var(--baixa)' : '')}
                 ${lin('Retorno em 1 ano (pesos de hoje)', `${fmtPctM(S.ret1a * 100)} × ${fmtPctM(S.ret1aIdx * 100)}`, S.ret1a >= S.ret1aIdx ? 'var(--alta)' : 'var(--baixa)')}
             </div>
-            ${V ? `<div class="mt-3 text-sm">Se o mesmo dinheiro de cada compra tivesse ido para o <b>${nomeIndice()}</b> na mesma data: <b>${fmtPrecoM(V.noIndice)}</b> hoje, contra <b>${fmtPrecoM(V.atual)}</b> nos papéis. <span style="color:${dif >= 0 ? 'var(--alta)' : 'var(--baixa)'}">${dif >= 0 ? 'Os papéis estão ganhando' : 'O índice está ganhando'} por ${fmtPrecoM(Math.abs(dif))}.</span>${S.semData ? ` <span style="color:var(--mudo)">(${S.semData} papel(éis) sem data de compra ficaram de fora; edite e preencha a data.)</span>` : ''}</div>` : `<div class="mt-3 text-sm" style="color:var(--mudo)">Preencha a data de compra dos papéis para comparar com o ${nomeIndice()}.</div>`}
+            ${V ? `<div class="mt-3 text-sm">Se o mesmo dinheiro de cada compra tivesse ido para o <b>${nomeIndice()}</b> na mesma data: <b>${fmtPrecoM(V.noIndice)}</b> hoje, contra <b>${fmtPrecoM(V.atual)}</b> nos papéis. <span style="color:${dif >= 0 ? 'var(--alta)' : 'var(--baixa)'}">${dif >= 0 ? 'Os papéis estão ganhando' : 'O índice está ganhando'} por ${fmtPrecoM(Math.abs(dif))}.</span>${V.noRF !== null ? ` No <b>${nomeRendaFixa()}</b>, sem risco, seriam <b>${fmtPrecoM(V.noRF)}</b>${V.atual < V.noRF ? ': por enquanto, o risco da bolsa não foi pago' : ''}.` : ''}${S.semData ? ` <span style="color:var(--mudo)">(${S.semData} papel(éis) sem data de compra ficaram de fora; edite e preencha a data.)</span>` : ''}</div>` : `<div class="mt-3 text-sm" style="color:var(--mudo)">Preencha a data de compra dos papéis para comparar com o ${nomeIndice()}.</div>`}
             ${alertas.length ? `<div class="mt-3 text-sm space-y-1">${alertas.map(a => `<div>⚠️ ${a}</div>`).join('')}</div>` : `<div class="mt-3 text-sm" style="color:var(--alta)">Sem alerta de concentração ou de risco.</div>`}
             <p class="text-xs mt-2" style="color:var(--mudo)">Dados dos últimos ${S.dias} pregões, com os pesos de hoje. Não é recomendação: mostra quanto risco a carteira carrega e se ela está valendo a pena contra o índice.</p>
         </div>`;
@@ -3457,7 +3469,8 @@
         const precoFim = x.saidaPreco > 0 && x.saidaData ? x.saidaPreco : d.close[i1];
         const sinal = x.tipo === 'venda' ? -1 : 1;   // venda: "acertou" se o papel caiu depois
         const ret = sinal * (precoFim / precoIni - 1), idx = retornoIndice(x.data, d.dates[i1]);
-        return { ret, idx: idx === null ? null : sinal * idx, ate: d.dates[i1], encerrada: !!(x.saidaData && x.saidaPreco > 0) };
+        const rf = retornoRendaFixa(x.data, d.dates[i1]);
+        return { ret, idx: idx === null ? null : sinal * idx, rf: x.tipo === 'venda' ? null : rf, ate: d.dates[i1], encerrada: !!(x.saidaData && x.saidaPreco > 0) };
     }
     function htmlDecisoes() {
         const merc = mercadoCodigo(); const lista = lerDecisoes().map((x, k) => ({ x, k })).filter(o => o.x.m === merc);
@@ -3465,7 +3478,8 @@
         const comp = av.filter(o => o.a && o.a.idx !== null);
         const venceu = comp.filter(o => o.a.ret > o.a.idx).length;
         const media = comp.length ? comp.reduce((s, o) => s + o.a.ret - o.a.idx, 0) / comp.length : null;
-        const placar = comp.length ? `<div class="am-card"><div class="font-bold">Placar das suas decisões</div><div class="text-sm mt-1">${comp.length} decisões · <b>${venceu}</b> venceram o ${nomeIndice()} (${fmtNumM(venceu / comp.length * 100, 0)}%) · em média ${fmtPctM(media * 100)} contra o índice nas mesmas datas.</div>
+        const compRF = av.filter(o => o.a && o.a.rf !== null && o.a.rf !== undefined), venceuRF = compRF.filter(o => o.a.ret > o.a.rf).length;
+        const placar = comp.length ? `<div class="am-card"><div class="font-bold">Placar das suas decisões</div><div class="text-sm mt-1">${comp.length} decisões · <b>${venceu}</b> venceram o ${nomeIndice()} (${fmtNumM(venceu / comp.length * 100, 0)}%) · em média ${fmtPctM(media * 100)} contra o índice nas mesmas datas.${compRF.length ? ` Das ${compRF.length} compras, <b>${venceuRF}</b> renderam mais que o ${nomeRendaFixa()}.` : ''}</div>
             <p class="text-xs mt-2" style="color:var(--mudo)">${comp.length < 30 ? `Com menos de 30 decisões, o placar ainda é quase só sorte. ` : ''}Para uma venda, "acertar" é o papel cair depois; o índice entra com sinal trocado.</p></div>` : '';
         const cartoes = av.slice().reverse().map(({ x, k, a }) => `<div class="am-card"><div class="flex items-center justify-between gap-2"><span><span class="am-tk">${x.t}</span> <span class="am-chip ${x.tipo === 'venda' ? 'vermelho' : 'verde'}">${x.tipo === 'venda' ? 'Venda' : 'Compra'}</span></span><span class="text-sm" style="color:var(--mudo)">${fmtDataBR(x.data)}</span></div>
             ${x.motivo ? `<div class="text-sm mt-2">“${escapeHtmlM(x.motivo)}”</div>` : ''}
@@ -4107,7 +4121,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { volFinanceiro, quedaDoTopo, volAnual, resumoBussola, get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio, get estrategiasConfluencia() { return confluenceStrategies; }, get indice() { return indiceDados; }, set indice(v) { indiceDados = v; }, retornoIndice, comparacaoIndiceSim, htmlDiario, termometroIndice, saudeCarteira, avaliarDecisao, htmlTestado, htmlDecisoes, lerDecisoes, gravarDecisoes };
+    window.investDebug = { retornoRendaFixa, nomeRendaFixa, volFinanceiro, quedaDoTopo, volAnual, resumoBussola, get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio, get estrategiasConfluencia() { return confluenceStrategies; }, get indice() { return indiceDados; }, set indice(v) { indiceDados = v; }, retornoIndice, comparacaoIndiceSim, htmlDiario, termometroIndice, saudeCarteira, avaliarDecisao, htmlTestado, htmlDecisoes, lerDecisoes, gravarDecisoes };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).

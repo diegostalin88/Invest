@@ -266,6 +266,8 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     ok(!(await cel.page.$('[data-pagina="inicio"] #am-melhores')) && !/Score/.test(await cel.page.textContent('[data-pagina="inicio"]')), 'celular: Início sem ranking técnico (foi para o Avançado)');
     const T = await cel.page.evaluate(() => { const t = window.investDebug.termometroIndice(); const s = window.investDebug.indice.series['BOVA11.SA']; const c = s.close, n = c.length; let m = 0; for (let i = n - 200; i < n; i++) m += c[i]; return { ok: Math.abs(t.distMM200 - (c[n - 1] / (m / 200) - 1)) < 1e-9 && Math.abs(t.quedaPico - (1 - c[n - 1] / Math.max(...c))) < 1e-9 && t.volPct > 0 && t.volPct <= 1 }; });
     ok(T.ok, 'celular: termômetro confere com o cálculo à mão (MME200 e queda do topo)');
+    const rfOk = await cel.page.evaluate(() => { const D = window.investDebug; const s = D.indice.series.CDI; const n = s.dates.length; const r = D.retornoRendaFixa(s.dates[n - 253], s.dates[n - 1]); return Math.abs(r - (Math.pow(1.0005, 252) - 1)) < 1e-6 && Math.abs(D.termometroIndice().rf12m - r) < 1e-12; });
+    ok(rfOk && /CDI em 12 meses/.test(termo), 'celular: termômetro mostra o CDI de 12 meses (conta confere)');
     const larg = await cel.page.evaluate(() => ({ doc: document.documentElement.scrollWidth, sw: document.getElementById('market-switch').getBoundingClientRect().right }));
     ok(larg.doc <= 390 && larg.sw <= 390, `celular: sem rolagem lateral (${JSON.stringify(larg)})`);
     await cel.page.screenshot({ path: path.join(SHOTS, 'celular_inicio.png'), fullPage: false });
@@ -605,7 +607,7 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     ok(saude.conta && saude.pesos && saude.nEf >= 1 && saude.nEf <= 4, `celular: saúde da carteira confere a conta contra o índice e os pesos (efetivos ${saude.nEf.toFixed(2)})`);
     await cel.page.click('.am-nav [data-ir-pagina="inicio"]'); await cel.page.click('.am-nav [data-ir-pagina="carteira"]');
     const sTxt = await cel.page.textContent('[data-saude-carteira]');
-    ok(/Saúde da carteira/.test(sTxt) && /Se o mesmo dinheiro de cada compra/.test(sTxt) && (saude.maior > 0.2 ? /⚠️/.test(sTxt) : true), 'celular: saúde da carteira aparece com a comparação e os alertas');
+    ok(/Saúde da carteira/.test(sTxt) && /Se o mesmo dinheiro de cada compra/.test(sTxt) && /No CDI, sem risco/.test(sTxt) && (saude.maior > 0.2 ? /⚠️/.test(sTxt) : true), 'celular: saúde da carteira aparece com a comparação e os alertas');
     await cel.page.waitForTimeout(400); await cel.page.screenshot({ path: path.join(SHOTS, 'celular_saude_carteira.png'), fullPage: false });
     await cel.page.evaluate(() => localStorage.removeItem('invest-carteira'));
     // Diário das minhas decisões e "O que já foi testado"
