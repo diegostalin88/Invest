@@ -1,0 +1,42 @@
+name: Opções - backtest das travas de crédito
+
+# Só leitura: hipótese O1 (docs/opcoes/hipotese-travas-credito.md). Baixa o COTAHIST, simula as travas de crédito
+# com preços reais das opções e compara com o CDI e o BOVA11. Não publica nada.
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/project-thread-ouh2hk]
+    paths: ["opcoes/travas.py", ".github/workflows/opcoes-travas.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Testes (sem rede)
+        run: |
+          pip install pytest==9.2.0
+          python -m pytest -q opcoes/tests
+
+      - name: Backtest
+        working-directory: opcoes
+        run: python travas.py --anos 2018-2026 --saida ../opcoes_resultado
+
+      - name: Guardar o resultado
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opcoes-travas
+          path: opcoes_resultado/
+          if-no-files-found: ignore
