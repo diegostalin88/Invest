@@ -629,6 +629,29 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     ok(await cel.page.isVisible('#fundamentals-results-container'), 'celular: Mais → Técnica × Fundamentos');
     await cel.page.click('#fundamentals-results-container tbody tr[data-explicar]');
     ok(await cel.page.isVisible('#am-ativo'), 'celular: tocar numa linha do Módulo 6 abre a tela do ativo');
+    // Imposto das vendas do mês (Brasil): contas e tela
+    const IR = await cel.page.evaluate(() => {
+        const C = window.investDebug.calcularIR, v = (tipo, qtd, preco, pm) => ({ t: 'X', tipo, qtd, preco, pm });
+        const a = C([v('acao', 100, 150, 120)], 0, 0, '2026-11');                       // vendeu 15 mil, lucro 3 mil: isento
+        const b = C([v('acao', 200, 150, 135)], 1000, 0, '2026-11');                    // vendeu 30 mil, lucro 3 mil − prejuízo 1 mil → 15% de 2 mil
+        const c = C([v('acao', 100, 95, 100), v('etf', 10, 200, 100)], 0, 0, '2026-12'); // mês isento com perda de 500 + lucro de ETF de 1.000 → 15% de 500
+        const d = C([v('fii', 10, 200, 100)], 0, 200, '2026-11');                       // FII: 20% de (1.000 − 200)
+        const e = C([v('etf', 1, 133, 100)], 0, 0, '2026-11');                          // R$ 4,95: abaixo de R$ 10, sem DARF
+        const f = C([v('acao', 300, 100, 110)], 0, 0, '2026-11');                       // prejuízo de 3 mil fica para os próximos meses
+        return { a: [a.isento, a.total, a.lucroIsento], b: [b.isento, +b.total.toFixed(2), b.vencimento], c: [+c.total.toFixed(2), c.vencimento], d: +d.total.toFixed(2), e: [+e.total.toFixed(2), e.pagar], f: f.prejComumDepois };
+    });
+    ok(JSON.stringify(IR) === JSON.stringify({ a: [true, 0, 3000], b: [false, 300, '2026-12-31'], c: [75, '2027-01-29'], d: 160, e: [4.95, false], f: 3000 }), `celular: imposto do mês segue isenção de 20 mil, prejuízo, ETF, FII e DARF mínimo (${JSON.stringify(IR)})`);
+    for (let k = 0; k < 4 && await cel.page.$('.am-tela.aberta'); k++) { await cel.page.goBack(); await cel.page.waitForTimeout(200); }
+    await cel.page.click('.am-nav [data-ir-pagina="mais"]');
+    await cel.page.click('[data-pagina="mais"] [data-sub="imposto"]');
+    await cel.page.fill('#ir-mes', '2026-11'); await cel.page.dispatchEvent('#ir-mes', 'change');
+    await cel.page.fill('#ir-t', 'PETR4'); await cel.page.fill('#ir-qtd', '1000'); await cel.page.fill('#ir-preco', '40'); await cel.page.fill('#ir-pm', '30');
+    await cel.page.click('#ir-salvar');
+    const irTxt = await cel.page.textContent('[data-ir-resultado]');
+    ok(/Tem DARF/.test(irTxt) && /1\.500,00/.test(irTxt) && /6015/.test(irTxt) && /31\/12\/2026/.test(irTxt), 'celular: venda de R$ 40 mil com lucro de R$ 10 mil mostra DARF de R$ 1.500 até 31/12/2026');
+    await cel.page.click('[data-ir-apagar="0"]');
+    ok(/Sem DARF/.test(await cel.page.textContent('[data-ir-resultado]')), 'celular: apagar a venda zera o imposto');
+    await cel.page.goBack(); await cel.page.waitForSelector('#am-sub-tela', { state: 'hidden', timeout: 5000 });
     // Histórico de balanços (EUA): aba Balanços na tela do ativo
     await cel.page.goto(BASE + '?mercado=us');
     await cel.page.waitForFunction(() => window.investDebug && Object.keys(window.investDebug.allData || {}).length > 0, null, { timeout: 60000 });

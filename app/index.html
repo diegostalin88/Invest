@@ -383,6 +383,7 @@
             <div class="am-lista">
                 <button type="button" class="am-linha" data-sub="decisoes"><span class="am-avatar" style="background:#0e7490">✍️</span><span class="am-meio"><span class="am-tk block">Diário das minhas decisões</span><span class="am-nome block">Cada compra e venda contra o índice</span></span></button>
                 <button type="button" class="am-linha" data-sub="testado"><span class="am-avatar" style="background:#475569">🔬</span><span class="am-meio"><span class="am-tk block">O que já foi testado</span><span class="am-nome block">O que passou e o que reprovou</span></span></button>
+                <button type="button" class="am-linha" data-sub="imposto"><span class="am-avatar" style="background:#15803d">🧾</span><span class="am-meio"><span class="am-tk block">Imposto das vendas do mês</span><span class="am-nome block">Isenção de R$ 20 mil, prejuízo a compensar e DARF (Brasil)</span></span></button>
             </div>
             <div class="am-secao mt-4">Avançado <span class="text-xs font-normal" style="color:var(--mudo)">(estratégia técnica congelada em 04/11/2026: perdeu para o índice nos testes)</span></div>
             <div class="am-lista">
@@ -432,6 +433,7 @@
             <div class="am-tela-corpo">
                 <div data-sub-slot="decisoes" class="hidden"></div>
                 <div data-sub-slot="testado" class="hidden"></div>
+                <div data-sub-slot="imposto" class="hidden"></div>
                 <div data-sub-slot="sinais" class="hidden">
                     <p class="text-sm mb-3" style="color:var(--mudo)">Score da estratégia técnica congelada. Nos testes de 04/11/2026 ela perdeu para o índice; serve só para acompanhar o teste até 11/2027.</p>
                     <button type="button" class="am-pilula mb-3" id="am-abrir-filtros"><svg class="am-ico" style="width:1.1rem;height:1.1rem"><use href="#i-filtro"/></svg>Filtros</button>
@@ -3606,6 +3608,94 @@
         if ([p.rf, p.indice, p.acoes].some(x => x < 0) || Math.abs(soma - 100) > 0.01) { document.getElementById('plano-erro').textContent = `As três metas precisam somar 100% (agora somam ${fmtNumM(soma, 0)}%).`; return false; }
         const todos = lerPlano(); todos[mercadoCodigo()] = p; gravarPlano(todos); desenharCarteira(); return true;
     }
+    // ----- Imposto de renda das vendas do mês (Brasil, operações comuns; regras da Receita em 2026) -----
+    // Ações: isentas se o total VENDIDO em ações no mês for até R$ 20 mil; acima disso, 15% sobre o lucro.
+    // ETFs de ações: 15%, sem isenção. FIIs: 20%, sem isenção e com prejuízo separado. Prejuízo de meses anteriores
+    // abate o lucro (ações e ETFs no mesmo grupo). DARF código 6015, até o último dia útil do mês seguinte;
+    // abaixo de R$ 10 o valor passa para o mês seguinte. Day trade (20%) fica de fora.
+    const CHAVE_IR = 'invest-ir', ISENCAO_ACOES = 20000;
+    function lerIR() { try { const v = JSON.parse(localStorage.getItem(CHAVE_IR) || '{}'); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } }
+    function gravarIR(v) { try { localStorage.setItem(CHAVE_IR, JSON.stringify(v)); return true; } catch (e) { return false; } }
+    function tipoPadraoIR(t) { return ETFS_INDICE.has(t) ? 'etf' : 'acao'; }
+    function ultimoDiaUtil(ano, mes) {   // mes 1–12; ignora feriados (aviso na tela)
+        const d = new Date(Date.UTC(ano, mes, 0)); while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10);
+    }
+    function calcularIR(vendas, prejComum = 0, prejFII = 0, mes = null) {
+        const soma = (tipo, f) => vendas.filter(v => v.tipo === tipo).reduce((s, v) => s + f(v), 0);
+        const lucro = v => v.qtd * (v.preco - v.pm) - (v.custos || 0);
+        const vendidoAcoes = soma('acao', v => v.qtd * v.preco);
+        const lucroAcoes = soma('acao', lucro), lucroETF = soma('etf', lucro), lucroFII = soma('fii', lucro);
+        const isento = vendidoAcoes <= ISENCAO_ACOES;
+        // no mês isento, o lucro de ações não paga nem abate prejuízo; o prejuízo de ações continua compensável
+        const resComum = (isento ? Math.min(lucroAcoes, 0) : lucroAcoes) + lucroETF;
+        const baseComum = resComum - Math.max(0, prejComum), baseFII = lucroFII - Math.max(0, prejFII);
+        const impComum = baseComum > 0 ? 0.15 * baseComum : 0, impFII = baseFII > 0 ? 0.20 * baseFII : 0;
+        const total = impComum + impFII;
+        let venc = null; if (mes) { const [a, m] = mes.split('-').map(Number); venc = m === 12 ? ultimoDiaUtil(a + 1, 1) : ultimoDiaUtil(a, m + 1); }
+        return { vendidoAcoes, isento, lucroAcoes, lucroETF, lucroFII, impComum, impFII, total, pagar: total >= 10, vencimento: venc,
+            prejComumDepois: baseComum < 0 ? -baseComum : 0, prejFIIDepois: baseFII < 0 ? -baseFII : 0, lucroIsento: isento && lucroAcoes > 0 ? lucroAcoes : 0 };
+    }
+    function htmlIR() {
+        const dados = lerIR(); const mes = dados.mesAtual || new Date().toISOString().slice(0, 7);
+        const reg = (dados.meses || {})[mes] || { vendas: [], prejComum: 0, prejFII: 0 };
+        const R = calcularIR(reg.vendas, reg.prejComum, reg.prejFII, mes);
+        const din = v => `R$ ${fmtNumM(v, 2)}`, cor = v => v >= 0 ? 'var(--alta)' : 'var(--baixa)';
+        const nomeTipo = { acao: 'Ação', etf: 'ETF', fii: 'FII' };
+        const linhas = reg.vendas.map((v, k) => `<div class="am-card" data-ir-venda><div class="flex items-center justify-between"><span><span class="am-tk">${escapeHtmlM(v.t)}</span> <span class="am-chip">${nomeTipo[v.tipo]}</span></span><button type="button" class="am-chip" data-ir-apagar="${k}">Apagar</button></div>
+            <div class="text-sm mt-1">${v.qtd} × ${din(v.preco)} (preço médio ${din(v.pm)}) · lucro <b style="color:${cor(v.qtd * (v.preco - v.pm))}">${din(v.qtd * (v.preco - v.pm) - (v.custos || 0))}</b></div></div>`).join('');
+        return `<div class="space-y-3" data-ir>
+            <div class="am-card"><div class="font-bold">Vendas do mês</div>
+                <div class="grid grid-cols-2 gap-2 mt-2 text-sm">
+                    <label class="block"><span class="text-xs" style="color:var(--mudo)">Mês</span><input id="ir-mes" type="month" value="${mes}" class="w-full mt-1"></label>
+                    <label class="block"><span class="text-xs" style="color:var(--mudo)">Papel</span><input id="ir-t" type="text" autocomplete="off" class="w-full mt-1" placeholder="PETR4"></label>
+                    <label class="block"><span class="text-xs" style="color:var(--mudo)">Tipo</span><select id="ir-tipo" class="w-full mt-1"><option value="acao">Ação</option><option value="etf">ETF</option><option value="fii">FII</option></select></label>
+                    <label class="block"><span class="text-xs" style="color:var(--mudo)">Quantidade vendida</span><input id="ir-qtd" type="number" inputmode="decimal" step="any" min="0" class="w-full mt-1"></label>
+                    <label class="block"><span class="text-xs" style="color:var(--mudo)">Preço de venda</span><input id="ir-preco" type="number" inputmode="decimal" step="any" min="0" class="w-full mt-1"></label>
+                    <label class="block"><span class="text-xs" style="color:var(--mudo)">Preço médio de compra</span><input id="ir-pm" type="number" inputmode="decimal" step="any" min="0" class="w-full mt-1"></label>
+                    <label class="block"><span class="text-xs" style="color:var(--mudo)">Custos (corretagem, taxas)</span><input id="ir-custos" type="number" inputmode="decimal" step="any" min="0" class="w-full mt-1" value="0"></label>
+                </div>
+                <p class="text-sm mt-2" style="color:#fca5a5" id="ir-erro"></p>
+                <button type="button" class="am-botao mt-1" id="ir-salvar">Adicionar venda</button></div>
+            ${linhas}
+            <div class="am-card"><div class="font-bold">Prejuízo de meses anteriores</div>
+                <div class="grid grid-cols-2 gap-2 mt-2 text-sm">
+                    <label class="block"><span class="text-xs" style="color:var(--mudo)">Ações e ETFs (R$)</span><input id="ir-prej" type="number" inputmode="decimal" step="any" min="0" value="${reg.prejComum || 0}" class="w-full mt-1"></label>
+                    <label class="block"><span class="text-xs" style="color:var(--mudo)">FIIs (R$)</span><input id="ir-prej-fii" type="number" inputmode="decimal" step="any" min="0" value="${reg.prejFII || 0}" class="w-full mt-1"></label>
+                </div><button type="button" class="am-botao sec mt-2" id="ir-prej-salvar">Atualizar prejuízo</button></div>
+            <div class="am-card" data-ir-resultado><div class="flex items-center justify-between"><span class="font-bold">Resultado de ${mes.split('-').reverse().join('/')}</span><span class="am-chip ${R.pagar ? 'amarelo' : 'verde'}">${R.pagar ? 'Tem DARF' : 'Sem DARF'}</span></div>
+                <div class="am-grade mt-2">
+                    <div class="am-dado"><div class="r">Vendido em ações</div><div class="v">${din(R.vendidoAcoes)}</div><div class="text-xs" style="color:var(--mudo)">${R.isento ? 'até R$ 20 mil: lucro de ações isento' : 'acima de R$ 20 mil: lucro de ações tributado'}</div></div>
+                    <div class="am-dado"><div class="r">Lucro em ações · ETFs · FIIs</div><div class="v">${din(R.lucroAcoes)} · ${din(R.lucroETF)} · ${din(R.lucroFII)}</div></div>
+                    <div class="am-dado"><div class="r">Imposto (15% · 20% FII)</div><div class="v">${din(R.total)}</div>${R.total > 0 && !R.pagar ? '<div class="text-xs" style="color:var(--mudo)">abaixo de R$ 10: some ao próximo mês</div>' : ''}</div>
+                    <div class="am-dado"><div class="r">Prejuízo que sobra</div><div class="v">${din(R.prejComumDepois)} · FII ${din(R.prejFIIDepois)}</div></div>
+                </div>
+                ${R.pagar ? `<p class="text-sm mt-2">DARF código <b>6015</b>, vencimento até <b>${fmtDataBR(R.vencimento)}</b> (último dia útil do mês seguinte; confira feriados).</p>` : ''}
+                ${R.lucroIsento ? `<p class="text-sm mt-2">Lucro isento de ${din(R.lucroIsento)}: vai na declaração anual como rendimento isento.</p>` : ''}
+            </div>
+            <p class="text-xs" style="color:var(--mudo)">Só operações comuns (swing trade) no mercado à vista. Day trade, opções, BDRs e aluguel têm regras próprias. O imposto retido na fonte (0,005%) pode ser descontado do DARF. Os números ficam só neste aparelho. Confira com a sua corretora ou um contador antes de pagar.</p>
+        </div>`;
+    }
+    function desenharIR() { const box = document.querySelector('[data-sub-slot="imposto"]'); if (box) box.innerHTML = htmlIR(); }
+    function prepararIR() {
+        const box = document.querySelector('[data-sub-slot="imposto"]'); if (!box || box.dataset.pronto) return; box.dataset.pronto = '1';
+        const regDo = (d, mes) => { d.meses = d.meses || {}; return d.meses[mes] = d.meses[mes] || { vendas: [], prejComum: 0, prejFII: 0 }; };
+        box.addEventListener('change', e => {
+            if (e.target.id === 'ir-mes' && e.target.value) { const d = lerIR(); d.mesAtual = e.target.value; gravarIR(d); desenharIR(); }
+            if (e.target.id === 'ir-t') { const t = e.target.value.trim().toUpperCase(); document.getElementById('ir-tipo').value = tipoPadraoIR(t); const c = lerCarteira().find(x => x.t === t); if (c && !document.getElementById('ir-pm').value) document.getElementById('ir-pm').value = c.pm; }
+        });
+        box.addEventListener('click', e => {
+            const d = lerIR(); const mes = d.mesAtual || new Date().toISOString().slice(0, 7); const reg = regDo(d, mes);
+            if (e.target.id === 'ir-salvar') {
+                const v = id => +document.getElementById(id).value;
+                const t = (document.getElementById('ir-t').value || '').trim().toUpperCase();
+                const venda = { t, tipo: document.getElementById('ir-tipo').value, qtd: v('ir-qtd'), preco: v('ir-preco'), pm: v('ir-pm'), custos: v('ir-custos') || 0 };
+                if (!t || !(venda.qtd > 0) || !(venda.preco > 0) || !(venda.pm >= 0)) { document.getElementById('ir-erro').textContent = 'Preencha papel, quantidade, preço de venda e preço médio.'; return; }
+                reg.vendas.push(venda); gravarIR(d); desenharIR(); return;
+            }
+            if (e.target.id === 'ir-prej-salvar') { reg.prejComum = Math.max(0, +document.getElementById('ir-prej').value || 0); reg.prejFII = Math.max(0, +document.getElementById('ir-prej-fii').value || 0); gravarIR(d); desenharIR(); return; }
+            const ap = e.target.closest('[data-ir-apagar]'); if (ap) { reg.vendas.splice(+ap.dataset.irApagar, 1); gravarIR(d); desenharIR(); }
+        });
+    }
     // ----- Diário das minhas decisões (salvo só neste aparelho) -----
     const CHAVE_DECISOES = 'invest-decisoes';
     function lerDecisoes() { try { const v = JSON.parse(localStorage.getItem(CHAVE_DECISOES) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
@@ -4111,7 +4201,8 @@
                 if (sub.dataset.sub === 'decisoes') { prepararDecisoes(); desenharDecisoes(); }
                 if (sub.dataset.sub === 'testado') document.querySelector('[data-sub-slot="testado"]').innerHTML = htmlTestado();
                 if (sub.dataset.sub === 'simulacao') desenharSimulacao();
-                const titulos = { sinais: 'Ranking técnico', simulacao: 'Simulação da estratégia congelada', decisoes: 'Diário das minhas decisões', testado: 'O que já foi testado', estrategias: 'Screener de Estratégias', fundamentos: 'Técnica × Fundamentos', correlacao: 'Correlação (Pearson)', relatorio: 'Relatório' };
+                if (sub.dataset.sub === 'imposto') { prepararIR(); desenharIR(); }
+                const titulos = { imposto: 'Imposto das vendas do mês', sinais: 'Ranking técnico', simulacao: 'Simulação da estratégia congelada', decisoes: 'Diário das minhas decisões', testado: 'O que já foi testado', estrategias: 'Screener de Estratégias', fundamentos: 'Técnica × Fundamentos', correlacao: 'Correlação (Pearson)', relatorio: 'Relatório' };
                 document.querySelectorAll('[data-sub-slot]').forEach(sl => sl.classList.toggle('hidden', sl.dataset.subSlot !== sub.dataset.sub));
                 document.getElementById('am-sub-titulo').textContent = titulos[sub.dataset.sub];
                 abrirTela('am-sub-tela');
@@ -4273,7 +4364,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { carregarBalancos, get balancos() { return balancosDados; }, reacaoBalanco, prepararBalancos, calcularPlano, lerPlano, htmlPlano, retornoRendaFixa, nomeRendaFixa, volFinanceiro, quedaDoTopo, volAnual, resumoBussola, get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio, get estrategiasConfluencia() { return confluenceStrategies; }, get indice() { return indiceDados; }, set indice(v) { indiceDados = v; }, retornoIndice, comparacaoIndiceSim, htmlDiario, termometroIndice, saudeCarteira, avaliarDecisao, htmlTestado, htmlDecisoes, lerDecisoes, gravarDecisoes };
+    window.investDebug = { calcularIR, lerIR, carregarBalancos, get balancos() { return balancosDados; }, reacaoBalanco, prepararBalancos, calcularPlano, lerPlano, htmlPlano, retornoRendaFixa, nomeRendaFixa, volFinanceiro, quedaDoTopo, volAnual, resumoBussola, get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio, get estrategiasConfluencia() { return confluenceStrategies; }, get indice() { return indiceDados; }, set indice(v) { indiceDados = v; }, retornoIndice, comparacaoIndiceSim, htmlDiario, termometroIndice, saudeCarteira, avaliarDecisao, htmlTestado, htmlDecisoes, lerDecisoes, gravarDecisoes };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).
