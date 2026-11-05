@@ -23,8 +23,8 @@ jobs:
       - name: Estudo
         run: |
           pip install -q yfinance pandas numpy
-          python coleta/estudo_quantico_gangorra.py
-          cat estudo_quantico_gangorra.md >> "$GITHUB_STEP_SUMMARY"
+          python coleta/estudo_quantico_hoje.py
+          cat estudo_quantico_hoje.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
           name: estudo-quantico
