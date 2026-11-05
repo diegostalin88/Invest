@@ -540,7 +540,7 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     await cel.page.waitForSelector('#am-carteira [data-cart-editar]', { timeout: 10000 });
     const cartTxt = await cel.page.textContent('#am-carteira');
     ok(!/object Object/.test(cartTxt), "celular: nota fundamentalista da Carteira aparece como número (sem [object Object])");
-    ok(cartTxt.includes(papelCart) && /(Viés de alta|Viés de baixa|Neutro)/.test(cartTxt) && /Resultado/.test(cartTxt), `celular: Carteira mostra ${papelCart} com viés e resultado`);
+    ok(cartTxt.includes(papelCart) && /% da carteira/.test(cartTxt) && /Resultado/.test(cartTxt) && !/Viés de|Score técnico/.test(cartTxt), `celular: Carteira mostra ${papelCart} com peso e resultado, sem sinal técnico`);
     await cel.page.waitForTimeout(300);
     await cel.page.screenshot({ path: path.join(SHOTS, 'celular_carteira.png'), fullPage: false });
     await cel.page.click('#am-carteira [data-cart-editar]');
@@ -554,45 +554,8 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     await cel.page.click('#am-carteira [data-cart-editar]');
     await cel.page.click('#am-cart-remover');
     ok(await cel.page.evaluate(() => JSON.parse(localStorage.getItem('invest-carteira')).length === 0), 'celular: remover tira o papel da Carteira');
-    // Análise da carteira: um papel de viés de baixa, um de alta e concentração
-    const montagem = await cel.page.evaluate(() => {
-        const D = window.investDebug; const ts = Object.keys(D.allData).filter(t => D.allData[t].close.length >= 260);
-        // monta com os primeiros 6 papéis; o 1º fica com ~60% do valor (concentrado)
-        const esc = ts.slice(0, 6); const ult = t => D.allData[t].close.at(-1);
-        const lista = esc.map((t, k) => ({ t, m: 'br', qtd: Math.round((k === 0 ? 9000 : 1200) / ult(t)) || 1, pm: ult(t), data: null }));
-        localStorage.setItem('invest-carteira', JSON.stringify(lista)); return esc;
-    });
-    // gera o Relatório de novo (o recarregamento apagou o que foi gerado no aparelho)
-    await cel.page.click('.am-nav [data-ir-pagina="mais"]'); await cel.page.click('[data-sub="relatorio"]');
-    await cel.page.click('#am-relatorio [data-gerar-relatorio]');
-    await cel.page.waitForFunction(() => /Último teste/.test(document.getElementById('am-relatorio').textContent), null, { timeout: 120000 });
-    await cel.page.goBack(); await cel.page.waitForSelector('#am-sub-tela', { state: 'hidden', timeout: 5000 });
-    await cel.page.click('.am-nav [data-ir-pagina="carteira"]');
-    await cel.page.evaluate(() => { const d = document.querySelector('[data-sinais-tecnicos]'); if (d) d.open = true; });
-    await cel.page.waitForSelector('#am-cart-analise', { timeout: 15000 });
-    const A = await cel.page.evaluate(() => { const a = window.investDebug.analisarCarteira(); return { pos: a.posicoes.map(p => ({ t: p.t, acao: p.acao, vies: p.v && p.v.vies, peso: p.peso, conc: p.concentrada, val: !!(p.rel && p.rel.confirmada), op: !!(p.rel && p.rel.confirmada && p.rel.situacao === 'posicao') })), cand: a.candidatos.map(c => c.t), candOk: a.candidatos.every(c => c.entrada && c.v.vies === 'alta'), veredito: a.veredito, reforcar: a.reforcar && a.reforcar.t }; });
-    const regrasOk = A.pos.every(p => (p.vies === 'baixa' && p.val && !p.op) ? p.acao === 'trocar' : p.conc ? p.acao === 'reduzir' : p.acao === ({ alta: 'manter', neutro: 'neutro', baixa: 'neutro' }[p.vies] || 'neutro'));
-    ok(A.pos.length === montagem.length && regrasOk, `celular: análise da carteira aplica as regras (${A.pos.map(p => p.t + ':' + p.acao).join(', ')})`);
-    ok(A.pos[0].conc && A.candOk && A.cand.every(t => !montagem.includes(t)), `celular: análise aponta concentração e só sugere papéis de fora (${A.cand.join(', ') || 'nenhum'})`);
-    const anTxt = await cel.page.textContent('#am-cart-analise');
-    ok(/Análise de \d\d\/\d\d\/\d{4}/.test(anTxt) && /(Trocar ou reduzir|Reduzir peso)/.test(anTxt) && /Não é recomendação/.test(anTxt), 'celular: análise mostra data, sugestões e aviso');
-    // Caso "trocar": papel com viés de baixa e regra validada fora da operação (se existir nos dados de exemplo)
-    const troca = await cel.page.evaluate(() => {
-        const D = window.investDebug; const R = D.relatorio;
-        const alvo = R.ativos.find(a => a.confirmada && a.situacao !== 'posicao' && D.allData[a.t] && D.allData[a.t].close.length >= 260
-            && (() => { localStorage.setItem('invest-carteira', JSON.stringify([{ t: a.t, m: 'br', qtd: 10, pm: 10, data: null }])); const x = D.analisarCarteira(); return x.posicoes[0].v && x.posicoes[0].v.vies === 'baixa'; })());
-        if (!alvo) return null;
-        const x = D.analisarCarteira(); return { t: alvo.t, acao: x.posicoes[0].acao, cand: x.candidatos.length };
-    });
-    if (troca) {
-        await cel.page.evaluate(() => { const d = document.querySelector('[data-sinais-tecnicos]'); if (d) d.open = true; });
-        await cel.page.click('#am-cart-reanalisar');
-        const tTxt = await cel.page.textContent('#am-cart-analise');
-        ok(troca.acao === 'trocar' && /Trocar ou reduzir/.test(tTxt) && /(trocar por|ficar em caixa)/.test(tTxt), `celular: viés de baixa + regra validada fora → sugere trocar (${troca.t}, ${troca.cand} alternativa(s))`);
-    } else console.log('ℹ️ dados de exemplo sem caso de troca; regra coberta só pela verificação geral');
-    await cel.page.evaluate(() => document.getElementById('am-cart-analise').scrollIntoView());
-    await cel.page.waitForTimeout(300);
-    await cel.page.screenshot({ path: path.join(SHOTS, 'celular_carteira_analise.png'), fullPage: false });
+    // A antiga "análise da carteira" (trocar/reduzir pelos sinais da estratégia congelada) saiu em 05/11/2026
+    ok(!(await cel.page.$('#am-cart-analise')) && !(await cel.page.$('[data-sinais-tecnicos]')), 'celular: Carteira sem sugestões de troca pela estratégia técnica');
     // Saúde da carteira: concentração, risco e o mesmo dinheiro no índice
     const saude = await cel.page.evaluate(() => {
         const D = window.investDebug; const ts = Object.keys(D.allData).filter(t => D.allData[t].close.length >= 260).slice(0, 4);
@@ -609,6 +572,24 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     const sTxt = await cel.page.textContent('[data-saude-carteira]');
     ok(/Saúde da carteira/.test(sTxt) && /Se o mesmo dinheiro de cada compra/.test(sTxt) && /No CDI, sem risco/.test(sTxt) && (saude.maior > 0.2 ? /⚠️/.test(sTxt) : true), 'celular: saúde da carteira aparece com a comparação e os alertas');
     await cel.page.waitForTimeout(400); await cel.page.screenshot({ path: path.join(SHOTS, 'celular_saude_carteira.png'), fullPage: false });
+    // Plano de alocação: conta pura e tela
+    const P = await cel.page.evaluate(() => {
+        const D = window.investDebug; const preco = t => ({ AAA: 10, BOVA11: 100 })[t];
+        const c = D.calcularPlano({ rf: 40, indice: 40, acoes: 20, valorRF: 2000, valorIndice: 0 }, [{ t: 'AAA', qtd: 500 }, { t: 'BOVA11', qtd: 30 }], preco, 1000);
+        return c && { total: c.total, pesos: c.classes.map(x => +x.peso.toFixed(4)), fora: c.classes.map(x => x.fora), div: c.classes.map(x => +c.divisao[x.k].toFixed(2)), soma: Object.values(c.divisao).reduce((a, b) => a + b, 0) };
+    });
+    // total 2000 + 3000 + 5000 = 10000 → 20% rf, 30% índice, 50% ações; com +1000: faltam 2400 em rf e 1400 no índice → divide 1000 na proporção 24:14
+    ok(P && P.total === 10000 && P.pesos.join() === '0.2,0.3,0.5' && P.fora.join() === 'true,true,true' && Math.abs(P.soma - 1000) < 1e-6 && Math.abs(P.div[0] - 631.58) < 0.01 && P.div[2] === 0, `celular: plano de alocação calcula pesos, faixas e divide o aporte só no que está abaixo da meta (${JSON.stringify(P)})`);
+    await cel.page.fill('#plano-rf', '50'); await cel.page.fill('#plano-indice', '30'); await cel.page.fill('#plano-acoes', '30');
+    await cel.page.click('[data-plano-salvar]');
+    ok(/somar 100%/.test(await cel.page.textContent('#plano-erro')), 'celular: plano recusa metas que não somam 100%');
+    await cel.page.fill('#plano-acoes', '20'); await cel.page.fill('#plano-valorRF', '5000'); await cel.page.fill('#plano-aporte', '1000');
+    await cel.page.click('[data-plano-salvar]');
+    const plTxt = await cel.page.textContent('[data-plano]');
+    ok(/Renda fixa e reserva/.test(plTxt) && /meta 50%/.test(plTxt) && /Para o aporte de/.test(plTxt) && JSON.parse(await cel.page.evaluate(() => localStorage.getItem('invest-plano'))).br.rf === 50, 'celular: plano salvo mostra barras, meta e divisão do aporte');
+    ok(/Maior setor/.test(await cel.page.textContent('[data-saude-carteira]')), 'celular: saúde mostra o setor de maior peso');
+    await cel.page.evaluate(() => document.querySelector('[data-plano]').scrollIntoView());
+    await cel.page.waitForTimeout(300); await cel.page.screenshot({ path: path.join(SHOTS, 'celular_plano_alocacao.png'), fullPage: false });
     await cel.page.evaluate(() => localStorage.removeItem('invest-carteira'));
     // Diário das minhas decisões e "O que já foi testado"
     await cel.page.click('.am-nav [data-ir-pagina="mais"]'); await cel.page.click('[data-pagina="mais"] [data-sub="decisoes"]');

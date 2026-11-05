@@ -3327,34 +3327,28 @@
         const vies = pts >= 1.5 ? 'alta' : pts <= -1.5 ? 'baixa' : 'neutro';
         return { vies, pts, motivos, atr: ind.ATR[n - 1], score: computeStrategyScore(analyzeAllSignals(d, ind, n - 1), getCurrentWeights()).totalScore };
     }
-    function cartaoCarteira(item, k) {
+    function cartaoCarteira(item, k, S = saudeCarteira()) {
         const t = item.t; const d = allData[t];
         if (!d) return `<div class="am-card"><div class="flex items-center justify-between"><span class="am-tk">${t}</span><button type="button" class="am-chip" data-cart-editar="${k}">Editar</button></div><div class="text-sm mt-1" style="color:var(--mudo)">Sem dados deste papel neste mercado (${item.m === 'br' ? 'troque para Brasil' : 'troque para EUA'} no topo, ou ele não está no universo coletado).</div></div>`;
         const n = d.close.length, fech = d.close[n - 1]; const res = (fech / item.pm - 1) * 100; const vd = variacaoDia(t);
-        const v = viesDoPapel(t); const f = (fundamentalsData && fundamentalsData[t]) || null; const nota = notaFundamentalista(t);
-        const rel = relatorioValido() && relatorioDados.ativos.find(x => x.t === t); const vend = dadosVendido(t); const perf = perfilDoAtivo(d);
-        const rp = getBacktestRiskParams(); const stop = v && v.atr ? fech - v.atr * rp.atrMult : null;
-        const corV = { alta: 'verde', baixa: 'vermelho', neutro: 'amarelo' }[v ? v.vies : 'neutro'];
-        const rotV = { alta: '▲ Viés de alta', baixa: '▼ Viés de baixa', neutro: '● Neutro' }[v ? v.vies : 'neutro'];
+        const f = (fundamentalsData && fundamentalsData[t]) || null;
+        const hoje = d.dates[n - 1], ri = item.data ? retornoIndice(item.data, hoje) : null, rf = item.data ? retornoRendaFixa(item.data, hoje) : null;
+        const peso = S ? (S.pos.find(p => p.t === t) || {}).peso : null;
         const dado = (r, val, cor) => `<div class="am-dado"><div class="r">${r}</div><div class="v"${cor ? ` style="color:${cor}"` : ''}>${val}</div></div>`;
+        const cor = v => v >= 0 ? 'var(--alta)' : 'var(--baixa)';
         return `<div class="am-card">
             <div class="flex items-center justify-between gap-2"><button type="button" class="flex items-center gap-2 text-left" data-ativo="${t}"><span class="am-avatar" style="background:${corAvatar(t)}">${t.slice(0, 2)}</span><span><span class="am-tk block">${t}</span><span class="am-nome block">${nomeAtivo(t) || ''}</span></span></button>
-                <span class="am-chip ${corV}">${rotV}</span></div>
+                ${peso ? `<span class="am-chip ${peso > LIMITE_PAPEL ? 'vermelho' : ''}">${fmtNumM(peso * 100, 0)}% da carteira</span>` : ''}</div>
             <div class="am-grade mt-3">
-                ${dado('Preço atual', `${fmtPrecoM(fech)} <span class="text-sm ${vd >= 0 ? 'alta' : 'baixa'}" style="color:${vd >= 0 ? 'var(--alta)' : 'var(--baixa)'}">${vd === null ? '' : fmtPctM(vd)}</span>`)}
-                ${dado('Resultado', `${fmtPctM(res)}`, res >= 0 ? 'var(--alta)' : 'var(--baixa)')}
-                ${dado('Posição', `${fmtPrecoM(item.qtd * fech)}`)}${dado('Lucro/prejuízo', fmtPrecoM(item.qtd * (fech - item.pm)), res >= 0 ? 'var(--alta)' : 'var(--baixa)')}
-                ${stop ? dado(`Stop móvel (${fmtNumM(rp.atrMult, 1)}×ATR)`, `${fmtPrecoM(stop)} <span class="text-sm" style="color:var(--mudo)">${fmtPctM((stop / fech - 1) * 100)}</span>`, '#f87171') : ''}
-                ${dado('Score técnico hoje', v ? fmtNumM(v.score, 1) : '—')}
+                ${dado('Preço atual', `${fmtPrecoM(fech)} <span class="text-sm" style="color:${cor(vd ?? 0)}">${vd === null ? '' : fmtPctM(vd)}</span>`)}
+                ${dado('Resultado', `${fmtPctM(res)}`, cor(res))}
+                ${dado('Posição', `${fmtPrecoM(item.qtd * fech)}`)}${dado('Lucro/prejuízo', fmtPrecoM(item.qtd * (fech - item.pm)), cor(res))}
+                ${ri !== null ? dado(`${nomeIndice()} no mesmo período`, fmtPctM(ri * 100), res / 100 >= ri ? 'var(--alta)' : 'var(--baixa)') : ''}
+                ${rf !== null ? dado(`${nomeRendaFixa()} no mesmo período`, fmtPctM(rf * 100)) : ''}
             </div>
-            ${v ? `<div class="mt-3 text-sm space-y-1">${v.motivos.map(([bom, txt]) => `<div>${bom === true ? '🟢' : bom === false ? '🔴' : '⚪'} ${txt}</div>`).join('')}</div>` : ''}
-            <div class="mt-3 text-sm space-y-1" style="color:var(--mudo)">
-                ${f ? `<div>Fundamentos: <b style="color:var(--txt)">${nota ? nota.ok : '—'}/5</b>${Number.isFinite(Number(f.pe)) ? ` · P/L ${fmtNumM(Number(f.pe), 1)}` : ''}${Number.isFinite(Number(f.roe)) ? ` · ROE ${fmtNumM(f.roe * 100, 1)}%` : ''}${Number.isFinite(Number(f.debtToEquity)) ? ` · Dívida/PL ${fmtNumM(Number(f.debtToEquity), 2)}` : ''}</div>` : ''}
-                ${perf ? `<div>Perfil: <b style="color:var(--txt)">${perf.nome}</b></div>` : ''}
-                ${rel ? `<div>Relatório: ${rel.regra ? `melhor regra <b style="color:var(--txt)">${nomeRegra(rel.regra)}</b>${rel.confirmada ? '' : ' (não confirmada)'}${rel.situacao === 'posicao' ? ' · a regra está <b style="color:var(--txt)">em operação</b>' : rel.situacao === 'entrada' ? ' · sinal de <b style="color:var(--txt)">entrada</b> hoje' : ''}` : 'sem regra com operações suficientes'}</div>` : ''}
-                ${vend ? `<div>Vendidos: ${vend.dias === null ? '—' : fmtNumM(vend.dias, 1)} dias para zerar${rel && rel.squeeze ? ' · ⚡ possível short squeeze' : ''}</div>` : ''}
-            </div>
-            <div class="flex gap-2 mt-3"><button type="button" class="am-botao sec" data-ativo="${t}">Abrir análise</button><button type="button" class="am-botao sec" data-cart-editar="${k}">Editar</button></div>
+            ${!item.data ? `<div class="mt-2 text-xs" style="color:var(--mudo)">Sem data de compra: edite e preencha para comparar com o índice e com o ${nomeRendaFixa()}.</div>` : ''}
+            ${f ? `<div class="mt-3 text-sm" style="color:var(--mudo)">${[f.sector ? `Setor: <b style="color:var(--txt)">${f.sector}</b>` : '', Number.isFinite(Number(f.pe)) ? `P/L ${fmtNumM(Number(f.pe), 1)}` : '', Number.isFinite(Number(f.roe)) ? `ROE ${fmtNumM(f.roe * 100, 1)}%` : '', Number.isFinite(Number(f.debtToEquity)) ? `Dívida/PL ${fmtNumM(Number(f.debtToEquity), 2)}` : ''].filter(Boolean).join(' · ')}${f.nextEarningsDate && daysUntil(f.nextEarningsDate) >= 0 ? ` · próximo balanço ${fmtDataBR(String(f.nextEarningsDate).slice(0, 10))}` : ''}</div>` : ''}
+            <div class="flex gap-2 mt-3"><button type="button" class="am-botao sec" data-ativo="${t}">Abrir papel</button><button type="button" class="am-botao sec" data-cart-editar="${k}">Editar</button></div>
         </div>`;
     }
     // =================== BÚSSOLA: termômetro, saúde da carteira, diário de decisões e o que já foi testado ===================
@@ -3397,7 +3391,7 @@
         </div>`;
     }
     // ----- Saúde da carteira: diversificação, risco e comparação com o índice (só números, sem "compre/venda") -----
-    const LIMITE_PAPEL = 0.20;
+    const LIMITE_PAPEL = 0.20, LIMITE_SETOR = 0.40;
     function saudeCarteira() {
         const merc = mercadoCodigo(); const itens = lerCarteira().filter(x => x.m === merc && allData[x.t]); if (!itens.length) return null;
         const ult = t => { const c = allData[t].close; return c[c.length - 1]; };
@@ -3425,7 +3419,9 @@
         let investido = 0, noIndice = 0, comData = 0, semData = 0, atualComData = 0, noRF = 0, comRF = 0;
         const hoje = ultimoPregaoDados();
         itens.forEach(x => { const v = x.qtd * x.pm; const r = x.data ? retornoIndice(x.data, hoje) : null; if (r === null) { semData++; return; } comData++; investido += v; noIndice += v * (1 + r); atualComData += x.qtd * ult(x.t); const rf = retornoRendaFixa(x.data, hoje); if (rf !== null) { noRF += v * (1 + rf); comRF++; } });
-        return { total, pos, nEfetivo: 1 / hhi, maior: pos[0], top3: pos.slice(0, 3).reduce((s, x) => s + x.peso, 0), dias: retsCart.length,
+        const setores = {}; pos.forEach(p => { const f = fundamentalsData && fundamentalsData[p.t]; const st = (f && f.sector) || 'Sem setor nos dados'; setores[st] = (setores[st] || 0) + p.peso; });
+        const maiorSetor = Object.entries(setores).sort((a, b) => b[1] - a[1])[0];
+        return { total, pos, setores, maiorSetor: { nome: maiorSetor[0], peso: maiorSetor[1] }, nEfetivo: 1 / hhi, maior: pos[0], top3: pos.slice(0, 3).reduce((s, x) => s + x.peso, 0), dias: retsCart.length,
             vol: vol === null ? null : vol * Math.sqrt(252), volIdx: volIdx === null ? null : volIdx * Math.sqrt(252), beta, quedaCart: queda(retsCart), quedaIdx: queda(retsIdx),
             ret1a: acum(retsCart), ret1aIdx: acum(retsIdx), corrMedia: corrN ? corrSoma / corrN : null,
             vsIndice: comData ? { investido, noIndice, atual: atualComData, n: comData, noRF: comRF === comData ? noRF : null } : null, semData };
@@ -3435,6 +3431,7 @@
         const alertas = [];
         if (S.maior.peso > LIMITE_PAPEL) alertas.push(`<b>${S.maior.t}</b> é ${fmtNumM(S.maior.peso * 100, 0)}% da carteira. Uma queda forte dele pesa muito no total; muitos gestores limitam cada papel a ${fmtNumM(LIMITE_PAPEL * 100, 0)}%.`);
         if (S.nEfetivo < 5) alertas.push(`Na prática, a carteira equivale a só ${fmtNumM(S.nEfetivo, 1)} papéis de mesmo peso. Pouca diversificação aumenta o risco sem aumentar o retorno esperado.`);
+        if (S.pos.length >= 3 && S.maiorSetor.peso > LIMITE_SETOR && S.maiorSetor.nome !== 'Sem setor nos dados') alertas.push(`${fmtNumM(S.maiorSetor.peso * 100, 0)}% está num só setor (<b>${S.maiorSetor.nome}</b>). Um problema do setor atinge vários papéis ao mesmo tempo.`);
         if (S.vol && S.volIdx && S.vol > 1.5 * S.volIdx) alertas.push(`A carteira oscila ${fmtNumM(S.vol / S.volIdx, 1)} vezes mais que o ${nomeIndice()}.`);
         if (S.corrMedia !== null && S.corrMedia > 0.6 && S.pos.length > 2) alertas.push(`Os papéis andam muito juntos (correlação média ${fmtNumM(S.corrMedia, 2)}): na queda, tendem a cair juntos.`);
         const lin = (r, v, c) => `<div class="am-dado"><div class="r">${r}</div><div class="v"${c ? ` style="color:${c}"` : ''}>${v}</div></div>`;
@@ -3446,6 +3443,7 @@
                 ${lin('3 maiores juntas', `${fmtNumM(S.top3 * 100, 0)}%`)}
                 ${lin('Papéis "efetivos"', fmtNumM(S.nEfetivo, 1), S.nEfetivo < 5 ? 'var(--baixa)' : '')}
                 ${lin('Correlação média', S.corrMedia === null ? '—' : fmtNumM(S.corrMedia, 2))}
+                ${lin('Maior setor', `${S.maiorSetor.nome} · ${fmtNumM(S.maiorSetor.peso * 100, 0)}%`, S.pos.length >= 3 && S.maiorSetor.peso > LIMITE_SETOR ? 'var(--baixa)' : '')}
                 ${lin(`Oscilação ao ano (carteira × ${nomeIndice()})`, S.vol ? `${fmtNumM(S.vol * 100, 0)}% × ${fmtNumM(S.volIdx * 100, 0)}%` : '—')}
                 ${lin('Beta', S.beta === null ? '—' : fmtNumM(S.beta, 2))}
                 ${lin('Maior queda em 1 ano (pesos de hoje)', `${fmtNumM(S.quedaCart * 100, 1)}% × ${fmtNumM(S.quedaIdx * 100, 1)}%`, S.quedaCart > S.quedaIdx * 1.5 ? 'var(--baixa)' : '')}
@@ -3455,6 +3453,68 @@
             ${alertas.length ? `<div class="mt-3 text-sm space-y-1">${alertas.map(a => `<div>⚠️ ${a}</div>`).join('')}</div>` : `<div class="mt-3 text-sm" style="color:var(--alta)">Sem alerta de concentração ou de risco.</div>`}
             <p class="text-xs mt-2" style="color:var(--mudo)">Dados dos últimos ${S.dias} pregões, com os pesos de hoje. Não é recomendação: mostra quanto risco a carteira carrega e se ela está valendo a pena contra o índice.</p>
         </div>`;
+    }
+    // ----- Plano de alocação (núcleo e satélite) com rebalanceamento pelos aportes -----
+    // Graham (O Investidor Inteligente) manda dividir entre ações e renda fixa e rebalancear quando a divisão
+    // se afasta da meta; Bogle e Swensen defendem um núcleo em fundo de índice. A regra das faixas "5/25" diz quando
+    // vale rebalancear: a classe se afastou 5 pontos da meta, ou 25% do próprio tamanho (para metas pequenas).
+    // Com aportes, o rebalanceamento é feito comprando o que está abaixo da meta, sem vender (sem imposto e sem custo).
+    const CHAVE_PLANO = 'invest-plano';
+    const ETFS_INDICE = new Set(['BOVA11', 'BOVV11', 'BRAX11', 'IVVB11', 'SMAL11', 'PIBB11', 'ECOO11', 'XBOV11', 'NASD11', 'SPXI11', 'WRLD11', 'ACWI11',
+        'SPY', 'VOO', 'IVV', 'VTI', 'QQQ', 'VT', 'VXUS', 'VEA', 'VWO', 'SCHB', 'SCHX', 'ITOT', 'SPLG', 'IWM', 'DIA', 'RSP']);
+    const CLASSES_PLANO = [['rf', 'Renda fixa e reserva'], ['indice', 'Fundos de índice (núcleo)'], ['acoes', 'Ações escolhidas (satélite)']];
+    function lerPlano() { try { const v = JSON.parse(localStorage.getItem(CHAVE_PLANO) || '{}'); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } }
+    function gravarPlano(p) { try { localStorage.setItem(CHAVE_PLANO, JSON.stringify(p)); return true; } catch (e) { return false; } }
+    function calcularPlano(plano, carteira, precoDe, aporte = 0) {
+        if (!plano) return null;
+        const meta = { rf: plano.rf / 100, indice: plano.indice / 100, acoes: plano.acoes / 100 };
+        const atual = { rf: Math.max(0, +plano.valorRF || 0), indice: Math.max(0, +plano.valorIndice || 0), acoes: 0 };
+        carteira.forEach(x => { const p = precoDe(x.t); if (!(p > 0)) return; atual[ETFS_INDICE.has(x.t.replace(/\.SA$/, '')) ? 'indice' : 'acoes'] += x.qtd * p; });
+        const total = atual.rf + atual.indice + atual.acoes; if (!(total > 0)) return null;
+        const classes = CLASSES_PLANO.map(([k, nome]) => {
+            const peso = atual[k] / total, dif = peso - meta[k];
+            const fora = Math.abs(dif) > Math.min(0.05, 0.25 * meta[k]) && Math.abs(dif) > 0.005;
+            return { k, nome, valor: atual[k], peso, meta: meta[k], dif, fora };
+        });
+        // aporte: completa primeiro o que está abaixo da meta (proporcional à falta); o que sobrar segue as metas
+        const novoTotal = total + aporte, falta = {}; let somaFalta = 0;
+        classes.forEach(c => { falta[c.k] = Math.max(0, novoTotal * c.meta - c.valor); somaFalta += falta[c.k]; });
+        const divisao = {};
+        classes.forEach(c => { divisao[c.k] = aporte <= 0 ? 0 : somaFalta >= aporte ? aporte * falta[c.k] / somaFalta : falta[c.k] + (aporte - somaFalta) * c.meta; });
+        return { total, classes, aporte, divisao, precisa: classes.some(c => c.fora) };
+    }
+    const fmtDinheiroM = v => `${MERCADO.simbolo} ${fmtNumM(v, 2)}`;
+    function htmlPlano() {
+        const merc = mercadoCodigo(); const plano = lerPlano()[merc];
+        const sim = mercadoCodigo() === 'br' ? 'R$' : 'US$';
+        const form = (p) => `<div class="mt-3 space-y-2 text-sm" data-plano-form>
+                <div class="grid grid-cols-3 gap-2">${CLASSES_PLANO.map(([k, nome]) => `<label class="block"><span class="text-xs" style="color:var(--mudo)">${nome} (%)</span><input type="number" inputmode="decimal" min="0" max="100" step="any" class="w-full mt-1" id="plano-${k}" value="${p ? p[k] : { rf: 40, indice: 45, acoes: 15 }[k]}"></label>`).join('')}</div>
+                <label class="block"><span class="text-xs" style="color:var(--mudo)">Quanto você tem hoje em renda fixa e reserva (${sim})</span><input type="number" inputmode="decimal" min="0" step="any" class="w-full mt-1" id="plano-valorRF" value="${p ? p.valorRF || 0 : 0}"></label>
+                <label class="block"><span class="text-xs" style="color:var(--mudo)">Fundos de índice que não estão na carteira do app (${sim})</span><input type="number" inputmode="decimal" min="0" step="any" class="w-full mt-1" id="plano-valorIndice" value="${p ? p.valorIndice || 0 : 0}"></label>
+                <label class="block"><span class="text-xs" style="color:var(--mudo)">Próximo aporte (${sim}, opcional)</span><input type="number" inputmode="decimal" min="0" step="any" class="w-full mt-1" id="plano-aporte" value="${p ? p.aporte || 0 : 0}"></label>
+                <div class="text-xs" id="plano-erro" style="color:var(--baixa)"></div>
+                <button type="button" class="am-botao" data-plano-salvar>Salvar plano</button>
+            </div>`;
+        if (!plano) return `<div class="am-card mt-3" data-plano><div class="font-bold">🎯 Plano de alocação</div>
+            <p class="text-sm mt-1" style="color:var(--mudo)">Defina quanto quer em renda fixa, em fundo de índice (o núcleo) e em ações escolhidas por você (o satélite). O app mostra quando a carteira sai da meta e como dividir o próximo aporte para voltar a ela, sem vender nada.</p>${form(null)}</div>`;
+        const P = calcularPlano(plano, lerCarteira().filter(x => x.m === merc && allData[x.t]), ultimoPreco, +plano.aporte || 0);
+        if (!P) return `<div class="am-card mt-3" data-plano><div class="font-bold">🎯 Plano de alocação</div><p class="text-sm mt-1" style="color:var(--mudo)">Sem valores para comparar ainda.</p>${form(plano)}</div>`;
+        const barra = c => `<div class="mt-2"><div class="flex justify-between text-sm"><span>${c.nome}</span><span${c.fora ? ' style="color:var(--baixa)"' : ''}><b>${fmtNumM(c.peso * 100, 0)}%</b> · meta ${fmtNumM(c.meta * 100, 0)}%</span></div>
+            <div class="am-barra" style="position:relative"><div style="width:${Math.min(100, c.peso * 100)}%;background:${c.fora ? 'var(--baixa)' : 'var(--acento)'}"></div><span style="position:absolute;left:${c.meta * 100}%;top:-2px;bottom:-2px;width:2px;background:var(--txt)"></span></div></div>`;
+        return `<div class="am-card mt-3" data-plano><div class="flex items-center justify-between"><span class="font-bold">🎯 Plano de alocação</span><span class="am-chip ${P.precisa ? 'amarelo' : 'verde'}">${P.precisa ? 'Fora da faixa' : 'Dentro da faixa'}</span></div>
+            ${P.classes.map(barra).join('')}
+            <div class="text-sm mt-3">Total: <b>${fmtDinheiroM(P.total)}</b>.${P.precisa ? ` ${P.classes.filter(c => c.fora).map(c => `${c.nome} está ${fmtNumM(Math.abs(c.dif) * 100, 1)} pontos ${c.dif > 0 ? 'acima' : 'abaixo'} da meta`).join('; ')}.` : ' Nenhuma classe passou da faixa de tolerância (5 pontos, ou 25% da meta).'}</div>
+            ${P.aporte > 0 ? `<div class="text-sm mt-2" data-plano-aporte>Para o aporte de <b>${fmtDinheiroM(P.aporte)}</b>: ${P.classes.map(c => `${c.nome} <b>${fmtDinheiroM(P.divisao[c.k])}</b>`).join(' · ')}.</div>` : ''}
+            <details class="mt-3"><summary class="text-sm" style="color:var(--acento);cursor:pointer">Editar plano</summary>${form(plano)}</details>
+            <p class="text-xs mt-2" style="color:var(--mudo)">Fundos de índice reconhecidos na carteira (ex.: BOVA11, IVVB11, SPY, VOO) contam como núcleo. Rebalancear pelo aporte evita vender, pagar imposto e corretagem. Não é recomendação: as metas são suas.</p>
+        </div>`;
+    }
+    function salvarPlano() {
+        const v = k => +(document.getElementById('plano-' + k) || {}).value || 0;
+        const p = { rf: v('rf'), indice: v('indice'), acoes: v('acoes'), valorRF: v('valorRF'), valorIndice: v('valorIndice'), aporte: v('aporte') };
+        const soma = p.rf + p.indice + p.acoes;
+        if ([p.rf, p.indice, p.acoes].some(x => x < 0) || Math.abs(soma - 100) > 0.01) { document.getElementById('plano-erro').textContent = `As três metas precisam somar 100% (agora somam ${fmtNumM(soma, 0)}%).`; return false; }
+        const todos = lerPlano(); todos[mercadoCodigo()] = p; gravarPlano(todos); desenharCarteira(); return true;
     }
     // ----- Diário das minhas decisões (salvo só neste aparelho) -----
     const CHAVE_DECISOES = 'invest-decisoes';
@@ -3540,18 +3600,18 @@
         const daqui = todos.map((x, k) => ({ x, k })).filter(o => o.x.m === merc);
         const outros = todos.length - daqui.length;
         if (!daqui.length) {
-            box.innerHTML = `<div class="am-card text-center"><div class="text-lg font-bold">Sua carteira ${merc === 'br' ? 'no Brasil' : 'nos EUA'} está vazia</div><p class="text-sm mt-1" style="color:var(--mudo)">Adicione os papéis que você tem, com quantidade e preço médio. O app mostra o viés de alta ou de baixa, o stop, o score e os fundamentos de cada um.</p>${outros ? `<p class="text-sm mt-2" style="color:var(--mudo)">Você tem ${outros} papel(éis) no outro mercado: troque no topo.</p>` : ''}</div>`;
+            box.innerHTML = `<div class="am-card text-center"><div class="text-lg font-bold">Sua carteira ${merc === 'br' ? 'no Brasil' : 'nos EUA'} está vazia</div><p class="text-sm mt-1" style="color:var(--mudo)">Adicione os papéis que você tem, com quantidade e preço médio. O app mostra o peso de cada um, o risco da carteira e a comparação com o índice e com a renda fixa.</p>${outros ? `<p class="text-sm mt-2" style="color:var(--mudo)">Você tem ${outros} papel(éis) no outro mercado: troque no topo.</p>` : ''}</div>`;
             return;
         }
         let invest = 0, atual = 0;
         daqui.forEach(({ x }) => { const d = allData[x.t]; if (d) { invest += x.qtd * x.pm; atual += x.qtd * d.close[d.close.length - 1]; } });
-        const res = invest ? (atual / invest - 1) * 100 : 0;
+        const res = invest ? (atual / invest - 1) * 100 : 0; const S = saudeCarteira();
         box.innerHTML = `<div class="am-card"><div class="text-sm" style="color:var(--mudo)">Patrimônio ${merc === 'br' ? 'no Brasil' : 'nos EUA'}</div><div class="am-preco-grande">${fmtPrecoM(atual)}</div>
                 <div class="text-sm mt-1" style="color:${res >= 0 ? 'var(--alta)' : 'var(--baixa)'}">${fmtPctM(res)} · ${fmtPrecoM(atual - invest)} sobre ${fmtPrecoM(invest)} investidos</div>
                 ${outros ? `<div class="text-xs mt-2" style="color:var(--mudo)">+ ${outros} papel(éis) no outro mercado (troque no topo para ver).</div>` : ''}</div>
-            ${htmlSaudeCarteira(saudeCarteira())}
-            <details class="am-card mt-3" data-sinais-tecnicos><summary class="font-semibold">Sinais técnicos por papel <span class="text-xs" style="color:var(--mudo)">(sem vantagem comprovada nos testes)</span></summary>${htmlAnaliseCarteira(analisarCarteira())}</details>
-            <div class="space-y-3 mt-3">${daqui.map(({ x, k }) => cartaoCarteira(x, k)).join('')}</div>`;
+            ${htmlSaudeCarteira(S)}
+            ${htmlPlano()}
+            <div class="space-y-3 mt-3">${daqui.map(({ x, k }) => cartaoCarteira(x, k, S)).join('')}</div>`;
     }
     // ===== Simulação com dinheiro fictício ("incubação" de Kaufman/Fitschen) =====
     // A pessoa segue os vereditos 🟢 do Relatório. Compra na ABERTURA seguinte ao toque (preço real dos dados), com o
@@ -3902,6 +3962,7 @@
         document.getElementById('am-carteira').addEventListener('click', e => {
             const b = e.target.closest('[data-cart-editar]'); if (b) abrirFolhaCarteira(true, +b.dataset.cartEditar);
             if (e.target.closest('#am-cart-reanalisar')) desenharCarteira();
+            if (e.target.closest('[data-plano-salvar]')) salvarPlano();
         });
         document.querySelector('.am-nav [data-ir-pagina="carteira"]').addEventListener('click', () => { desenharCarteira(); desenharSimulacao(); });
         document.getElementById('am-simulacao').addEventListener('click', e => {
@@ -4121,7 +4182,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { retornoRendaFixa, nomeRendaFixa, volFinanceiro, quedaDoTopo, volAnual, resumoBussola, get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio, get estrategiasConfluencia() { return confluenceStrategies; }, get indice() { return indiceDados; }, set indice(v) { indiceDados = v; }, retornoIndice, comparacaoIndiceSim, htmlDiario, termometroIndice, saudeCarteira, avaliarDecisao, htmlTestado, htmlDecisoes, lerDecisoes, gravarDecisoes };
+    window.investDebug = { calcularPlano, lerPlano, htmlPlano, retornoRendaFixa, nomeRendaFixa, volFinanceiro, quedaDoTopo, volAnual, resumoBussola, get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio, get estrategiasConfluencia() { return confluenceStrategies; }, get indice() { return indiceDados; }, set indice(v) { indiceDados = v; }, retornoIndice, comparacaoIndiceSim, htmlDiario, termometroIndice, saudeCarteira, avaliarDecisao, htmlTestado, htmlDecisoes, lerDecisoes, gravarDecisoes };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).
