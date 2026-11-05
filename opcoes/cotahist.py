@@ -233,8 +233,16 @@ def _baixar(url, tentativas=4):
             time.sleep(2 ** (i + 1))
 
 
-def linhas_do_ano(ano):
-    dados = _baixar(URL_ANUAL.format(ano=ano))
+def linhas_do_ano(ano, tentativas=5):
+    # a B3 às vezes devolve uma página no lugar do zip quando muitos downloads chegam juntos: espera e tenta de novo
+    for i in range(tentativas):
+        dados = _baixar(URL_ANUAL.format(ano=ano))
+        if zipfile.is_zipfile(io.BytesIO(dados)):
+            break
+        if i == tentativas - 1:
+            raise zipfile.BadZipFile(f'COTAHIST {ano}: a B3 não devolveu um zip ({len(dados)} bytes)')
+        print(f'  {ano}: resposta da B3 não é zip; tentando de novo em {30 * 2 ** i}s', flush=True)
+        time.sleep(30 * 2 ** i)
     with zipfile.ZipFile(io.BytesIO(dados)) as z:
         nome = z.namelist()[0]
         with z.open(nome) as f:

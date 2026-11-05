@@ -1,4 +1,4 @@
-name: Opções - O3: ordem limite e até o vencimento
+name: "Opções - O3: ordem limite e até o vencimento"
 
 # Só leitura: hipótese O3 (docs/opcoes/hipotese-vencimento.md) e sua auditoria adversarial
 # (docs/opcoes/auditoria-o3.md). Não publica nada.
