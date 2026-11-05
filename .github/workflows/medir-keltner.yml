@@ -22,6 +22,6 @@ jobs:
           import json,sys
           j=json.load(sys.stdin)
           print('principal',j.get('principal'),'rendaFixa',j.get('rendaFixa'),'geradoEm',j.get('geradoEm'))
-          for t,s in j['series'].items(): print(t,s['nome'],len(s['dates']),s['dates'][:1],s['dates'][-1:],s['close'][:2],s['close'][-2:])
+          for t,s in j['series'].items(): print(t,s['nome'],len(s['dates']),list(zip(s['dates'][-25:],s['close'][-25:])))
           " || echo "sem indice.json"
           done
