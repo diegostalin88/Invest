@@ -3263,7 +3263,7 @@
         return `<div class="am-card"><div class="text-sm" style="color:var(--mudo)">Lucro líquido por trimestre (${tri.length} trimestres)</div>${barras}
                 <p class="text-xs mt-1" style="color:var(--mudo)">Fonte: ${B.fonte}. Cada número entra com a data em que ficou público. A reação usa os preços do app.</p></div>
             <div class="space-y-3 mt-3" data-balancos>${linhas}</div>
-            <p class="text-xs mt-3" style="color:var(--mudo)">Nos testes (EUA, 2009–2026, ${'~26 mil'} balanços), o quinto com maior alta do lucro contra o ano anterior subiu, nos 60 pregões seguintes, cerca de 1 ponto a mais que o quinto com maior queda. É um efeito pequeno e instável (quase nada de 2009 a 2018); serve como contexto, não como sinal de compra.</p>`;
+            <p class="text-xs mt-3" style="color:var(--mudo)">Nos testes (EUA, 2009–2026, cerca de 26 mil balanços), o quinto com maior alta do lucro contra o ano anterior subiu, nos 60 pregões seguintes, cerca de 1 ponto a mais que o quinto com maior queda. Como carteira, o ganho foi pequeno e sumiu de 2009 a 2017 (confirmação reprovada); serve como contexto, não como sinal de compra.</p>`;
     }
     function desenharBalancos(t, box) {
         if (balancosDados || !balancosNome) { box.innerHTML = htmlBalancos(t, balancosDados); return; }
@@ -3765,10 +3765,10 @@
         ['Queda forte (≥30%) + sinal Otimista', 'REPROVADA', 'Média de +2% por operação, mas mediana negativa e acerto de 1 em 3. O sinal não acrescenta nada a comprar a queda em dia sorteado.', 'docs/cenario-queda-reversao.md'],
         ['Stop mais curto, zero a zero, limite por setor, trava de resistência', 'REPROVADAS', 'Nenhuma melhorou o resultado de forma consistente fora da amostra.', null],
         ['Carteira por fundamentos (valor + qualidade)', 'REPROVADA', 'EUA 2011–2026, 30 papéis baratos e rentáveis: 13,2% ao ano contra 13,7% do SPY, com queda de 21% contra 12%. Ficou abaixo da mediana de carteiras sorteadas. Venceu de 2011 a 2018 e perdeu muito depois.', 'docs/hipotese-fundamentos.md'],
-        ['Deriva depois do balanço (lucro acima do ano anterior)', 'APROVADA COM RESSALVAS', 'Nos 60 pregões depois do balanço, o quinto com lucro mais acima do ano anterior subiu cerca de 1 ponto a mais que o quinto mais abaixo. Passou nos critérios, mas o efeito é pequeno, quase zero de 2009 a 2018, e exige muitas operações. Uma confirmação está registrada.', 'docs/hipotese-deriva-confirmacao.md'],
+        ['Deriva depois do balanço (lucro acima do ano anterior)', 'NÃO CONFIRMADA', 'O efeito existe: nos 60 pregões depois do balanço, o quinto com lucro mais acima do ano anterior subiu cerca de 0,7 ponto acima da média. Mas, como carteira, rendeu 17,0% ao ano contra 15,6% de comprar todos os balanços, e perdeu na 1ª metade (2009–2017). Fica como informação na aba Balanços, sem sinal.', 'docs/hipotese-deriva-confirmacao.md'],
     ];
     function htmlTestado() {
-        const cor = v => v.startsWith('REPROV') ? 'vermelho' : v === 'APROVADA' ? 'verde' : 'amarelo';
+        const cor = v => v.startsWith('REPROV') || v.startsWith('NÃO') ? 'vermelho' : v === 'APROVADA' ? 'verde' : 'amarelo';
         return `<div class="space-y-3" data-testado>
             <div class="am-card"><div class="font-bold">Como ler</div><p class="text-sm mt-1">Cada ideia foi escrita com regras e critérios <b>antes</b> de ver o resultado e comparada com o índice e com escolhas sorteadas. "Reprovada" quer dizer que não mostrou vantagem real, mesmo que tenha dado lucro.</p></div>
             ${TESTES_FEITOS.map(([nome, v, txt, doc]) => `<div class="am-card"><div class="flex items-start justify-between gap-2"><div class="font-semibold">${nome}</div><span class="am-chip ${cor(v)}">${v}</span></div><p class="text-sm mt-1">${txt}</p>${doc ? `<a class="text-xs underline" style="color:var(--acento)" href="https://github.com/diegostalin88/Invest/blob/main/${doc}" target="_blank" rel="noopener">Ver o registro e os números</a>` : ''}</div>`).join('')}

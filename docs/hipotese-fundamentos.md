@@ -88,6 +88,8 @@ Os quatro critérios falharam: ficou abaixo da mediana do acaso, perdeu para o S
 
 ### D: deriva depois do balanço, **APROVADA nos critérios registrados, com ressalvas**
 
+> **Depois:** a confirmação registrada em `docs/hipotese-deriva-confirmacao.md` deu **NÃO CONFIRMADA**. O efeito existe, mas como carteira não ganhou de comprar todos os balanços na 1ª metade do período.
+
 De 2009T3 a 2026T3, 25.940 balanços.
 
 - **Reação** (de 2 pregões antes a 1 depois): quintil alto +1,48%, baixo −0,33%.
