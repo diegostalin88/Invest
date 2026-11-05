@@ -120,6 +120,26 @@ def main(destino):
         m['arquivoIndice'] = 'indice.json'
         with open(mp, 'w') as f:
             json.dump(m, f, indent=2)
+    # Balanços sintéticos dos EUA (mesmo formato do coleta/balancos_app.py): 12 trimestres + 4 do ano anterior
+    from datetime import timedelta
+    fim0 = date.fromisoformat(datas[-1]) - timedelta(days=45)
+    bal = {}
+    for t in precos:
+        tri, lucro = [], rng.uniform(-50, 200) * 1e6
+        for k in range(15, -1, -1):
+            fim = fim0 - timedelta(days=91 * k)
+            lucro = lucro * rng.uniform(0.8, 1.25) + rng.uniform(-20, 20) * 1e6
+            rec = abs(lucro) * rng.uniform(4, 10) + 1e8
+            tri.append([fim.isoformat(), (fim + timedelta(days=30)).isoformat(), int(rec), int(lucro), round(lucro / 1e8, 2), int(rec * 0.4)])
+        bal[t] = {'t': tri, 'b': [[x[0], 5_000_000_000, 2_000_000_000, 3_000_000_000] for x in tri[-12:]]}
+    with open(os.path.join(destino, 'data', 'balancos.json'), 'w') as f:
+        json.dump({'geradoEm': '2026-01-01T00:00:00Z', 'fonte': 'SEC (sintético)', 'campos': {'t': ['fim', 'divulgado', 'receita', 'lucro', 'lpa', 'lucroBruto'], 'b': ['fim', 'ativo', 'patrimonio', 'passivo']}, 'ativos': bal}, f)
+    mus = os.path.join(destino, 'data', 'manifest.json')
+    with open(mus) as f:
+        m = json.load(f)
+    m['arquivoBalancos'] = 'balancos.json'
+    with open(mus, 'w') as f:
+        json.dump(m, f, indent=2)
     print(f"Site de exemplo em {destino}: {n_us} ativos EUA, {len(precos_br)} ativos Brasil.")
 
 

@@ -232,7 +232,9 @@
             .am-periodos button { flex: 1; padding: 0.45rem 0; border-radius: 999px; font-size: 0.85rem; font-weight: 600; color: var(--mudo); }
             .am-periodos button.ativa { background: var(--sup2); color: var(--txt); }
             .am-periodos .am-cheia { flex: 0 0 auto; padding: 0.45rem 0.7rem; color: var(--acento); display: flex; align-items: center; gap: 0.3rem; }
-            .am-abas { display: flex; gap: 1.4rem; border-bottom: 1px solid var(--borda); margin: 1.3rem 0 1rem; }
+            .am-abas { display: flex; gap: 1.4rem; border-bottom: 1px solid var(--borda); margin: 1.3rem 0 1rem; overflow-x: auto; scrollbar-width: none; }
+            .am-abas::-webkit-scrollbar { display: none; }
+            .am-abas button { flex-shrink: 0; }
             .am-abas button { padding: 0.7rem 0; font-weight: 600; color: var(--mudo); border-bottom: 2px solid transparent; margin-bottom: -1px; }
             .am-abas button.ativa { color: var(--txt); border-color: var(--acento); }
             .am-grade { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
@@ -407,7 +409,7 @@
                     <button type="button" data-meses="1">1M</button><button type="button" data-meses="3">3M</button><button type="button" data-meses="6" class="ativa">6M</button><button type="button" data-meses="12">1A</button><button type="button" data-meses="0">Tudo</button>
                     <button type="button" class="am-cheia" id="am-abrir-grafico"><svg class="am-ico" style="width:1.1rem;height:1.1rem"><use href="#i-cheia"/></svg>Tela cheia</button>
                 </div>
-                <div class="am-abas" id="am-abas"><button type="button" class="ativa" data-aba="resumo">Resumo</button><button type="button" data-aba="fundamentos">Fundamentos</button><button type="button" data-aba="tecnica">Técnica</button><button type="button" data-aba="plano">Plano</button></div>
+                <div class="am-abas" id="am-abas"><button type="button" class="ativa" data-aba="resumo">Resumo</button><button type="button" data-aba="balancos">Balanços</button><button type="button" data-aba="fundamentos">Fundamentos</button><button type="button" data-aba="tecnica">Técnica</button><button type="button" data-aba="plano">Plano</button></div>
                 <div id="am-aba-conteudo"></div>
             </div>
         </div>
@@ -1220,6 +1222,7 @@
             diarioDados = diario && Array.isArray(diario.sinais) ? diario : null;
             calibracaoDados = calib && calib.alvo ? calib : null;
             indiceDados = indice && indice.series ? indice : null;
+            balancosNome = manifest.arquivoBalancos || null; balancosPromessa = null; balancosDados = null;
             inicializarComDados(precos, fundamentos, { manifest });
             if (!fundamentos) mostrarMensagem('Preços carregados, mas o arquivo de fundamentos não veio. O Módulo 6 fica sem dados até a próxima coleta.', 'aviso');
             esconderProgresso();
@@ -3179,6 +3182,84 @@
             + dado('Oscilação ao ano (3 meses)', vol === null ? '—' : fmtNumM(vol * 100, 0) + '%') + dado('Abaixo da máxima de 1 ano', q === null ? '—' : fmtNumM(q * 100, 1) + '%')
             + (tot > 0 ? dado('Peso na minha carteira', fmtNumM(meu / tot * 100, 1) + '%') : '');
     }
+    // ===== Histórico de balanços (EUA, SEC): como eram os números, quando saíram e como o preço reagiu =====
+    let balancosNome = null, balancosPromessa = null, balancosDados = null;
+    function carregarBalancos() {
+        if (!balancosNome) return Promise.resolve(null);
+        if (!balancosPromessa) balancosPromessa = buscar(MERCADO.pasta + balancosNome).then(r => r.json())
+            .then(j => { balancosDados = j && j.ativos ? prepararBalancos(j) : null; return balancosDados; })
+            .catch(() => { balancosPromessa = null; return null; });
+        return balancosPromessa;
+    }
+    // Para cada trimestre: variação contra o mesmo trimestre do ano anterior e a "surpresa" do teste D
+    // (lucro − lucro de um ano antes, dividido pelo ativo), com o quinto dela entre todos os balanços do mesmo trimestre.
+    function prepararBalancos(j) {
+        const out = {}, porTri = {};
+        for (const [t, a] of Object.entries(j.ativos)) {
+            const ativoAte = fim => { let v = null; for (const b of a.b || []) if (b[0] <= fim && b[1]) v = b[1]; return v; };
+            const tri = a.t.map(r => ({ fim: r[0], divulgado: r[1], receita: r[2], lucro: r[3], lpa: r[4], lucroBruto: r[5] }));
+            tri.forEach(q => {
+                const ant = tri.find(x => { const d = (new Date(q.fim) - new Date(x.fim)) / 864e5; return d >= 350 && d <= 380; });
+                q.receitaAno = ant && ant.receita ? q.receita / ant.receita - 1 : null;
+                q.lucroAnt = ant ? ant.lucro : null;
+                const at = ativoAte(q.fim);
+                q.surpresa = ant && q.lucro !== null && ant.lucro !== null && at ? (q.lucro - ant.lucro) / at : null;
+                q.tri = q.divulgado.slice(0, 4) + 'T' + (Math.floor((+q.divulgado.slice(5, 7) - 1) / 3) + 1);
+                if (q.surpresa !== null) (porTri[q.tri] = porTri[q.tri] || []).push(q.surpresa);
+            });
+            out[t] = { tri, bal: a.b || [] };
+        }
+        for (const v of Object.values(porTri)) v.sort((a, b) => a - b);
+        for (const a of Object.values(out)) a.tri.forEach(q => {
+            const v = porTri[q.tri]; if (q.surpresa === null || !v || v.length < 25) { q.quinto = null; return; }
+            let k = 0; while (k < v.length && v[k] < q.surpresa) k++;
+            q.quinto = Math.min(5, Math.floor(k / v.length * 5) + 1);
+        });
+        return { ...j, ativos: out };
+    }
+    function reacaoBalanco(t, dia) {
+        const d = allData[t]; if (!d) return null;
+        const i = d.dates.findIndex(x => x >= dia); if (i < 2 || i + 1 >= d.dates.length) return null;
+        const n = d.dates.length, fimDep = Math.min(i + 61, n - 1);
+        const reacao = d.close[i + 1] / d.close[i - 2] - 1, depois = fimDep > i + 1 ? d.close[fimDep] / d.close[i + 1] - 1 : null;
+        return { reacao, idxReacao: retornoIndice(d.dates[i - 2], d.dates[i + 1]), depois, idxDepois: depois === null ? null : retornoIndice(d.dates[i + 1], d.dates[fimDep]), pregoes: fimDep - (i + 1) };
+    }
+    function htmlBalancos(t, B) {
+        const a = B && B.ativos[t];
+        if (!a) return `<p style="color:var(--mudo)">${mercadoCodigo() === 'br' ? 'Os balanços trimestrais do Brasil (CVM) ainda não estão no app.' : 'Sem balanços deste papel nos dados (o histórico cobre os 1.000 papéis mais negociados dos EUA).'}</p>`;
+        const tri = a.tri.filter(q => q.lucro !== null || q.receita !== null).slice(-12);
+        const mx = Math.max(...tri.map(q => Math.abs(q.lucro || 0)), 1);
+        const barras = `<svg viewBox="0 0 ${tri.length * 20} 64" class="w-full" style="height:64px" preserveAspectRatio="none">${tri.map((q, k) => { const h = Math.abs(q.lucro || 0) / mx * 30; return `<rect x="${k * 20 + 3}" y="${q.lucro >= 0 ? 32 - h : 32}" width="14" height="${Math.max(h, 0.5)}" fill="${q.lucro >= 0 ? 'var(--alta)' : 'var(--baixa)'}"/>`; }).join('')}<line x1="0" x2="${tri.length * 20}" y1="32" y2="32" stroke="var(--borda)"/></svg>`;
+        const p = v => v === null || v === undefined || !Number.isFinite(v) ? '—' : fmtPctM(v * 100);
+        const grande = v => v === null || v === undefined ? '—' : `${v < 0 ? '−' : ''}${MERCADO.simbolo} ${fmtGrandeM(Math.abs(v))}`;
+        const cor = v => v === null || v === undefined ? '' : v >= 0 ? 'var(--alta)' : 'var(--baixa)';
+        const nomeQuinto = { 5: 'entre os 20% de maior alta do lucro no trimestre', 1: 'entre os 20% de maior queda do lucro no trimestre' };
+        const linhas = tri.slice().reverse().map(q => {
+            const r = reacaoBalanco(t, q.divulgado);
+            const margem = q.lucroBruto && q.receita ? q.lucroBruto / q.receita : null;
+            return `<div class="am-card" data-balanco="${q.fim}">
+                <div class="flex items-center justify-between gap-2"><span class="font-semibold">Trimestre até ${fmtDataBR(q.fim)}</span><span class="text-xs" style="color:var(--mudo)">divulgado ${fmtDataBR(q.divulgado)}</span></div>
+                <div class="am-grade mt-2">
+                    <div class="am-dado"><div class="r">Receita</div><div class="v">${grande(q.receita)} <span class="text-sm" style="color:${cor(q.receitaAno)}">${q.receitaAno === null ? '' : p(q.receitaAno) + ' no ano'}</span></div></div>
+                    <div class="am-dado"><div class="r">Lucro líquido</div><div class="v" style="color:${cor(q.lucro)}">${grande(q.lucro)}</div><div class="text-xs" style="color:var(--mudo)">${q.lucroAnt === null ? '' : `um ano antes: ${grande(q.lucroAnt)}`}</div></div>
+                    ${margem !== null ? `<div class="am-dado"><div class="r">Margem bruta</div><div class="v">${fmtNumM(margem * 100, 1)}%</div></div>` : ''}
+                    ${q.lpa !== null ? `<div class="am-dado"><div class="r">Lucro por ação</div><div class="v">${fmtNumM(q.lpa, 2)}</div></div>` : ''}
+                    ${r ? `<div class="am-dado"><div class="r">Reação (2 dias antes a 1 depois)</div><div class="v" style="color:${cor(r.reacao)}">${p(r.reacao)}</div><div class="text-xs" style="color:var(--mudo)">${nomeIndice()} ${p(r.idxReacao)}</div></div>` : ''}
+                    ${r && r.depois !== null ? `<div class="am-dado"><div class="r">Depois (${r.pregoes < 60 ? `${r.pregoes} pregões, até hoje` : '60 pregões'})</div><div class="v" style="color:${cor(r.depois)}">${p(r.depois)}</div><div class="text-xs" style="color:var(--mudo)">${nomeIndice()} ${p(r.idxDepois)}</div></div>` : ''}
+                </div>
+                ${nomeQuinto[q.quinto] ? `<div class="text-xs mt-2"><span class="am-chip ${q.quinto === 5 ? 'verde' : 'vermelho'}">${nomeQuinto[q.quinto]}</span></div>` : ''}
+            </div>`;
+        }).join('');
+        return `<div class="am-card"><div class="text-sm" style="color:var(--mudo)">Lucro líquido por trimestre (${tri.length} trimestres)</div>${barras}
+                <p class="text-xs mt-1" style="color:var(--mudo)">Fonte: ${B.fonte}. Cada número entra com a data em que ficou público. A reação usa os preços do app.</p></div>
+            <div class="space-y-3 mt-3" data-balancos>${linhas}</div>
+            <p class="text-xs mt-3" style="color:var(--mudo)">Nos testes (EUA, 2009–2026, ${'~26 mil'} balanços), o quinto com maior alta do lucro contra o ano anterior subiu, nos 60 pregões seguintes, cerca de 1 ponto a mais que o quinto com maior queda. É um efeito pequeno e instável (quase nada de 2009 a 2018); serve como contexto, não como sinal de compra.</p>`;
+    }
+    function desenharBalancos(t, box) {
+        if (balancosDados || !balancosNome) { box.innerHTML = htmlBalancos(t, balancosDados); return; }
+        box.innerHTML = '<p style="color:var(--mudo)">Carregando balanços…</p>';
+        carregarBalancos().then(B => { if (ativoAberto === t && document.querySelector('#am-abas [data-aba="balancos"].ativa')) box.innerHTML = htmlBalancos(t, B); });
+    }
     function abaAtivo(t, aba) {
         document.querySelectorAll('#am-abas button').forEach(b => b.classList.toggle('ativa', b.dataset.aba === aba));
         const box = document.getElementById('am-aba-conteudo');
@@ -3188,6 +3269,7 @@
             return;
         }
         if (aba === 'plano') { box.innerHTML = planoOperacao(t, ex); return; }
+        if (aba === 'balancos') { desenharBalancos(t, box); return; }
         if (aba === 'fundamentos') { box.innerHTML = ex.secFund || '<p style="color:var(--mudo)">Sem dados fundamentalistas.</p>'; return; }
         const ult = d.close.slice(-252); let vol20 = 0; for (let j = n - 20; j < n; j++) vol20 += d.close[j] * d.volume[j];
         const r = filteredScreenerResults.find(x => x.ticker === t); const pos = filteredScreenerResults.indexOf(r);
@@ -3584,7 +3666,8 @@
         ['Tendência no índice (média de 10 meses)', 'REPROVADA', 'Reduz as quedas, mas desde 2010 rendeu 7,8% ao ano contra 13,9% de ficar comprado no S&P 500. No Brasil perdeu para o CDI.', 'docs/hipotese-momento-tendencia.md'],
         ['Queda forte (≥30%) + sinal Otimista', 'REPROVADA', 'Média de +2% por operação, mas mediana negativa e acerto de 1 em 3. O sinal não acrescenta nada a comprar a queda em dia sorteado.', 'docs/cenario-queda-reversao.md'],
         ['Stop mais curto, zero a zero, limite por setor, trava de resistência', 'REPROVADAS', 'Nenhuma melhorou o resultado de forma consistente fora da amostra.', null],
-        ['Carteira por fundamentos (valor + qualidade) e deriva depois do balanço', 'EM TESTE', 'Registrada antes de rodar. O resultado entra aqui quando sair.', 'docs/hipotese-fundamentos.md'],
+        ['Carteira por fundamentos (valor + qualidade)', 'REPROVADA', 'EUA 2011–2026, 30 papéis baratos e rentáveis: 13,2% ao ano contra 13,7% do SPY, com queda de 21% contra 12%. Ficou abaixo da mediana de carteiras sorteadas. Venceu de 2011 a 2018 e perdeu muito depois.', 'docs/hipotese-fundamentos.md'],
+        ['Deriva depois do balanço (lucro acima do ano anterior)', 'APROVADA COM RESSALVAS', 'Nos 60 pregões depois do balanço, o quinto com lucro mais acima do ano anterior subiu cerca de 1 ponto a mais que o quinto mais abaixo. Passou nos critérios, mas o efeito é pequeno, quase zero de 2009 a 2018, e exige muitas operações. Uma confirmação está registrada.', 'docs/hipotese-deriva-confirmacao.md'],
     ];
     function htmlTestado() {
         const cor = v => v.startsWith('REPROV') ? 'vermelho' : v === 'APROVADA' ? 'verde' : 'amarelo';
@@ -4182,7 +4265,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { calcularPlano, lerPlano, htmlPlano, retornoRendaFixa, nomeRendaFixa, volFinanceiro, quedaDoTopo, volAnual, resumoBussola, get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio, get estrategiasConfluencia() { return confluenceStrategies; }, get indice() { return indiceDados; }, set indice(v) { indiceDados = v; }, retornoIndice, comparacaoIndiceSim, htmlDiario, termometroIndice, saudeCarteira, avaliarDecisao, htmlTestado, htmlDecisoes, lerDecisoes, gravarDecisoes };
+    window.investDebug = { carregarBalancos, get balancos() { return balancosDados; }, reacaoBalanco, prepararBalancos, calcularPlano, lerPlano, htmlPlano, retornoRendaFixa, nomeRendaFixa, volFinanceiro, quedaDoTopo, volAnual, resumoBussola, get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio, get estrategiasConfluencia() { return confluenceStrategies; }, get indice() { return indiceDados; }, set indice(v) { indiceDados = v; }, retornoIndice, comparacaoIndiceSim, htmlDiario, termometroIndice, saudeCarteira, avaliarDecisao, htmlTestado, htmlDecisoes, lerDecisoes, gravarDecisoes };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).

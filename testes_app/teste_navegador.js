@@ -617,6 +617,26 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     ok(await cel.page.isVisible('#fundamentals-results-container'), 'celular: Mais → Técnica × Fundamentos');
     await cel.page.click('#fundamentals-results-container tbody tr[data-explicar]');
     ok(await cel.page.isVisible('#am-ativo'), 'celular: tocar numa linha do Módulo 6 abre a tela do ativo');
+    // Histórico de balanços (EUA): aba Balanços na tela do ativo
+    await cel.page.goto(BASE + '?mercado=us');
+    await cel.page.waitForFunction(() => window.investDebug && Object.keys(window.investDebug.allData || {}).length > 0, null, { timeout: 60000 });
+    await cel.page.click('.am-nav [data-ir-pagina="ranking"]');
+    await cel.page.fill('#am-busca', 'R000');
+    await cel.page.click('#am-ranking .am-linha[data-ativo="R000"]');
+    await cel.page.click('#am-abas [data-aba="balancos"]');
+    await cel.page.waitForSelector('[data-balancos] [data-balanco]', { timeout: 15000 });
+    const balTxt = await cel.page.textContent('#am-aba-conteudo');
+    const B = await cel.page.evaluate(() => {
+        const D = window.investDebug, a = D.balancos.ativos.R000, d = D.allData.R000;
+        const q = a.tri.filter(x => D.reacaoBalanco('R000', x.divulgado)).slice(-2)[0]; const r = D.reacaoBalanco('R000', q.divulgado);
+        const i = d.dates.findIndex(x => x >= q.divulgado);
+        const quintos = Object.values(D.balancos.ativos).flatMap(x => x.tri.map(y => y.quinto)).filter(Boolean);
+        return { reacaoOk: Math.abs(r.reacao - (d.close[i + 1] / d.close[i - 2] - 1)) < 1e-12, anoOk: q.receitaAno !== null && Math.abs(q.surpresa - (q.lucro - q.lucroAnt) / 5e9) < 1e-12,
+                 q5: quintos.filter(x => x === 5).length, q1: quintos.filter(x => x === 1).length, n: quintos.length, linhas: document.querySelectorAll('[data-balancos] [data-balanco]').length };
+    });
+    ok(B.reacaoOk && B.anoOk && B.linhas === 12 && B.q5 > 0.15 * B.n && B.q5 < 0.25 * B.n, `celular: aba Balanços com 12 trimestres, reação e surpresa conferidas (quintos: ${B.q5}/${B.n} no de cima)`);
+    ok(/Lucro líquido por trimestre/.test(balTxt) && /Reação \(2 dias antes a 1 depois\)/.test(balTxt) && /não como sinal de compra/.test(balTxt), 'celular: aba Balanços explica a fonte, a reação e o limite do teste');
+    await cel.page.waitForTimeout(300); await cel.page.screenshot({ path: path.join(SHOTS, 'celular_balancos.png'), fullPage: false });
     const errosCel = cel.erros.filter(e => !IGNORAR.some(r => r.test(e)));
     ok(errosCel.length === 0, `celular: console sem erros${errosCel.length ? ': ' + errosCel.join(' | ') : ''}`);
     await cel.page.close();

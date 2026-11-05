@@ -77,6 +77,42 @@ jobs:
         continue-on-error: true
         run: python coleta/indices.py site/data
 
+      - name: Semana (os balanços da SEC são renovados uma vez por semana)
+        id: semana
+        run: echo "s=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Balanços da semana (cache)
+        id: cache-bal
+        continue-on-error: true
+        uses: actions/cache/restore@v4
+        with:
+          path: balancos-cache
+          key: balancos-us-${{ steps.semana.outputs.s }}
+          restore-keys: balancos-us-
+
+      - name: Balanços trimestrais dos EUA (SEC, 1.000 mais negociados; uma vez por semana)
+        if: steps.cache-bal.outputs.cache-hit != 'true'
+        continue-on-error: true
+        timeout-minutes: 40
+        env:
+          SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+        run: |
+          mkdir -p balancos-cache
+          cd coleta && python balancos_sec.py ../site/data ../balancos-cache/novo.json --limite 1000 | tail -2
+          mv ../balancos-cache/novo.json ../balancos-cache/balancos_us.json
+
+      - name: Guardar os balanços da semana
+        if: steps.cache-bal.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: balancos-cache
+          key: balancos-us-${{ steps.semana.outputs.s }}
+
+      - name: Histórico de balanços para o app
+        continue-on-error: true
+        run: python coleta/balancos_app.py balancos-cache/balancos_us.json site/data
+
       - name: Aluguel B3 baixado pelo coletor no Brasil (se houver)
         continue-on-error: true
         uses: actions/cache/restore@v4
@@ -174,7 +210,7 @@ jobs:
           import json, sys, subprocess, os
           base, pasta = sys.argv[1], sys.argv[2]
           caminho = os.path.join(pasta, 'manifest.json'); m = json.load(open(caminho))
-          for chave in ('arquivoRelatorio', 'arquivoVendidos', 'arquivoDiario', 'arquivoCalibracao', 'arquivoIndice'):
+          for chave in ('arquivoRelatorio', 'arquivoVendidos', 'arquivoDiario', 'arquivoCalibracao', 'arquivoIndice', 'arquivoBalancos'):
               nome = m.get(chave)
               if nome and subprocess.run(['curl', '-fsSL', f'{base}/{nome}', '-o', os.path.join(pasta, nome)]).returncode != 0:
                   m.pop(chave)
