@@ -25,6 +25,9 @@ jobs:
           pip install -q yfinance pandas numpy
           python coleta/estudo_quantico_swing.py
           cat estudo_quantico_swing.md >> "$GITHUB_STEP_SUMMARY"
+          # Mesma regra em outros papéis voláteis: vencedores e perdedores de 2022-2026 (reduz o viés de só olhar quem subiu)
+          PAPEIS="PLTR SOUN BBAI RKLB ASTS ACHR JOBY SMCI MSTR COIN HOOD UPST AFRM MARA RIOT LUNR OKLO SMR PLUG FCEL LCID RIVN CHPT BYND SPCE OPEN SOFI U PATH AI" SAIDA=estudo_quantico_swing_amplo.md python coleta/estudo_quantico_swing.py
+          cat estudo_quantico_swing_amplo.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
           name: estudo-quantico

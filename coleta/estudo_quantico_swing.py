@@ -5,17 +5,19 @@ Compara cada configuração com comprar no mesmo dia e segurar o mesmo número d
 período em duas metades (a segunda serve de fora da amostra) e testa filtros de entrada simples.
 Dados diários do Yahoo (yfinance), ~4 anos. Entrada na abertura do pregão seguinte ao sinal.
 """
+import os
 import numpy as np
 import pandas as pd
 import yfinance as yf
 
-QUANT = ["IONQ", "RGTI", "QBTS", "QUBT"]
+QUANT = os.environ.get("PAPEIS", "IONQ RGTI QBTS QUBT").split()
 CUSTO = 0.002  # 0,20% ida e volta (spread + derrapagem; swing em small caps voláteis)
 saida = []
 p = saida.append
 
 raw = yf.download(QUANT + ["SPY"], period="4y", interval="1d", group_by="ticker", auto_adjust=True, progress=False)
-dados = {t: raw[t].dropna() for t in QUANT + ["SPY"]}
+dados = {t: raw[t].dropna() for t in QUANT + ["SPY"] if t in raw.columns.get_level_values(0) and len(raw[t].dropna()) > 300}
+QUANT = [t for t in QUANT if t in dados]
 
 
 def atr(df, n):
@@ -101,7 +103,7 @@ def rodar(filtro, k, R, N):
 
 
 spy = dados["SPY"]["Close"]
-p("# Swing por risco-retorno nos papéis quânticos (IONQ, RGTI, QBTS, QUBT)")
+p(f"# Swing por risco-retorno: {', '.join(QUANT)}")
 p("")
 p(f"Período: {min(d.index[0] for d in prep.values()).date()} a {max(d.index[-1] for d in prep.values()).date()}. "
   f"1ª metade (treino) até {meio.date()}, 2ª metade (fora da amostra) depois. Custo {CUSTO*100:.1f}% ida e volta.")
@@ -172,5 +174,5 @@ for f in ("todos os dias", "recuo acima da MME50"):
 p("")
 
 texto = "\n".join(saida)
-open("estudo_quantico_swing.md", "w").write(texto)
+open(os.environ.get("SAIDA", "estudo_quantico_swing.md"), "w").write(texto)
 print("RELATORIO_INICIO"); print(texto); print("RELATORIO_FIM")
