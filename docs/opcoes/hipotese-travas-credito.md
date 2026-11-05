@@ -55,7 +55,8 @@ objetiva, então fica representado pela banda de Keltner.
 
 - **Vencimento:** entre 25 e 50 dias corridos, o mais perto de 35.
 - **Perna vendida:** delta mais perto de 0,25 (Black-Scholes com a IV do dia). **Perna comprada:** strike mais
-  distante cuja largura fique mais perto de 5% do preço à vista.
+  distante cuja largura fique mais perto de 5% do preço à vista. No iron condor, as duas pernas vendidas usam delta
+  mais perto de 0,16, no mesmo vencimento.
 - **Uma posição por ativo** por vez.
 - **Tamanho:** perda máxima de 1% do capital por operação (perda máxima = largura − crédito). Capital inicial de
   R$ 100 mil; o que não está em risco rende CDI.
