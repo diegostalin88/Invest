@@ -22,7 +22,8 @@ def _cadeia(s, d, venc, vol=0.4, r=math.log(1.1)):
         for tipo in ('call', 'put'):
             v = ch.bs_preco(tipo, s, k, t, r, vol)
             if v > 0.02:
-                out.append((f'{tipo[0]}{k}', tipo, k, venc, round(v * 0.98, 2), round(v * 1.02, 2)))
+                out.append((f'{tipo[0]}{k}', tipo, k, venc, round(v * 0.98, 2), round(v * 1.02, 2),
+                            round(v * 1.01, 2), round(v * 0.99, 2)))   # máxima e mínima negociadas
     return out
 
 

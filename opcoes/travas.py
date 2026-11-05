@@ -139,7 +139,8 @@ class Indicadores:
 
 def carregar(anos, linhas_do_ano=ch.linhas_do_ano):
     """Devolve (pregoes, spot, ohlc, cadeia, ivs).
-    cadeia[(data, ativo)] = lista de (codigo, tipo, strike, vencimento, oferta_compra, oferta_venda)."""
+    cadeia[(data, ativo)] = lista de (codigo, tipo, strike, vencimento, oferta_compra, oferta_venda, maxima, minima);
+    máxima e mínima são os preços negociados no dia (0 sem negócio)."""
     spot, ohlc, cadeia, ivs = {}, {}, {}, {}
     for ano in anos:
         t0 = time.time()
@@ -158,7 +159,8 @@ def carregar(anos, linhas_do_ano=ch.linhas_do_ano):
                 continue
             f = max(r['fatcot'], 1)
             cadeia.setdefault((r['data'], r['ativo']), []).append(
-                (r['codneg'], r['tipo'], r['preexe'], r['datven'], r['preofc'] / f, r['preofv'] / f))
+                (r['codneg'], r['tipo'], r['preexe'], r['datven'], r['preofc'] / f, r['preofv'] / f,
+                 r['premax'] / f, r['premin'] / f))
         print(f'{ano}: carregado em {time.time() - t0:.0f}s', flush=True)
     pregoes = sorted({d for d, _ in spot})
     return pregoes, spot, ohlc, cadeia, ivs
@@ -253,6 +255,49 @@ def intrinseco(pos, cadeia_ref, s):
     return total
 
 
+# ---------- ordem limite (hipótese O3) ----------
+
+def limites_meio(pernas, cadeia_ref):
+    """Preço limite de cada perna: o meio entre as ofertas da cadeia de referência (a do fechamento do sinal)."""
+    precos = {(c[0], c[3]): c for c in cadeia_ref}
+    return {(cod, venc): (precos[(cod, venc)][4] + precos[(cod, venc)][5]) / 2 for cod, venc, _ in pernas}
+
+
+def executa(pernas, limites, cadeia_dia, estrito=False):
+    """'todas', 'parte' ou 'nenhuma': quantas pernas a ordem limite teria executado no dia. A vendida executa se a
+    opção foi negociada a preço ≥ limite (máxima); a comprada, se foi negociada a preço ≤ limite (mínima).
+    `estrito` exige negócio estritamente melhor que o limite (auditoria)."""
+    precos = {(c[0], c[3]): c for c in cadeia_dia}
+    feitas = 0
+    for cod, venc, lado in pernas:
+        c = precos.get((cod, venc))
+        if not c or len(c) < 8:
+            continue
+        lim, mx, mn = limites[(cod, venc)], c[6], c[7]
+        if lado < 0:
+            feitas += mx > 0 and (mx > lim if estrito else mx >= lim - 1e-9)
+        else:
+            feitas += mn > 0 and (mn < lim if estrito else mn <= lim + 1e-9)
+    return 'todas' if feitas == len(pernas) else ('parte' if feitas else 'nenhuma')
+
+
+def ordem_limite(montar_fn, ref, cad, p, ordens):
+    """Monta a estrutura pela cadeia de referência `ref` = (data, à vista, cadeia, iv) com preço no meio das ofertas e
+    devolve a montagem se a ordem limite executa hoje (em `cad`); conta o resultado em `ordens`."""
+    if not ref:
+        return None
+    d0, s0, cad0, iv0 = ref
+    m = montar_fn(cad0, s0, d0, {**p, 'exec_meio': True}, iv0)
+    if not m:
+        return None
+    if p.get('limite_sempre'):        # auditoria: limite otimista, executa sempre
+        st = 'todas'
+    else:
+        st = executa(m['pernas'], limites_meio(m['pernas'], cad0), cad, estrito=bool(p.get('estrito')))
+    ordens[st] += 1
+    return m if st == 'todas' else None
+
+
 # ---------- simulação ----------
 
 def escolher(i, s, p):
@@ -287,6 +332,9 @@ def simular(dados, p, inicio, fim):
     sorteio = p.get('sorteio')                  # auditoria: (probabilidade, semente) no lugar do IV Rank e do gatilho
     rng = random.Random(sorteio[1]) if sorteio else None
     elegiveis = sinais = 0
+    limite, ate_venc = bool(p.get('limite')), bool(p.get('ate_vencimento'))
+    marca_meio = bool(p.get('exec_meio')) or limite
+    ultimo, ordens = {}, {'todas': 0, 'parte': 0, 'nenhuma': 0}
     for d in pregoes:
         ativo_no_periodo = inicio <= d <= fim
         # juros do CDI sobre o caixa livre, do pregão anterior até hoje (a taxa do dia anterior rende hoje)
@@ -310,12 +358,17 @@ def simular(dados, p, inicio, fim):
                 pendentes[a][1] -= 1
             if a in pendentes and pendentes[a][1] <= 0 and a not in posicoes:
                 estrutura = pendentes.pop(a)[0]
-                m = montar(estrutura, cad, s, d, p, ivs.get((d, a), 0.3))
+                if limite:
+                    m = ordem_limite(lambda c0, s0, d0, pp, iv0: montar(estrutura, c0, s0, d0, pp, iv0),
+                                     ultimo.get(a), cad, p, ordens)
+                    cad_m = ultimo[a][2] if m else cad
+                else:
+                    m, cad_m = montar(estrutura, cad, s, d, p, ivs.get((d, a), 0.3)), cad
                 if m:
                     risco_un = m['largura'] - m['credito']
                     qtd = int(caixa * p['risco'] / risco_un // 100) * 100
                     if qtd > 0 and travado + qtd * risco_un <= caixa:
-                        m['strikes'] = {c[0]: (c[2], c[1]) for c in cad}
+                        m['strikes'] = {c[0]: (c[2], c[1]) for c in cad_m}
                         posicoes[a] = {**m, 'qtd': qtd, 'entrada': d, 'estrutura': estrutura, 'risco_un': risco_un}
                         travado += qtd * risco_un
             if a in pendentes and pendentes[a][1] <= 0:
@@ -330,6 +383,10 @@ def simular(dados, p, inicio, fim):
                 motivo = None
                 if dte <= 0:
                     rec, motivo = intrinseco(pos, cad, s), 'vencimento'
+                    if ate_venc:     # O3: custo do exercício
+                        rec += p['custo'] * len(pos['pernas'])
+                elif ate_venc:
+                    pass
                 elif rec is not None and gat is not None:
                     if gat <= pos['credito'] * (1 - p['alvo']):
                         motivo = 'alvo'
@@ -360,10 +417,11 @@ def simular(dados, p, inicio, fim):
                 if est and (minimo is None or rank >= minimo):
                     pendentes[a] = [est, atraso]
                     sinais += 1
+            ultimo[a] = (d, s, cad, ivs.get((d, a), 0.3))
         if ativo_no_periodo:
             aberto = 0.0
             for a, pos in posicoes.items():
-                rec = custo_recompra(pos, cadeia.get((d, a), []), p['custo'], meio=bool(p.get('exec_meio')))
+                rec = custo_recompra(pos, cadeia.get((d, a), []), p['custo'], meio=marca_meio)
                 if rec is not None:
                     aberto += (pos['credito'] - min(rec, pos['largura'])) * pos['qtd']
             valor = caixa + aberto
@@ -372,7 +430,8 @@ def simular(dados, p, inicio, fim):
             curva.append((d, round(valor, 2)))
         anterior = d
     return {'operacoes': operacoes, 'curva': curva, 'final': caixa, 'queda_max': queda_max,
-            'cdi': cdi_acum - 1, 'abertas': len(posicoes), 'elegiveis': elegiveis, 'sinais': sinais}
+            'cdi': cdi_acum - 1, 'abertas': len(posicoes), 'elegiveis': elegiveis, 'sinais': sinais,
+            'ordens': ordens}
 
 
 def metricas(res, bova):

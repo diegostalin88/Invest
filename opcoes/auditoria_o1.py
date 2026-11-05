@@ -1,5 +1,5 @@
-"""Auditoria adversarial das hipóteses O1 (travas.py) e O2 (debito.py). Tenta derrubar o resultado.
-Registros: docs/opcoes/auditoria-o1.md e docs/opcoes/auditoria-o2.md.
+"""Auditoria adversarial das hipóteses O1 (travas.py), O2 (debito.py) e O3 (vencimento.py). Tenta derrubar o
+resultado. Registros: docs/opcoes/auditoria-o1.md, auditoria-o2.md e auditoria-o3.md.
 
 Uso: python auditoria_o1.py --sorteios 100 --saida ../opcoes_resultado
 """
@@ -54,8 +54,8 @@ def conferencia(dados, ops, n=5, semente=1):
 SIMULADOR = travas.simular
 
 
-def rodar(dados, p):
-    res = SIMULADOR(dados, p, *FORA)
+def rodar(dados, p, sim=None):
+    res = (sim or SIMULADOR)(dados, p, *FORA)
     return res, travas.metricas(res, travas.retorno_bova(dados[1], *FORA))
 
 
@@ -64,15 +64,17 @@ def main(argv=None):
     ap.add_argument('--anos', default='2018-2026')
     ap.add_argument('--sorteios', type=int, default=100)
     ap.add_argument('--saida', default='../opcoes_resultado')
-    ap.add_argument('--hipotese', default='o1', choices=['o1', 'o2'])
+    ap.add_argument('--hipotese', default='o1', choices=['o1', 'o2', 'o3'])
     args = ap.parse_args(argv)
-    global SIMULADOR
-    if args.hipotese == 'o2':
+    o3 = args.hipotese == 'o3'
+    if o3:
+        import vencimento
+        versoes = vencimento.VERSOES
+    elif args.hipotese == 'o2':
         import debito
-        SIMULADOR = debito.simular
-        versoes = {'simples': debito.BASE, 'técnica': {**debito.BASE, **debito.TECNICO}}
+        versoes = {'simples': (debito.simular, debito.BASE), 'técnica': (debito.simular, {**debito.BASE, **debito.TECNICO})}
     else:
-        versoes = {'simples': travas.BASE, 'técnica': {**travas.BASE, **travas.TECNICO}}
+        versoes = {'simples': (travas.simular, travas.BASE), 'técnica': (travas.simular, {**travas.BASE, **travas.TECNICO})}
     a0, a1 = (int(x) for x in args.anos.split('-'))
     os.makedirs(args.saida, exist_ok=True)
     try:
@@ -82,32 +84,40 @@ def main(argv=None):
         return 1
     dados = travas.carregar(range(a0, a1 + 1))
     rel = {}
-    for nome, p in versoes.items():
-        res, m = rodar(dados, p)
+    for nome, (sim, p) in versoes.items():
+        rodar_v = lambda dd, pp: rodar(dd, pp, sim)  # noqa: E731
+        res, m = rodar_v(dados, p)
         r = {'original': m, 'porAno': por_ano(res['operacoes']), 'piorMes': pior_mes(res),
              'conferencia': conferencia(dados, res['operacoes']),
              'frequencia': round(res['sinais'] / res['elegiveis'], 4) if res['elegiveis'] else 0}
         # 1) reprodução: a mesma simulação de novo tem que dar o mesmo número
-        _, m2 = rodar(dados, p)
+        _, m2 = rodar_v(dados, p)
         r['reproduz'] = m2 == m
         # 2) execução atrasada: 2 e 3 pregões depois do sinal
-        r['atraso2'] = rodar(dados, {**p, 'atraso': 2})[1]
-        r['atraso3'] = rodar(dados, {**p, 'atraso': 3})[1]
-        # 2b) saída decidida pelo preço médio das ofertas (incluída depois do 1º resultado: ver o doc)
-        r['saidaMeio'] = rodar(dados, {**p, 'saida_meio': True})[1]
-        # 2c) limite otimista: entrada e saída no meio das ofertas (incluído depois do 1º resultado)
-        r['execMeio'] = rodar(dados, {**p, 'exec_meio': True, 'saida_meio': True})[1]
+        r['atraso2'] = rodar_v(dados, {**p, 'atraso': 2})[1]
+        r['atraso3'] = rodar_v(dados, {**p, 'atraso': 3})[1]
+        if o3:
+            # 7) execução estrita; 8) ordens executadas e parciais; 9) limite otimista (sempre executa no meio)
+            r['estrito'] = rodar_v(dados, {**p, 'estrito': True})[1]
+            r['ordens'] = res['ordens']
+            r['saidaMeio'] = r['estrito']
+            r['execMeio'] = rodar_v(dados, {**p, 'limite_sempre': True})[1]
+        else:
+            # 2b) saída decidida pelo preço médio das ofertas (incluída depois do 1º resultado: ver o doc)
+            r['saidaMeio'] = rodar_v(dados, {**p, 'saida_meio': True})[1]
+            # 2c) limite otimista: entrada e saída no meio das ofertas (incluído depois do 1º resultado)
+            r['execMeio'] = rodar_v(dados, {**p, 'exec_meio': True, 'saida_meio': True})[1]
         # 2d) quanto a diferença entre as ofertas pesa: ida e volta ÷ crédito, na entrada
         razoes = sorted(o['spread'] / o['credito'] for o in res['operacoes'] if o['credito'] > 0)
         r['spreadSobreCredito'] = {'mediana': round(statistics.median(razoes), 3) if razoes else None,
                                    'p25': round(razoes[len(razoes) // 4], 3) if razoes else None,
                                    'p75': round(razoes[3 * len(razoes) // 4], 3) if razoes else None}
         # 3) custos mais altos
-        r['custo4x'] = rodar(dados, {**p, 'custo': p['custo'] * 4})[1]
+        r['custo4x'] = rodar_v(dados, {**p, 'custo': p['custo'] * 4})[1]
         # 4) placebo: mesma frequência de entrada, dias sorteados (sem IV Rank e sem gatilho técnico)
         placebo = []
         for semente in range(args.sorteios):
-            pm = rodar(dados, {**p, 'sorteio': (r['frequencia'], semente)})[1]
+            pm = rodar_v(dados, {**p, 'sorteio': (r['frequencia'], semente)})[1]
             placebo.append((pm['pnlPorRisco'] or 0, pm['retorno']))
         pr = sorted(x[0] for x in placebo)
         r['placebo'] = {
@@ -130,9 +140,14 @@ def main(argv=None):
               f"(CDI {pct(m['cdi'])}), fator de lucro {m['fatorLucro']}, queda máx. {pct(m['quedaMax'])}",
               f"- Execução 2 pregões depois: P&L/risco {pct(r['atraso2']['pnlPorRisco'])}, retorno {pct(r['atraso2']['retorno'])}",
               f"- Execução 3 pregões depois: P&L/risco {pct(r['atraso3']['pnlPorRisco'])}, retorno {pct(r['atraso3']['retorno'])}",
-              f"- Saída decidida pelo preço médio: P&L/risco {pct(r['saidaMeio']['pnlPorRisco'])}, retorno {pct(r['saidaMeio']['retorno'])}, "
-              f"acerto {pct(r['saidaMeio']['acerto'])}",
-              f"- Limite otimista, tudo no meio das ofertas: P&L/risco {pct(r['execMeio']['pnlPorRisco'])}, "
+              (f"- Execução estrita (negócio estritamente melhor que o limite): P&L/risco {pct(r['estrito']['pnlPorRisco'])}, "
+               f"retorno {pct(r['estrito']['retorno'])}, {r['estrito']['operacoes']} operações" if o3 else
+               f"- Saída decidida pelo preço médio: P&L/risco {pct(r['saidaMeio']['pnlPorRisco'])}, retorno {pct(r['saidaMeio']['retorno'])}, "
+              f"acerto {pct(r['saidaMeio']['acerto'])}"),
+              (f"- Ordens: {r['ordens']['todas']} executadas, {r['ordens']['parte']} só em parte, "
+               f"{r['ordens']['nenhuma']} sem execução" if o3 else ''),
+              ("- Limite otimista, toda ordem executada no meio: P&L/risco" if o3 else
+               "- Limite otimista, tudo no meio das ofertas: P&L/risco") + f" {pct(r['execMeio']['pnlPorRisco'])}, "
               f"retorno {pct(r['execMeio']['retorno'])}, acerto {pct(r['execMeio']['acerto'])}, fator de lucro {r['execMeio']['fatorLucro']}",
               f"- Diferença entre ofertas (ida e volta) ÷ prêmio na entrada: mediana {r['spreadSobreCredito']['mediana']} "
               f"(p25 {r['spreadSobreCredito']['p25']}, p75 {r['spreadSobreCredito']['p75']})",

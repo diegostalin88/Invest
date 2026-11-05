@@ -1,0 +1,46 @@
+name: Opções - O3: ordem limite e até o vencimento
+
+# Só leitura: hipótese O3 (docs/opcoes/hipotese-vencimento.md) e sua auditoria adversarial
+# (docs/opcoes/auditoria-o3.md). Não publica nada.
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/project-thread-ouh2hk]
+    paths: ["opcoes/vencimento.py", ".github/workflows/opcoes-vencimento.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  o3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Testes (sem rede)
+        run: |
+          pip install pytest==9.2.0
+          python -m pytest -q opcoes/tests
+
+      - name: Backtest
+        working-directory: opcoes
+        run: python vencimento.py --anos 2018-2026 --saida ../opcoes_resultado
+
+      - name: Auditoria
+        working-directory: opcoes
+        run: python auditoria_o1.py --hipotese o3 --sorteios 100 --saida ../opcoes_resultado
+
+      - name: Guardar o resultado
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opcoes-o3
+          path: opcoes_resultado/
+          if-no-files-found: ignore

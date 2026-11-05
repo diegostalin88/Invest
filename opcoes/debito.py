@@ -128,6 +128,9 @@ def simular(dados, p, inicio, fim):
     sorteio = p.get('sorteio')
     rng = random.Random(sorteio[1]) if sorteio else None
     meio = bool(p.get('exec_meio'))
+    limite, ate_venc = bool(p.get('limite')), bool(p.get('ate_vencimento'))
+    marca_meio = meio or limite
+    ultimo, ordens = {}, {'todas': 0, 'parte': 0, 'nenhuma': 0}
     elegiveis = sinais = 0
     for d in pregoes:
         no_periodo = inicio <= d <= fim
@@ -151,7 +154,11 @@ def simular(dados, p, inicio, fim):
                 pendentes[a][1] -= 1
             if a in pendentes and pendentes[a][1] <= 0 and a not in posicoes:
                 direcao = pendentes.pop(a)[0]
-                m = montar(direcao, cad, s, d, p)
+                if limite:
+                    m = travas.ordem_limite(lambda c0, s0, d0, pp, _iv: montar(direcao, c0, s0, d0, pp),
+                                            ultimo.get(a), cad, p, ordens)
+                else:
+                    m = montar(direcao, cad, s, d, p)
                 if m:
                     qtd = int(caixa * p['risco'] / m['debito'] // 100) * 100
                     if qtd > 0 and travado + qtd * m['debito'] <= caixa:
@@ -168,6 +175,10 @@ def simular(dados, p, inicio, fim):
                 motivo = None
                 if dte <= 0:
                     v, motivo = intrinseco(pos, s), 'vencimento'
+                    if ate_venc:     # O3: custo do exercício
+                        v -= p['custo'] * len(pos['pernas'])
+                elif ate_venc:
+                    pass
                 elif v is not None and gat is not None:
                     if gat >= p['alvo'] * pos['largura']:
                         motivo = 'alvo'
@@ -198,10 +209,11 @@ def simular(dados, p, inicio, fim):
                 if ok:
                     pendentes[a] = [direcao, atraso]
                     sinais += 1
+            ultimo[a] = (d, s, cad, ivs.get((d, a), 0.3))
         if no_periodo:
             aberto = 0.0
             for a, pos in posicoes.items():
-                v = valor(pos, cadeia.get((d, a), []), p['custo'], meio=meio)
+                v = valor(pos, cadeia.get((d, a), []), p['custo'], meio=marca_meio)
                 aberto += (v if v is not None else pos['debito']) * pos['qtd']
             total = caixa + aberto
             pico = max(pico, total)
@@ -211,7 +223,8 @@ def simular(dados, p, inicio, fim):
     # posições ainda abertas no fim voltam ao caixa pelo débito pago (sem lucro nem perda)
     final = caixa + sum(pos['debito'] * pos['qtd'] for pos in posicoes.values())
     return {'operacoes': operacoes, 'curva': curva, 'final': final, 'queda_max': queda_max,
-            'cdi': cdi_acum - 1, 'abertas': len(posicoes), 'elegiveis': elegiveis, 'sinais': sinais}
+            'cdi': cdi_acum - 1, 'abertas': len(posicoes), 'elegiveis': elegiveis, 'sinais': sinais,
+            'ordens': ordens}
 
 
 def markdown(saida):
