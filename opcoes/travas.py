@@ -455,7 +455,8 @@ def main(argv=None):
     try:
         CDI.update(ch.baixar_cdi(date(a0, 1, 1), date.today()))
     except Exception as e:  # noqa: BLE001
-        print(f'CDI indisponível ({e}); usando {ch.CDI_RESERVA:.0%}', flush=True)
+        print(f'CDI indisponível ({e}); sem o CDI real o resultado não vale, abortando', flush=True)
+        return 1
     dados = carregar(range(a0, a1 + 1))
     saida = {'versoes': {}}
     versoes = [{}, TECNICO, {**TECNICO, 'nome': 'técnica sem filtro de IV Rank', 'ivr_tendencia': None,
