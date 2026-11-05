@@ -23,6 +23,28 @@ async function mercado(browser, m) {
     const erros = []; page.on('console', x => { if (x.type() === 'error') erros.push(x.text()); }); page.on('pageerror', e => erros.push(String(e)));
     await page.goto(`${BASE}?mercado=${m}`);
     await page.waitForSelector('#am-top .am-linha', { state: 'attached', timeout: 180000 });
+    // Bússola: termômetro com a renda fixa, lista de ativos e histórico de balanços (EUA)
+    await page.waitForSelector('#am-termometro [data-termometro]', { timeout: 60000 });
+    const T = await page.evaluate(() => { const I = window.investDebug, t = I.termometroIndice(); return t && { nome: t.nome, data: t.data, ret12m: t.ret12m, rf12m: t.rf12m, nomeRF: t.nomeRF, distMM200: t.distMM200, quedaPico52: t.quedaPico52, vol: t.vol, acimaMM10: t.acimaMM10 }; });
+    console.log(`${m}: termômetro ${JSON.stringify(T)}`);
+    ok(T && T.rf12m !== null && T.rf12m > 0.01 && T.rf12m < 0.2, `${m}: termômetro com ${T && T.nomeRF} de 12 meses plausível (${T && T.rf12m})`);
+    await page.click('.am-nav [data-ir-pagina="ranking"]');
+    const nAt = await page.$$eval('#am-ranking .am-linha', l => l.length);
+    ok(nAt >= 30 && !(await page.$('#am-ranking .am-chip')), `${m}: Ativos lista ${nAt} papéis sem score`);
+    if (m === 'us') {
+        await page.evaluate(() => window.investDebug.carregarBalancos());
+        const bal = await page.evaluate(() => { const B = window.investDebug.balancos; if (!B) return null; const ts = Object.keys(B.ativos); const t = ['AAPL', 'MSFT', 'NVDA'].find(x => B.ativos[x]) || ts[0]; const q = B.ativos[t].tri.slice(-1)[0]; return { n: ts.length, t, q: { fim: q.fim, divulgado: q.divulgado, receita: q.receita, lucro: q.lucro, receitaAno: q.receitaAno, quinto: q.quinto }, reacao: window.investDebug.reacaoBalanco(t, q.divulgado) }; });
+        console.log(`${m}: balanços ${JSON.stringify(bal)}`);
+        ok(bal && bal.n >= 500, `${m}: histórico de balanços publicado (${bal && bal.n} papéis)`);
+        if (bal) {
+            await page.fill('#am-busca', bal.t); await page.click(`#am-ranking .am-linha[data-ativo="${bal.t}"]`);
+            await page.click('#am-abas [data-aba="balancos"]');
+            await page.waitForSelector('[data-balancos] [data-balanco]', { timeout: 30000 });
+            ok((await page.$$('[data-balancos] [data-balanco]')).length >= 8, `${m}: aba Balanços de ${bal.t} com os trimestres`);
+            await page.goBack();
+        }
+    }
+    await page.click('.am-nav [data-ir-pagina="inicio"]');
     await page.click('.am-nav [data-ir-pagina="mais"]'); await page.click('[data-sub="relatorio"]');
     await page.waitForFunction(() => /Último teste|Gerar agora/.test(document.getElementById('am-relatorio').textContent), null, { timeout: 120000 });
     if (await page.isVisible('#am-relatorio [data-gerar-relatorio]')) {
