@@ -72,7 +72,7 @@ def test_trimestres_quarto_trimestre_e_versao(tmp_path):
     assert t[0] == ['2025-03-31', '2025-05-12', 100000, 10000, None, 50000]          # MIL × 1.000
     assert t[2][3] == 15000 and t[2][1] == '2025-11-06'                                # números da versão 2, data da 1ª entrega
     assert t[3][2] == (460 - 330) * 1000 and t[3][3] == (50 - 37) * 1000 and t[3][1] == '2026-02-26'   # 4º tri = ano − 9 meses
-    assert b[0] == ['2025-03-31', 1000000, 400000, 1000000] and b[-1][0] == '2025-12-31'
+    assert b[0] == ['2025-03-31', 1000000, 400000, 600000]   # passivo sem o patrimônio and b[-1][0] == '2025-12-31'
 
 
 def test_main_grava_para_os_tickers_do_app(tmp_path):

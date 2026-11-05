@@ -157,7 +157,10 @@ class Acumulador:
         for ref, tipo in refs:
             d = self._fonte(cnpj, ref, tipo, self.bal)
             if d.get('ativo'):
-                b.append([ref, _int(d['ativo'][1]), _int((d.get('pl') or (0, None))[1]), _int((d.get('passivo') or (0, None))[1])])
+                pl = (d.get('pl') or (0, None))[1]
+                total = (d.get('passivo') or (0, None))[1]   # conta 2 da CVM = passivo + patrimônio
+                passivo = total - pl if total is not None and pl is not None else None
+                b.append([ref, _int(d['ativo'][1]), _int(pl), _int(passivo)])
         b = sorted({x[0]: x for x in b}.values())
         return t, b
 
