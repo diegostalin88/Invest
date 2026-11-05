@@ -1,25 +1,27 @@
-# Invest — Dashboard Quantitativo que se atualiza sozinho
-
-App web de análise de ações americanas (Nasdaq + NYSE/AMEX/ARCA) e brasileiras (carteira do IBOVESPA): Screener técnico com score ponderado,
-gráficos, Backtest, Walk-Forward, matriz de correlação e cruzamento com fundamentos (P/L, P/VP, ROE,
-Dívida/PL, margem, crescimento), radar de eventos corporativos (8-K da SEC) e sinais de mercado.
+# Invest — bússola de investimentos que se atualiza sozinha
 
 **Endereço:** https://diegostalin88.github.io/Invest/
 
-**Gráfico (Módulo 2):** duas abas. "Com sinais do app" usa a biblioteca gratuita Lightweight Charts (do TradingView)
-com os dados do app, os indicadores do app, setas nos dias em que o motor de pontuação passou do score mínimo e um
-quadro com os fundamentos. "TradingView completo" abre o widget oficial (dados do próprio TradingView, com desenho e
-todos os indicadores, mas sem os sinais do app).
+Depois da auditoria de 04/11/2026, os testes mostraram que a estratégia técnica do app **não vence o índice**
+(nem nos EUA, nem no Brasil). Desde 05/11/2026 o app deixou de prometer previsão e virou uma bússola: descreve o
+mercado e a carteira com números que se pode conferir, e cobra cada decisão contra o índice e contra o CDI.
 
-**Por que foi selecionado:** clicar num card das Melhores Opções, numa linha do Módulo 6 ou no 🔎 do Screener mostra
-cada tese técnica que pontuou, cada critério fundamentalista com valor e limite, e a conta do Score Combinado.
+O que o app mostra (barra de baixo: Início · Ativos · Carteira · Mais):
 
-No topo há um seletor **🇺🇸 EUA / 🇧🇷 Brasil (IBOVESPA)**. A escolha fica lembrada no navegador e também pode ir no
-link (`?mercado=br`). No Brasil, valores em R$ e volume mínimo padrão de R$ 10 mi/dia (EUA: US$ 50 mi).
-
-Ao abrir, o app já está com os dados do último pregão carregados, roda o Screener com os parâmetros padrão
-e mostra as "Melhores Opções" do cruzamento com fundamentos. Ninguém precisa rodar script nem carregar arquivo.
-Custo zero: tudo roda no GitHub Actions e no GitHub Pages.
+- **Termômetro do índice** (SPY / BOVA11): média de 10 meses, distância da média de 200 dias, queda desde o topo,
+  retorno de 1, 3 e 12 meses, a renda fixa (CDI / T-bill) no mesmo período e a volatilidade. Descreve; não prevê.
+- **Amplitude do mercado:** quantos papéis estão acima da média de 200 dias.
+- **Ativos:** o mercado todo, por volume, altas, quedas, distância do topo ou volatilidade (sem score).
+- **Tela do papel:** retorno de 1 ano contra o índice, oscilação, queda do topo, peso na sua carteira, fundamentos e,
+  nos EUA, os **últimos 12 balanços trimestrais** (SEC), com a data de divulgação e a reação do preço.
+- **Carteira:** saúde (concentração, papéis "efetivos", setor, correlação, beta, queda máxima), o mesmo dinheiro de
+  cada compra no índice e no CDI, e um **plano de alocação** (renda fixa, fundo de índice, ações escolhidas) com
+  faixas de rebalanceamento e a divisão do próximo aporte.
+- **Diário das decisões:** cada compra e venda anotada na hora, com o placar contra o índice e o CDI.
+- **Imposto das vendas do mês (Brasil):** isenção de R$ 20 mil, prejuízo a compensar e DARF.
+- **O que já foi testado:** cada ideia com registro prévio e o veredito (`docs/`).
+- **Avançado:** a estratégia técnica congelada (ranking, simulação, backtest), mantida só para o teste para frente
+  até 11/2027. O app antigo, com todos os módulos técnicos, abre em `?classico=1`.
 
 > ⚠️ **Não é recomendação de investimento.** É uma ferramenta de apoio à análise, com dados de fontes
 > gratuitas que podem vir incompletos, defasados ou (raramente) errados. Confira sempre a fonte primária

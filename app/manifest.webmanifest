@@ -1,7 +1,7 @@
 {
-  "name": "Invest — Dashboard Quantitativo",
+  "name": "Invest — bússola de investimentos",
   "short_name": "Invest",
-  "description": "Screener, backtest e fundamentos de ações americanas, atualizado todo dia útil.",
+  "description": "Termômetro do mercado, saúde da carteira contra o índice e o CDI, balanços e imposto. Dados atualizados todo dia útil (EUA e Brasil).",
   "lang": "pt-BR",
   "start_url": "./",
   "scope": "./",
