@@ -1,0 +1,41 @@
+name: Opções - auditoria da O1
+
+# Só leitura: auditoria adversarial da hipótese O1 (docs/opcoes/auditoria-o1.md). Não publica nada.
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/project-thread-ouh2hk]
+    paths: ["opcoes/auditoria_o1.py", ".github/workflows/opcoes-auditoria-o1.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  auditoria:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Testes (sem rede)
+        run: |
+          pip install pytest==9.2.0
+          python -m pytest -q opcoes/tests
+
+      - name: Auditoria
+        working-directory: opcoes
+        run: python auditoria_o1.py --sorteios 100 --saida ../opcoes_resultado
+
+      - name: Guardar o resultado
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opcoes-auditoria-o1
+          path: opcoes_resultado/
+          if-no-files-found: ignore

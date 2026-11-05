@@ -8,6 +8,7 @@ import argparse
 import json
 import math
 import os
+import random
 import sys
 import time
 from datetime import date
@@ -263,6 +264,10 @@ def simular(dados, p, inicio, fim):
     pico, queda_max = CAPITAL, 0.0
     cdi_acum = 1.0
     anterior = None
+    atraso = p.get('atraso', 1)                 # auditoria: pregões entre o sinal e a execução
+    sorteio = p.get('sorteio')                  # auditoria: (probabilidade, semente) no lugar do IV Rank e do gatilho
+    rng = random.Random(sorteio[1]) if sorteio else None
+    elegiveis = sinais = 0
     for d in pregoes:
         ativo_no_periodo = inicio <= d <= fim
         # juros do CDI sobre o caixa livre, do pregão anterior até hoje (a taxa do dia anterior rende hoje)
@@ -281,9 +286,11 @@ def simular(dados, p, inicio, fim):
             if not ativo_no_periodo:
                 continue
             cad = cadeia.get((d, a), [])
-            # 1) execução pendente do sinal de ontem
-            if a in pendentes and a not in posicoes:
-                estrutura = pendentes.pop(a)
+            # 1) execução pendente do sinal (de ontem, ou de `atraso` pregões atrás)
+            if a in pendentes:
+                pendentes[a][1] -= 1
+            if a in pendentes and pendentes[a][1] <= 0 and a not in posicoes:
+                estrutura = pendentes.pop(a)[0]
                 m = montar(estrutura, cad, s, d, p, ivs.get((d, a), 0.3))
                 if m:
                     risco_un = m['largura'] - m['credito']
@@ -292,7 +299,8 @@ def simular(dados, p, inicio, fim):
                         m['strikes'] = {c[0]: (c[2], c[1]) for c in cad}
                         posicoes[a] = {**m, 'qtd': qtd, 'entrada': d, 'estrutura': estrutura, 'risco_un': risco_un}
                         travado += qtd * risco_un
-            pendentes.pop(a, None)
+            if a in pendentes and pendentes[a][1] <= 0:
+                pendentes.pop(a)
             # 2) saída
             if a in posicoes:
                 pos = posicoes[a]
@@ -318,12 +326,18 @@ def simular(dados, p, inicio, fim):
                                       'risco': round(pos['qtd'] * pos['risco_un'], 2)})
                     del posicoes[a]
             # 3) sinal para amanhã
-            if a not in posicoes and ind[a].pronto() and len(hist_iv[a]) >= ch.JANELA_RANK \
+            if a not in posicoes and a not in pendentes and ind[a].pronto() and len(hist_iv[a]) >= ch.JANELA_RANK \
                     and (d, a) in ivs and not (a == 'PRIO3' and d < INICIO_PRIO3):
+                elegiveis += 1
                 rank = ch.iv_rank(hist_iv[a])
-                est, minimo = escolher(ind[a], s, p)
+                if sorteio:
+                    est = escolher(ind[a], s, {**p, 'gatilho': 'simples'})[0] if rng.random() < sorteio[0] else None
+                    minimo = None
+                else:
+                    est, minimo = escolher(ind[a], s, p)
                 if est and (minimo is None or rank >= minimo):
-                    pendentes[a] = est
+                    pendentes[a] = [est, atraso]
+                    sinais += 1
         if ativo_no_periodo:
             aberto = 0.0
             for a, pos in posicoes.items():
@@ -336,7 +350,7 @@ def simular(dados, p, inicio, fim):
             curva.append((d, round(valor, 2)))
         anterior = d
     return {'operacoes': operacoes, 'curva': curva, 'final': caixa, 'queda_max': queda_max,
-            'cdi': cdi_acum - 1, 'abertas': len(posicoes)}
+            'cdi': cdi_acum - 1, 'abertas': len(posicoes), 'elegiveis': elegiveis, 'sinais': sinais}
 
 
 def metricas(res, bova):
