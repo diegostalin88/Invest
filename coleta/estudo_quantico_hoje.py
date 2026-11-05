@@ -22,6 +22,8 @@ def baixar(intervalo, periodo):
             time.sleep(3 * (tentativa + 1))
         if isinstance(x.columns, pd.MultiIndex):
             x.columns = x.columns.get_level_values(0)
+        if intervalo == "1d":  # diário: só a data, sem fuso (o Bitcoin vem em UTC e as ações em NY)
+            x.index = pd.to_datetime([i.date() for i in x.index])
         partes[t] = x
     return pd.concat(partes, axis=1)
 
