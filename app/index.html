@@ -1225,7 +1225,7 @@
             await new Promise(r => setTimeout(r, 30)); // deixa a barra pintar 100% antes do cálculo pesado
             // Extras opcionais: só busca o que o manifesto diz que foi publicado (evita 404 no console)
             const [rel, vend, diario, calib, indice] = await Promise.all([manifest.arquivoRelatorio, manifest.arquivoVendidos, manifest.arquivoDiario, manifest.arquivoCalibracao, manifest.arquivoIndice].map(nome =>
-                nome ? buscar(MERCADO.pasta + nome).then(r => r.json()).catch(() => null) : null));
+                nome ? buscar(MERCADO.pasta + nome).then(r => r.text()).then(lerJsonTolerante).catch(() => null) : null));
             relatorioDados = rel && Array.isArray(rel.ativos) ? rel : null;
             vendidosDados = vend && vend.ativos ? vend : null;
             diarioDados = diario && Array.isArray(diario.sinais) ? diario : null;
@@ -1843,6 +1843,15 @@
     // As regras não mudam mais. O teste agora é só para frente: Simulação e Diário comparam cada operação com o índice
     // (SPY nos EUA, BOVA11 no Brasil) nas mesmas datas. Critérios de reavaliação em docs/congelamento.md.
     const CONGELADA_EM = '2026-11-04', REAVALIAR_EM = '2027-11-04', REAVALIAR_SINAIS = 100;
+    // JSON com NaN/Infinity (o Python grava assim um preço faltando) vira null em vez de derrubar o arquivo inteiro;
+    // nas séries de índice, os pregões sem fechamento válido saem.
+    function lerJsonTolerante(txt) {
+        let j; try { j = JSON.parse(txt); } catch (e) { j = JSON.parse(txt.replace(/\b(-?Infinity|NaN)\b/g, 'null')); }
+        if (j && j.series) for (const s of Object.values(j.series)) if (s && Array.isArray(s.close) && Array.isArray(s.dates) && s.close.some(c => !(c > 0))) {
+            const k = s.close.map((c, i) => c > 0 ? i : -1).filter(i => i >= 0); s.dates = k.map(i => s.dates[i]); s.close = k.map(i => s.close[i]);
+        }
+        return j;
+    }
     function serieIndice() {
         const I = indiceDados; if (!I || !I.series) return null;
         const s = I.series[I.principal] || Object.values(I.series)[0];
@@ -4364,7 +4373,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { calcularIR, lerIR, carregarBalancos, get balancos() { return balancosDados; }, reacaoBalanco, prepararBalancos, calcularPlano, lerPlano, htmlPlano, retornoRendaFixa, nomeRendaFixa, volFinanceiro, quedaDoTopo, volAnual, resumoBussola, get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio, get estrategiasConfluencia() { return confluenceStrategies; }, get indice() { return indiceDados; }, set indice(v) { indiceDados = v; }, retornoIndice, comparacaoIndiceSim, htmlDiario, termometroIndice, saudeCarteira, avaliarDecisao, htmlTestado, htmlDecisoes, lerDecisoes, gravarDecisoes };
+    window.investDebug = { lerJsonTolerante, calcularIR, lerIR, carregarBalancos, get balancos() { return balancosDados; }, reacaoBalanco, prepararBalancos, calcularPlano, lerPlano, htmlPlano, retornoRendaFixa, nomeRendaFixa, volFinanceiro, quedaDoTopo, volAnual, resumoBussola, get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio, get estrategiasConfluencia() { return confluenceStrategies; }, get indice() { return indiceDados; }, set indice(v) { indiceDados = v; }, retornoIndice, comparacaoIndiceSim, htmlDiario, termometroIndice, saudeCarteira, avaliarDecisao, htmlTestado, htmlDecisoes, lerDecisoes, gravarDecisoes };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).

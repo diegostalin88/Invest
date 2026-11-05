@@ -280,6 +280,8 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     ok(T.ok, 'celular: termômetro confere com o cálculo à mão (MME200 e queda do topo)');
     const rfOk = await cel.page.evaluate(() => { const D = window.investDebug; const s = D.indice.series.CDI; const n = s.dates.length; const r = D.retornoRendaFixa(s.dates[n - 253], s.dates[n - 1]); return Math.abs(r - (Math.pow(1.0005, 252) - 1)) < 1e-6 && Math.abs(D.termometroIndice().rf12m - r) < 1e-12; });
     ok(rfOk && /CDI em 12 meses/.test(termo), 'celular: termômetro mostra o CDI de 12 meses (conta confere)');
+    const tol = await cel.page.evaluate(() => { const j = window.investDebug.lerJsonTolerante('{"series":{"SPY":{"dates":["a","b","c"],"close":[1,NaN,2]}},"x":Infinity}'); return JSON.stringify(j); });
+    ok(tol === '{"series":{"SPY":{"dates":["a","c"],"close":[1,2]}},"x":null}', `celular: índice com NaN (pregão sem fechamento) não derruba o arquivo (${tol})`);
     const larg = await cel.page.evaluate(() => ({ doc: document.documentElement.scrollWidth, sw: document.getElementById('market-switch').getBoundingClientRect().right }));
     ok(larg.doc <= 390 && larg.sw <= 390, `celular: sem rolagem lateral (${JSON.stringify(larg)})`);
     await cel.page.screenshot({ path: path.join(SHOTS, 'celular_inicio.png'), fullPage: false });

@@ -70,3 +70,18 @@ def test_cdi_do_banco_central(monkeypatch):
     d, v = indices.baixar_cdi()
     assert d == ['2026-01-02', '2026-01-05', '2026-01-06'] and abs(v[2] - 1.0005 ** 2) < 1e-9
     assert 'sgs.12' in pedidos[0][0] and pedidos[0][1]['dataInicial'] and pedidos[0][1]['dataFinal']
+
+
+def test_fechamento_nan_fica_de_fora(tmp_path):
+    (tmp_path / 'manifest.json').write_text('{}')
+    datas = [f'2026-01-{d:02d}' for d in range(1, 31)]
+    precos = [100.0 + k for k in range(30)]
+    precos[-1] = float('nan')
+
+    def baixar(t):
+        return (datas, precos) if t == 'SPY' else None
+    indices.main(['x', str(tmp_path)], baixar=baixar)
+    texto = (tmp_path / 'indice.json').read_text()
+    assert 'NaN' not in texto
+    s = json.loads(texto)['series']['SPY']
+    assert len(s['close']) == 29 and s['dates'][-1] == '2026-01-29'

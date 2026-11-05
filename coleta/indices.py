@@ -11,6 +11,7 @@ rende parado, sem risco de bolsa.
 Uso: python coleta/indices.py site/data
 """
 import json
+import math
 import os
 import sys
 from datetime import datetime, timezone
@@ -87,8 +88,11 @@ def montar(lista, baixar):
         except Exception as e:  # um índice que falha não derruba o outro
             print(f'falhou {ticker}: {e}', file=sys.stderr)
             r = None
-        if r and len(r[0]) == len(r[1]) and len(r[0]) > 20:
-            series[ticker] = {'nome': nome, 'dates': list(r[0]), 'close': list(r[1])}
+        if r and len(r[0]) == len(r[1]):
+            # o Yahoo às vezes devolve o pregão do dia sem fechamento (NaN): NaN no JSON derruba o arquivo inteiro no app
+            pares = [(d, c) for d, c in zip(r[0], r[1]) if c is not None and math.isfinite(c) and c > 0]
+            if len(pares) > 20:
+                series[ticker] = {'nome': nome, 'dates': [d for d, _ in pares], 'close': [c for _, c in pares]}
     return series
 
 
@@ -110,7 +114,7 @@ def main(argv=None, baixar=baixar_padrao):
                  'principal': lista[0][0] if lista[0][0] in series else next(t for t in series if t not in RENDA_FIXA),
                  'rendaFixa': fixa, 'series': series}
         with open(os.path.join(pasta, 'indice.json'), 'w', encoding='utf-8') as f:
-            json.dump(saida, f, separators=(',', ':'))
+            json.dump(saida, f, separators=(',', ':'), allow_nan=False)
         with open(manifesto, encoding='utf-8') as f:
             m = json.load(f)
         m['arquivoIndice'] = 'indice.json'
