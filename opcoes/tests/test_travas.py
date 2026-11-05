@@ -41,6 +41,15 @@ def test_custo_recompra_paga_o_spread():
     cad = [('pA', 'put', 95, 'V', 1.0, 1.2), ('pB', 'put', 90, 'V', 0.3, 0.4)]
     assert abs(travas.custo_recompra(pos, cad, 0.0) - (1.2 - 0.3)) < 1e-12
     assert travas.custo_recompra(pos, cad[:1], 0.0) is None
+    assert abs(travas.custo_recompra(pos, cad, 0.0, meio=True) - (1.1 - 0.35)) < 1e-12
+
+
+def test_spread_largo_nao_dispara_stop_na_entrada():
+    """Com oferta larga, desmontar no mesmo dia já custa mais que 2x o crédito; o simulador não pode sair ali."""
+    cad = [('pV', 'put', 95.0, '20230215', 1.00, 1.60), ('pC', 'put', 90.0, '20230215', 0.20, 0.45)]
+    pos = {'pernas': [('pV', '20230215', -1), ('pC', '20230215', +1)]}
+    credito = 1.00 - 0.45
+    assert travas.custo_recompra(pos, cad, 0.0) >= 2 * credito       # o cenário do erro encontrado
 
 
 def test_simulacao_ponta_a_ponta():
@@ -68,6 +77,7 @@ def test_simulacao_ponta_a_ponta():
     assert all(o['estrutura'] in ('trava_alta_put', 'condor', 'trava_baixa_call') for o in res['operacoes'])
     assert all(o['pnl'] >= -o['risco'] - 1e-6 for o in res['operacoes'])   # nunca perde mais que o risco
     assert {o['motivo'] for o in res['operacoes']} & {'alvo', 'prazo', 'stop'}  # saídas antes do vencimento
+    assert all(o['saida'] > o['entrada'] for o in res['operacoes'])             # nunca sai no dia da entrada
     m = travas.metricas(res, 0.0)
     assert m['operacoes'] == len(res['operacoes']) and 0 <= m['quedaMax'] < 1
     tec = travas.simular(dados, {**travas.BASE, **travas.TECNICO}, '20220101', '20261231')

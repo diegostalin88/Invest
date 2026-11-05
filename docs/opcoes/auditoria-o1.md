@@ -19,6 +19,10 @@ Script: `opcoes/auditoria_o1.py` (mesmo motor de `opcoes/travas.py`, mesmos dado
 6. **Conferência à mão:** 5 operações sorteadas, com data, preço à vista, motivo de saída e P&L, para conferir
    contra as cotações da B3.
 
+7. **Saída decidida pelo preço médio** (incluído depois da 1ª execução, que teve um erro de simulador; ver o
+   registro da O1). O stop e o alvo passam a olhar o meio entre as ofertas, e a execução continua na oferta. Mede
+   quanto do resultado depende de ofertas largas ou desatualizadas no fechamento. Informativo: não entra no critério.
+
 ## Critério (para cada versão aprovada no backtest)
 
 O resultado **resiste à auditoria** se todos valerem:

@@ -81,6 +81,8 @@ def main(argv=None):
         # 2) execução atrasada: 2 e 3 pregões depois do sinal
         r['atraso2'] = rodar(dados, {**p, 'atraso': 2})[1]
         r['atraso3'] = rodar(dados, {**p, 'atraso': 3})[1]
+        # 2b) saída decidida pelo preço médio das ofertas (incluída depois do 1º resultado: ver o doc)
+        r['saidaMeio'] = rodar(dados, {**p, 'saida_meio': True})[1]
         # 3) custos mais altos
         r['custo4x'] = rodar(dados, {**p, 'custo': p['custo'] * 4})[1]
         # 4) placebo: mesma frequência de entrada, dias sorteados (sem IV Rank e sem gatilho técnico)
@@ -109,6 +111,8 @@ def main(argv=None):
               f"(CDI {pct(m['cdi'])}), fator de lucro {m['fatorLucro']}, queda máx. {pct(m['quedaMax'])}",
               f"- Execução 2 pregões depois: P&L/risco {pct(r['atraso2']['pnlPorRisco'])}, retorno {pct(r['atraso2']['retorno'])}",
               f"- Execução 3 pregões depois: P&L/risco {pct(r['atraso3']['pnlPorRisco'])}, retorno {pct(r['atraso3']['retorno'])}",
+              f"- Saída decidida pelo preço médio: P&L/risco {pct(r['saidaMeio']['pnlPorRisco'])}, retorno {pct(r['saidaMeio']['retorno'])}, "
+              f"acerto {pct(r['saidaMeio']['acerto'])}",
               f"- Custo × 4: P&L/risco {pct(r['custo4x']['pnlPorRisco'])}, retorno {pct(r['custo4x']['retorno'])}",
               f"- Placebo ({r['placebo']['n']} sorteios, frequência {pct(r['frequencia'])}): P&L/risco mediano "
               f"{pct(r['placebo']['pnlPorRiscoMediana'])}, retorno mediano {pct(r['placebo']['retornoMediana'])}; "

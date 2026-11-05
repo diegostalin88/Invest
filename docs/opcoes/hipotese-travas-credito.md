@@ -96,3 +96,15 @@ IV Rank mínimo 40 e 60; delta 0,20 e 0,30; largura 3% e 8%; custo × 2; saída 
 ## Resultado
 
 (preenchido depois da execução)
+
+### 1ª execução (05/11/2026, run 42104514625): descartada por erro do simulador
+
+Ambas as versões saíram reprovadas, com acerto de 7% a 13% e 271 de 303 operações encerradas pelo stop. Isso não
+é plausível para travas vendidas com delta 0,25 (o esperado é acertar a maioria). A causa é um erro do simulador:
+a regra de saída era verificada **no mesmo pregão da entrada**, com as mesmas ofertas. Como montar e desmontar na
+hora custa a diferença entre as ofertas das duas pernas, e essa diferença costuma ser maior que o crédito, o stop
+de 2× o crédito disparava logo na entrada.
+
+**Correção:** a saída só é verificada a partir do pregão seguinte à entrada. Nenhuma outra regra mudou. O teste
+`test_simulacao_ponta_a_ponta` agora exige que toda saída seja depois da entrada. O resultado válido é o da execução
+seguinte.

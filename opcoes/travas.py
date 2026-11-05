@@ -211,7 +211,7 @@ def montar(estrutura, cadeia_dia, s, d, p, iv_atm):
     return montar_trava('put' if estrutura == 'trava_alta_put' else 'call', cadeia_dia, s, d, p, iv_atm)
 
 
-def custo_recompra(pos, cadeia_dia, custo):
+def custo_recompra(pos, cadeia_dia, custo, meio=False):
     """Quanto custa, por opção, desmontar a posição agora (compra as vendidas na oferta de venda e vende as compradas
     na de compra). None se faltar oferta em alguma perna."""
     precos = {(c[0], c[3]): c for c in cadeia_dia}
@@ -220,7 +220,10 @@ def custo_recompra(pos, cadeia_dia, custo):
         c = precos.get((cod, venc))
         if not c or c[4] <= 0 or c[5] <= 0:
             return None
-        total += c[5] if lado < 0 else -c[4]
+        if meio:
+            total += (c[4] + c[5]) / 2 * (1 if lado < 0 else -1)
+        else:
+            total += c[5] if lado < 0 else -c[4]
     return total + custo * len(pos['pernas'])
 
 
@@ -301,18 +304,20 @@ def simular(dados, p, inicio, fim):
                         travado += qtd * risco_un
             if a in pendentes and pendentes[a][1] <= 0:
                 pendentes.pop(a)
-            # 2) saída
-            if a in posicoes:
+            # 2) saída (nunca no mesmo pregão da entrada: as mesmas ofertas não dizem nada novo)
+            if a in posicoes and posicoes[a]['entrada'] != d:
                 pos = posicoes[a]
                 dte = (ch._dia(pos['vencimento']) - ch._dia(d)).days
                 rec = custo_recompra(pos, cad, p['custo'])
+                # auditoria: decidir pelo preço médio das ofertas (a execução continua na oferta)
+                gat = custo_recompra(pos, cad, p['custo'], meio=True) if p.get('saida_meio') else rec
                 motivo = None
                 if dte <= 0:
                     rec, motivo = intrinseco(pos, cad, s), 'vencimento'
-                elif rec is not None:
-                    if rec <= pos['credito'] * (1 - p['alvo']):
+                elif rec is not None and gat is not None:
+                    if gat <= pos['credito'] * (1 - p['alvo']):
                         motivo = 'alvo'
-                    elif rec >= pos['credito'] * p['stop']:
+                    elif gat >= pos['credito'] * p['stop']:
                         motivo = 'stop'
                     elif dte <= p['dte_saida']:
                         motivo = 'prazo'
