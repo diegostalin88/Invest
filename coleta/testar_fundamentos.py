@@ -212,13 +212,14 @@ def hipotese_c(P, B, spy):
 
 
 # ---------- Hipótese D ----------
-def hipotese_d(P, B, spy):
+def eventos_d(P, B, spy, top=TOP_LIQ):
+    """Eventos de D: um por balanço trimestral de papel elegível (liquidez no fim do mês anterior, preço ≥ 5)."""
     cal = P.cal
     fins = [i for i in range(len(cal) - 1) if cal[i][:7] != cal[i + 1][:7]]
-    rank = {}  # liquidez no último fim de mês antes de cada data (top 500)
+    rank = {}  # liquidez no último fim de mês antes de cada data
     for i in fins:
         liq = sorted(((a, t) for a, t in ((P.adtv(t, i), t) for t in B if t in P.adj) if a == a), reverse=True)
-        rank[i] = {t for _, t in liq[:TOP_LIQ]}
+        rank[i] = {t for _, t in liq[:top]}
     ev = []
     for t, b in B.items():
         if t not in P.adj:
@@ -251,9 +252,14 @@ def hipotese_d(P, B, spy):
             s1, s2 = P.adj[spy][i + 1], P.adj[spy][i + 61]
             if not (a0 > 0 and a1 > 0 and a2 > 0):
                 continue
-            ev.append({'t': t, 'dia': cal[i], 'tri': cal[i][:4] + 'T' + str((int(cal[i][5:7]) - 1) // 3 + 1),
+            ev.append({'t': t, 'dia': cal[i], 'i': i, 'tri': cal[i][:4] + 'T' + str((int(cal[i][5:7]) - 1) // 3 + 1),
                        'surpresa': (x['ni'] - ant[0]['ni']) / bb[-1]['ativo'], 'reacao': a1 / a0 - 1,
                        'deriva': a2 / a1 - 1, 'derivaSpy': s2 / s1 - 1})
+    return ev
+
+
+def hipotese_d(P, B, spy):
+    ev = eventos_d(P, B, spy)
     if not ev:
         return None
     grupos = {}
