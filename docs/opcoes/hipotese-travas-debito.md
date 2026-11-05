@@ -62,4 +62,31 @@ Robustez (informativa, só na simples): IV Rank até 25 e até 45; largura 3% e 
 
 ## Resultado
 
-(preenchido depois da execução)
+**Veredito: as duas versões REPROVADAS.** Execução válida de 05/11/2026
+([run 42122050500](https://github.com/diegostalin88/Invest/actions/runs/42122050500)), já com o CDI real obrigatório.
+
+Fora da amostra (01/2023 a 10/2026), capital de R$ 100 mil, caixa livre rendendo CDI:
+
+| Versão | Operações | Acerto | Fator de lucro | P&L ÷ risco por operação | Retorno total | CDI | BOVA11 | Queda máx. |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Simples | 399 | 4% | 0,04 | −70% | −84,4% | 59,7% | 60,6% | 84,5% |
+| Técnica | 92 | 5% | 0,04 | −65% | −8,4% | 59,7% | 60,6% | 15,4% |
+
+Na simples, 379 das 399 operações saíram pelo stop, a maioria um a três pregões depois da entrada. As duas versões
+só passam no critério de número de operações (a técnica passa também no do filtro de IV Rank, mas perdendo menos
+por operação que sem filtro não basta). Todas as variantes de robustez perdem entre 62% e 78% do risco por
+operação, e dentro da amostra (2019 a 2022) o quadro é o mesmo.
+
+A causa é a mesma da O1: a diferença entre as ofertas. Montar e desmontar na hora custa, na mediana, 53% do débito
+pago na simples e 40% na técnica; logo depois da entrada a trava já vale, pela oferta de compra, perto da metade do
+que custou, e o stop em 50% do débito dispara. Mesmo no limite otimista (tudo no meio das ofertas) a simples empata
+(−0,8% por operação, fator de lucro 0,98) e a técnica perde (−11%). Ou seja, a previsão de direção não traz vantagem
+nem sem custo de execução, o que bate com a auditoria do motor do Invest (`docs/congelamento.md`).
+
+Detalhes em `docs/opcoes/auditoria-o2.md`.
+
+### 1ª execução (run 42117270727): descartada
+
+O passo do backtest não conseguiu baixar o CDI e usou a reserva de 10% ao ano, o que mudou o CDI de referência
+(43,7% em vez de 59,7%) e o tamanho das posições (393 operações em vez de 399). O veredito era o mesmo. Correção: os
+três scripts (`travas.py`, `debito.py`, `auditoria_o1.py`) agora param com erro se o CDI real não baixar.
