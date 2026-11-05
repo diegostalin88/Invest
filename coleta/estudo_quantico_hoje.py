@@ -10,8 +10,24 @@ NY = "America/New_York"
 saida = []
 p = saida.append
 
-m5 = yf.download(TODOS, interval="5m", period="60d", group_by="ticker", auto_adjust=True, progress=False)
-d1 = yf.download(TODOS, interval="1d", period="1y", group_by="ticker", auto_adjust=True, progress=False)
+def baixar(intervalo, periodo):
+    """Um papel por vez e sem threads (o cache do yfinance travou com downloads em paralelo), com nova tentativa."""
+    import time
+    partes = {}
+    for t in TODOS:
+        for tentativa in range(4):
+            x = yf.download(t, interval=intervalo, period=periodo, auto_adjust=True, progress=False, threads=False)
+            if not x.empty:
+                break
+            time.sleep(3 * (tentativa + 1))
+        if isinstance(x.columns, pd.MultiIndex):
+            x.columns = x.columns.get_level_values(0)
+        partes[t] = x
+    return pd.concat(partes, axis=1)
+
+
+m5 = baixar("5m", "60d")
+d1 = baixar("1d", "1y")
 
 
 def serie(df, t):
