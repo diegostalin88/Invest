@@ -1,0 +1,46 @@
+name: Opções - verificar histórico da B3
+
+# Só leitura: baixa os arquivos anuais do COTAHIST (B3), calcula a IV diária de ~30 dias do universo do estudo de
+# opções e mede a cobertura. Não publica nada e não mexe no app nem na estratégia congelada.
+on:
+  workflow_dispatch:
+    inputs:
+      anos:
+        description: "Anos do COTAHIST (ex.: 2018-2026)"
+        required: false
+        default: "2018-2026"
+  push:
+    branches: [claude/project-thread-ouh2hk]
+    paths: ["opcoes/**", ".github/workflows/opcoes-verificar-cotahist.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Testes (sem rede)
+        run: |
+          pip install pytest==9.2.0
+          python -m pytest -q opcoes/tests
+
+      - name: Baixar o COTAHIST e calcular a IV
+        run: python opcoes/cotahist.py --anos "${{ inputs.anos || '2018-2026' }}" --saida opcoes_resultado
+
+      - name: Guardar o resultado
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opcoes-cotahist
+          path: opcoes_resultado/
+          if-no-files-found: ignore
