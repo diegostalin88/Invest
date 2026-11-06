@@ -49,3 +49,36 @@ confirmar, a C-BR fica como resultado de um período só, sem uso.
   ficaram grandes depois, e não inclui as que quebraram ou encolheram no período. As comparações com o acaso e os
   pesos iguais do mesmo universo continuam valendo como controle, mas não eliminam o viés.
 - **Menos papéis elegíveis no início:** muitas empresas da carteira atual abriram o capital depois de 2012.
+
+## Resultado (06/11/2026, [run 42212966317](https://github.com/diegostalin88/Invest/actions/runs/42212966317))
+
+**Veredito: REPROVADA.** Passou nos critérios 2, 4, 5 e 6; falhou no 1 e no 3. Período de 30/03/2012 a 30/06/2020,
+33 trimestres, ~37 elegíveis por data.
+
+| Carteira | Retorno | Ao ano | Queda máx. |
+| --- | --- | --- | --- |
+| **Lucro/preço + dividendos (15 papéis)** | **167,8%** | **12,7%** | 36,1% |
+| BOVA11 | 43,4% | 4,5% | 37,7% |
+| CDI | 104,1% | | 0,0% |
+| Pesos iguais, todos os elegíveis | 204,4% | | |
+| Acaso (200 carteiras de 15) | p5 105,9%, mediana 192,4%, p95 289,1% | | |
+| Só lucro/preço | 182,5% | | |
+| Só dividendos | 182,0% | | |
+| 10 papéis | 213,4% | | |
+| 20 papéis | 149,0% | | |
+| Custo × 2 | 164,5% | | |
+
+- **Critério 1 (acaso):** percentil 32. A carteira ficou abaixo da mediana das carteiras sorteadas.
+- **Critério 3 (pesos iguais nas duas metades):**
+  - 2012 a 2016: carteira −1,0% contra pesos iguais 16,6% (BOVA11 −23,9%, CDI 47,0%). Perdeu.
+  - 2016 a 2020: carteira 170,4% contra pesos iguais 161,0% (BOVA11 88,4%, CDI 38,8%). Ganhou.
+- Por ano (carteira): 2012 4,6%; 2013 −5,4%; 2014 −6,5%; 2015 −12,5%; 2016 52,4%; 2017 38,1%; 2018 32,9%;
+  2019 45,6%; 2020 (até jun.) −18,7%.
+- Correções de escala: 4 datas (DIRR3, MGLU3, PRIO3).
+- O rebalanceamento semestral desta execução saiu errado (somava carteiras depois de 30/06/2020) e foi
+  desconsiderado; o erro foi corrigido no código. Era só informativo e não entra nos critérios.
+
+**Leitura:** ganhar do BOVA11 aqui não diz muito, porque o universo é a carteira atual do IBOVESPA, cheia de empresas
+que sobreviveram e cresceram. O controle certo é escolher ao acaso dentro do mesmo universo, e a regra de lucro e
+dividendos não fez melhor que isso. A vantagem de 2020 a 2026 foi de um período só. A C-BR não vira candidata ao app.
+

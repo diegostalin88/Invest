@@ -319,7 +319,7 @@ def hipotese(P, B, empresa, cdi, fim=None, min_trimestres=None):
              for _ in range(SORTEIOS)]
     reb_s = tf.datas_reb(P.cal, MESES_SEM)
     per_s = [{'i': i, 'i2': i2, 'e': elegiveis(P, B, empresa, i)} for i, i2 in zip(reb_s, reb_s[1:])
-             if i >= periodos[0]['i']]
+             if i >= periodos[0]['i'] and i2 <= periodos[-1]['i2']]
     per_s = [p for p in per_s if len(p['e']) >= MIN_ELEG]
     meio = len(periodos) // 2
     R = {

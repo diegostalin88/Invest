@@ -129,6 +129,7 @@ não 2012 a 2026.
 4. **Imposto fora:** a carteira gira a cada trimestre; com 15% sobre o ganho nas vendas acima de R$ 20 mil por mês,
    o retorno líquido cai.
 
-**Próximo passo:** confirmar em 2012 a 2020, que este teste não viu, com a quantidade de ações tirada de outra fonte
-da CVM (formulário de referência, que tem o capital social desde 2010) e as mesmas regras. Só depois disso a
-carteira vira candidata ao app.
+**Confirmação em 2012 a 2020 (`hipotese-fundamentos-brasil-confirmacao.md`): REPROVADA.** A carteira ganhou do
+BOVA11 e do CDI, mas ficou no percentil 32 das carteiras sorteadas e perdeu para os pesos iguais do mesmo universo
+(167,8% contra 204,4%). A vantagem de 2020 a 2026 não se repetiu no período anterior. **A C-BR fica como resultado
+de um período só, sem uso no app.**
