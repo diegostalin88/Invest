@@ -99,3 +99,18 @@ versão a aprovar, fica abaixo do fator de lucro mínimo e, pela auditoria, não
 veredito.
 
 A auditoria está em `docs/opcoes/auditoria-o3.md`.
+
+### Reexecução com o ajuste de strike por proventos (06/11/2026)
+
+Com a correção do strike das pernas abertas depois de proventos (ver `hipotese-travas-credito.md`), reexecutado
+([run 42144260799](https://github.com/diegostalin88/Invest/actions/runs/42144260799)). Aqui a mudança é maior,
+porque as travas ficam abertas até o vencimento e passam por mais datas ex:
+
+| Versão | Operações | Acerto | Fator de lucro | P&L ÷ risco | Retorno (CDI 59,8%) |
+| --- | --- | --- | --- | --- | --- |
+| Crédito | 62 | 77% | 0,73 | −4,4% | 55,0% |
+| Débito | 117 | 39% | 0,88 | −6,7% | 47,7% |
+| Débito sem filtro de IV Rank | 162 | 40% | 1,02 | +0,9% | 58,5% |
+
+Na auditoria: placebo nos percentis 62 (crédito) e 38 (débito); limite otimista −0,2% e +26%; ordens parciais
+iguais (95 e 117). **Veredito mantido**, com o débito agora mais claramente negativo.

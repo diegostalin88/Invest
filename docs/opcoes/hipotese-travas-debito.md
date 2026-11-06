@@ -85,6 +85,12 @@ nem sem custo de execução, o que bate com a auditoria do motor do Invest (`doc
 
 Detalhes em `docs/opcoes/auditoria-o2.md`.
 
+### Reexecução com o ajuste de strike por proventos (06/11/2026)
+
+Com a correção do strike das pernas abertas depois de proventos (ver `hipotese-travas-credito.md`), reexecutado
+([run 42144083436](https://github.com/diegostalin88/Invest/actions/runs/42144083436)): simples −70,0% por operação,
+retorno −84,4%; técnica −65,0%, retorno −8,4%. Os mesmos números. **Veredito mantido.**
+
 ### 1ª execução (run 42117270727): descartada
 
 O passo do backtest não conseguiu baixar o CDI e usou a reserva de 10% ao ano, o que mudou o CDI de referência

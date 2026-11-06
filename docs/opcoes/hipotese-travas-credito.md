@@ -111,6 +111,14 @@ CDI, e o filtro de IV Rank melhorando o resultado. Dentro da amostra (2019 a 202
 
 A auditoria adversarial (`docs/opcoes/auditoria-o1.md`) confirma que a reprovação é real e mostra a causa.
 
+### Reexecução com o ajuste de strike por proventos (06/11/2026)
+
+Na preparação da O5 apareceu um erro comum a todos os simuladores: a perna aberta guardava o strike da entrada,
+mas a B3 reduz o strike das opções em aberto quando o papel paga provento. Corrigido (o strike é atualizado pela
+cadeia do dia) e reexecutado ([run 42144226862](https://github.com/diegostalin88/Invest/actions/runs/42144226862)).
+O resultado praticamente não muda: simples 226 operações, −22,3% por operação, retorno 0,8% (CDI 59,8%); técnica 65
+operações, −20,7%, retorno 42,2%. **Veredito mantido.**
+
 ### 1ª execução (05/11/2026, run 42104514625): descartada por erro do simulador
 
 Ambas as versões saíram reprovadas, com acerto de 7% a 13% e 271 de 303 operações encerradas pelo stop. Isso não

@@ -48,4 +48,40 @@ Dentro da amostra 2019 a 2022; **fora da amostra 01/2023 a 10/2026, de onde sai 
 
 ## Resultado
 
-(preenchido depois da execução)
+**Veredito: REPROVADA.** Execução de 06/11/2026
+([run 42144083510](https://github.com/diegostalin88/Invest/actions/runs/42144083510)), com o CDI real.
+
+Fora da amostra (01/2023 a 10/2026), R$ 100 mil:
+
+| Variante | Retorno | CDI | Comprar e manter | Queda máx. | Puts | Exercidas | Calls | Prêmio da put ÷ strike (mediana) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Base | 58,8% | 59,8% | 82,4% | 45,9% | 105 | 13 | 60 | 0,2% |
+| Ordem limite no meio (informativo) | 68,5% | 59,8% | 82,4% | 47,1% | 72 | 13 | 59 | 0,6% |
+| Auditoria: venda 2 pregões depois | 54,5% | 59,8% | 82,4% | 45,9% | 101 | 12 | 58 | 0,2% |
+| Auditoria: custo × 4 | 56,0% | 59,8% | 82,4% | 45,9% | 105 | 13 | 60 | 0,2% |
+| Put 5% a 8% abaixo (informativo) | 60,8% | 59,8% | 82,4% | 46,1% | 97 | 16 | 67 | 0,4% |
+| Put 12% a 16% abaixo (informativo) | 47,2% | 59,8% | 82,4% | 10,0% | 131 | 7 | 13 | 0,1% |
+
+Por ano (base): 2023 20,9% contra CDI 13,0%; 2024 6,8% contra 10,8%; 2025 15,9% contra 14,2%; 2026 6,1% contra
+11,8%. Dois de quatro anos acima do CDI.
+
+Critérios: falha em ficar acima do CDI, na queda máxima ≤ 20% (45,9%) e nos 3 de 4 anos acima do CDI; passa no
+número de puts (105).
+
+**Leitura:**
+
+- O prêmio de uma put 8% a 12% fora do dinheiro, vendida pela oferta de compra, é muito pequeno: mediana de 0,2% do
+  strike por mês. Ele não compensa o que se perde quando a put é exercida.
+- Uma vez exercida, a carteira fica com a ação, e a queda máxima passa a ser a da ação (46%), não a de uma renda.
+  A estratégia vira "ações compradas com atraso", e perde para simplesmente comprar e manter os quatro papéis
+  (82,4%), que tiveram um bom período.
+- Só a variante mais longe (12% a 16%) controla a queda (10%), mas aí o prêmio é quase nulo e o retorno (47%) fica
+  bem abaixo do CDI.
+- O placebo (vender em 10% dos pregões livres, sorteados) dá retorno mediano de 56,2%: o resultado da base é
+  praticamente o mesmo do acaso. Reprodução: sim.
+- Dentro da amostra (2019 a 2022) a base rendeu 47,2% contra CDI 27,4%, com queda de 36,6%: foi um período de CDI
+  baixo, em que qualquer exposição a ações batia o CDI. Fora da amostra, com CDI alto, não bate.
+
+Conferência à mão (operações sorteadas): ITUB4 put strike 24,94 vendida em 18/09/2023 (à vista 27,51) por 0,04,
+virou pó; BBAS3 call strike 25,75 vendida em 20/04/2026 (24,28) por 0,33, virou pó; PETR4 put strike 21,93 vendida
+em 22/05/2023 (25,62) por 0,17, virou pó.
