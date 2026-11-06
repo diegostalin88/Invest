@@ -113,11 +113,24 @@ def balancos(tickers, baixar=cvm.baixar, hoje=None):
 
 
 # ---------- preços ----------
-def precos_yahoo(tickers, inicio=f'{ANO_INI}-01-01'):
+def precos_yahoo(tickers, inicio=f'{ANO_INI}-01-01', tentativas=3):
+    """Baixa em lote e tenta de novo, um a um, os que falharem (o Yahoo às vezes falha por acaso)."""
+    out = _precos_yahoo(tickers, inicio)
+    for _ in range(tentativas):
+        faltam = [t for t in tickers if t not in out]
+        if not faltam:
+            break
+        for t in faltam:
+            out.update(_precos_yahoo([t], inicio, threads=False))
+    print(f'sem preço no Yahoo: {sorted(set(tickers) - set(out))}', flush=True)
+    return out
+
+
+def _precos_yahoo(tickers, inicio, threads=True):
     import yfinance as yf
     out = {}
     df = yf.download([t + '.SA' for t in tickers], start=inicio, auto_adjust=False, actions=True,
-                     group_by='ticker', threads=True, progress=False)
+                     group_by='ticker', threads=threads, progress=False)
     for t in tickers:
         try:
             d = df[t + '.SA'].dropna(subset=['Close', 'Adj Close'])
