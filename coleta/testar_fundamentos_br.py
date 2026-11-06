@@ -94,7 +94,7 @@ def _num(x):
         return None
 
 
-def balancos(tickers, baixar=cvm.baixar, hoje=None):
+def balancos(tickers, baixar=cvm.baixar, hoje=None, fre=False):
     hoje = hoje or date.today()
     fca = baixar(f'{cvm.BASE}/FCA/DADOS/fca_cia_aberta_{hoje.year}.zip') or \
         baixar(f'{cvm.BASE}/FCA/DADOS/fca_cia_aberta_{hoje.year - 1}.zip')
@@ -109,7 +109,70 @@ def balancos(tickers, baixar=cvm.baixar, hoje=None):
                 acc.ler_zip(c, tipo, ano)
                 print(f'  {tipo} {ano}: ok', flush=True)
     print(f'colunas da composição do capital: {acc.colunas_capital}', flush=True)
-    return {t: acc.empresa_br(c) for t, c in mapa.items()}, mapa
+    B = {t: acc.empresa_br(c) for t, c in mapa.items()}
+    if fre:   # confirmação: ações do FRE antes de 2020, onde os ITR/DFP não têm a composição do capital
+        extra = {}
+        for ano in range(ANO_INI, 2021):
+            c = baixar(f'{cvm.BASE}/FRE/DADOS/fre_cia_aberta_{ano}.zip')
+            if c:
+                for cnpj, lst in acoes_fre(c, ano, set(mapa.values())).items():
+                    extra.setdefault(cnpj, []).extend(lst)
+                print(f'  FRE {ano}: ok', flush=True)
+        for t, cnpj in mapa.items():
+            prim = min((x['filed'] for x in B[t]['acoes']), default='9999')
+            B[t]['acoes'] = sorted([x for x in extra.get(cnpj, []) if x['filed'] < prim] + B[t]['acoes'],
+                                   key=lambda x: x['filed'])
+        print(f"  FRE: ações antes de 2020 para {sum(1 for c in mapa.values() if extra.get(c))} de {len(mapa)} empresas",
+              flush=True)
+    return B, mapa
+
+
+def _coluna(cab, *partes):
+    """Primeira coluna cujo nome contém todas as partes (sem diferença de maiúsculas)."""
+    for c in cab:
+        if all(x.lower() in c.lower() for x in partes):
+            return c
+    return None
+
+
+def acoes_fre(conteudo, ano, cnpjs):
+    """Quantidade total de ações pelo capital social do Formulário de Referência (confirmação de 2012–2020).
+    Devolve {cnpj: [{'end', 'filed', 'v'}]}; integralizado, ou emitido se não houver; a última versão."""
+    z = zipfile.ZipFile(io.BytesIO(conteudo))
+    nomes = z.namelist()
+    idx = next((n for n in nomes if n.lower() == f'fre_cia_aberta_{ano}.csv'), None)
+    cap = next((n for n in nomes if 'capital_social' in n.lower() and 'classe' not in n.lower()), None)
+    receb = {}
+    for r in cvm.linhas(z, idx) if idx else []:
+        c, ref, dt = r.get('CNPJ_CIA'), r.get('DT_REFER'), r.get('DT_RECEB')
+        if c in cnpjs and ref and dt:
+            receb[(c, ref)] = min(receb.get((c, ref), dt), dt)
+    out, melhor = {}, {}
+    cab = None
+    for r in cvm.linhas(z, cap) if cap else []:
+        if cab is None:
+            cab = list(r)
+            print(f'  FRE {ano}: colunas do capital social {cab}', flush=True)
+            col = {'cnpj': _coluna(cab, 'cnpj'), 'ref': _coluna(cab, 'data_refer') or _coluna(cab, 'dt_refer'),
+                   'ver': _coluna(cab, 'versao'), 'tipo': _coluna(cab, 'tipo_capital'),
+                   'qt': _coluna(cab, 'quantidade_total') or _coluna(cab, 'qtd_total') or _coluna(cab, 'total_acoes')}
+        c = r.get(col['cnpj'])
+        if c not in cnpjs or not col['qt']:
+            continue
+        tipo = (r.get(col['tipo']) or '').lower()
+        prio = 2 if 'integraliz' in tipo else 1 if 'emitid' in tipo else 0
+        q = _num(r.get(col['qt']))
+        if not prio or not q:
+            continue
+        ref = r.get(col['ref']) or f'{ano}-01-01'
+        ver = int(_num(r.get(col['ver'])) or 0)
+        k = (c, ref)
+        if k not in melhor or (prio, ver) >= melhor[k][0]:
+            melhor[k] = ((prio, ver), q)
+    for (c, ref), (_, q) in melhor.items():
+        filed = receb.get((c, ref)) or f'{ano}-06-30'
+        out.setdefault(c, []).append({'end': ref, 'filed': filed, 'v': q})
+    return out
 
 
 # ---------- preços ----------
@@ -233,9 +296,12 @@ def cdi_periodo(cdi, cal, i, i2):
     return v - 1
 
 
-def hipotese(P, B, empresa, cdi):
+def hipotese(P, B, empresa, cdi, fim=None, min_trimestres=None):
     excl = []
     reb = tf.datas_reb(P.cal, MESES_REB)
+    if fim:   # confirmação: só carteiras mantidas até `fim` (a última termina no 1º pregão depois de `fim`)
+        corte = next((i for i in range(len(P.cal)) if P.cal[i] >= fim), len(P.cal) - 1)
+        reb = [i for i in reb if i < corte] + [corte]
     periodos = []
     for i, i2 in zip(reb, reb[1:]):
         e = elegiveis(P, B, empresa, i, excl)
@@ -302,6 +368,11 @@ def hipotese(P, B, empresa, cdi):
                       'vence os pesos iguais nas duas metades': c3, 'com custo × 2 vence o BOVA11': c4,
                       'acima do CDI': c5}
     R['aprovada'] = all(R['criterios'].values())
+    if min_trimestres is not None:
+        R['trimestresMinimo'] = min_trimestres
+        R['inconclusivo'] = len(periodos) < min_trimestres
+        if R['inconclusivo']:
+            R['aprovada'] = False
     return R
 
 
@@ -330,7 +401,11 @@ def markdown(R):
          f"- hoje: {R['carteiraAtual']}", '']
     for k, v in R['criterios'].items():
         L.append(f'- {"OK" if v else "FALHOU"}: {k}')
-    L += ['', f"**Veredito: {'APROVADA' if R['aprovada'] else 'REPROVADA'}**", '']
+    v = 'INCONCLUSIVO' if R.get('inconclusivo') else 'APROVADA' if R['aprovada'] else 'REPROVADA'
+    if R.get('trimestresMinimo'):
+        L.append(f"- {'OK' if not R['inconclusivo'] else 'FALHOU'}: pelo menos {R['trimestresMinimo']} trimestres "
+                 f"({R['trimestres']})")
+    L += ['', f"**Veredito: {v}**", '']
     return '\n'.join(L)
 
 
@@ -361,9 +436,10 @@ def main(argv=None):
     warnings.filterwarnings('ignore')
     ap = argparse.ArgumentParser()
     ap.add_argument('--saida', default='fundamentos_br.json')
+    ap.add_argument('--confirmacao', action='store_true', help='2012–2020 com as ações do FRE')
     a = ap.parse_args(argv)
     tick = universo()
-    B, mapa = balancos(tick)
+    B, mapa = balancos(tick, fre=a.confirmacao)
     print(f'{len(B)} de {len(tick)} códigos com CNPJ na CVM; sem: {sorted(set(tick) - set(B))}', flush=True)
     bruto = precos_yahoo(sorted(B) + [INDICE])
     if INDICE not in bruto:
@@ -387,11 +463,12 @@ def main(argv=None):
         if t in B:
             print(f"  {t}: trimestres {[x['end'] for x in B[t]['trim']][:6]}..., ações {[x['end'] for x in B[t]['acoes']][:6]}...")
     cdi = cdi_diario(date.fromisoformat(cal[0]), date.fromisoformat(cal[-1]))
-    R = hipotese(P, B, mapa, cdi)
+    R = hipotese(P, B, mapa, cdi, fim='2020-06-30', min_trimestres=24) if a.confirmacao else hipotese(P, B, mapa, cdi)
     if not R:
         print('nenhuma data com elegíveis suficientes')
         return 1
-    R['registro'] = 'docs/hipotese-fundamentos-brasil.md'
+    R['registro'] = ('docs/hipotese-fundamentos-brasil-confirmacao.md' if a.confirmacao
+                     else 'docs/hipotese-fundamentos-brasil.md')
     json.dump(R, open(a.saida, 'w'), indent=1, ensure_ascii=False,
               default=lambda o: o.item() if hasattr(o, 'item') else str(o))
     texto = markdown(R)

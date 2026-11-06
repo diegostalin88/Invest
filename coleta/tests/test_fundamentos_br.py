@@ -98,3 +98,19 @@ def test_hipotese_ponta_a_ponta(monkeypatch):
     R = br.hipotese(P, B, emp, {d: 0.0004 for d in cal})
     assert R and R['trimestres'] > 4 and set(R['criterios']) and 'Veredito' in br.markdown(R)
     assert R['cdi']['retorno'] > 0
+
+
+def test_acoes_do_fre():
+    import io as _io
+    import zipfile as _zip
+    c = '11.111.111/0001-11'
+    buf = _io.BytesIO()
+    with _zip.ZipFile(buf, 'w') as z:
+        z.writestr('fre_cia_aberta_2015.csv', 'CNPJ_CIA;DT_REFER;VERSAO;ID_DOC;DT_RECEB\n'
+                   f'{c};2015-01-01;1;9;2015-05-20\n{c};2015-01-01;2;9;2015-08-01\n')
+        z.writestr('fre_cia_aberta_capital_social_2015.csv',
+                   'CNPJ_Companhia;Data_Referencia;Versao;Tipo_Capital;Quantidade_Total_Acoes\n'
+                   f'{c};2015-01-01;1;Capital Emitido;500\n{c};2015-01-01;1;Capital Integralizado;400\n'
+                   f'{c};2015-01-01;2;Capital Integralizado;450\n99.999.999/0001-99;2015-01-01;1;Capital Integralizado;7\n')
+    out = br.acoes_fre(buf.getvalue(), 2015, {c})
+    assert out == {c: [{'end': '2015-01-01', 'filed': '2015-05-20', 'v': 450.0}]}
