@@ -203,7 +203,10 @@ def montar_trava(tipo, cadeia_dia, s, d, p, iv_atm):
         mais_longe = [c for c in lista if (c[2] < venda[2] if tipo == 'put' else c[2] > venda[2])]
         if not mais_longe:
             continue
-        compra = min(mais_longe, key=lambda c: abs(c[2] - alvo))
+        if p.get('delta_compra'):       # O6: comprada pelo delta, não pela largura
+            compra = min(mais_longe, key=lambda c: abs(dlt(c) - p['delta_compra']))
+        else:
+            compra = min(mais_longe, key=lambda c: abs(c[2] - alvo))
         spread = (venda[5] - venda[4]) + (compra[5] - compra[4])        # ida e volta pelas ofertas, por opção
         if p.get('exec_meio'):   # auditoria: limite otimista, executa no meio das ofertas
             credito = (venda[4] + venda[5]) / 2 - (compra[4] + compra[5]) / 2 - 2 * p['custo']
@@ -211,6 +214,8 @@ def montar_trava(tipo, cadeia_dia, s, d, p, iv_atm):
             credito = venda[4] - compra[5] - 2 * p['custo']
         largura = abs(venda[2] - compra[2])
         if credito <= 0 or credito >= largura:
+            continue
+        if credito < p.get('credito_min', 0) * largura:     # O6: crédito mínimo como fração da largura
             continue
         return {'pernas': [(venda[0], venda[3], -1), (compra[0], compra[3], +1)], 'credito': credito,
                 'largura': largura, 'vencimento': venc, 'spread': spread}
@@ -309,6 +314,19 @@ def executa_casada(pernas, limites, cadeia_dia):
         alvo += -lado * limites[(cod, venc)]
         possivel += c[6] if lado < 0 else -c[7]
     return 'todas' if possivel >= alvo - 1e-9 else 'nenhuma'
+
+
+def recompra_casada(pos, cadeia_dia, preco):
+    """O6: ordem estruturada de recompra a preço líquido `preco`: executa se, no dia, as pernas negociaram em preços
+    cujo custo líquido de desmontar (recomprar a vendida pela mínima, vender a comprada pela máxima) fica ≤ preco."""
+    precos = {(c[0], c[3]): c for c in cadeia_dia}
+    custo = 0.0
+    for cod, venc, lado in pos['pernas']:
+        c = precos.get((cod, venc))
+        if not c or len(c) < 8 or c[6] <= 0 or c[7] <= 0:
+            return False
+        custo += c[7] if lado < 0 else -c[6]
+    return custo <= preco + 1e-9
 
 
 def ordem_limite(montar_fn, ref, cad, p, ordens):
@@ -423,6 +441,8 @@ def simular(dados, p, inicio, fim):
                     rec, motivo = intrinseco(pos, cad, s), 'vencimento'
                     if ate_venc:     # O3: custo do exercício
                         rec += p['custo'] * len(pos['pernas'])
+                elif ate_venc and p.get('alvo_casado') and recompra_casada(pos, cad, p['alvo_casado'] * pos['credito']):
+                    rec, motivo = p['alvo_casado'] * pos['credito'] + p['custo'] * len(pos['pernas']), 'alvo'
                 elif ate_venc:
                     pass
                 elif rec is not None and gat is not None:

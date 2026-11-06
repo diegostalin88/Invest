@@ -17,11 +17,21 @@ outra IA. As regras, os critérios e a auditoria abaixo não mudam depois de ver
 
 ## Regras
 
-- **Estrutura:** trava de alta com put. Vendida com delta mais perto de 0,25, comprada com largura perto de 5% do
-  preço. Vencimento entre 42 e 63 dias corridos (cerca de 30 a 45 pregões), o mais perto de 52.
+**Revisão do registro, 06/11/2026, antes de qualquer resultado:** a primeira versão deste registro (vendida delta
+0,25, largura de 5%, 42 a 63 dias, sem alvo) foi enviada para rodar às 01h28. Às 01h29 o Diego trouxe os parâmetros
+exatos da proposta, e o registro passou a usá-los antes de qualquer número ser visto. A primeira versão continua
+rodando como comparação informativa.
+
+- **Estrutura:** trava de alta com put. Vendida com **delta mais perto de 0,15**; comprada, mais abaixo, com **delta
+  mais perto de 0,05**. Vencimento entre **35 e 56 dias corridos** (cerca de 25 a 40 pregões), o mais perto de 45.
+- **Crédito mínimo:** o crédito líquido (meio das ofertas, menos custo) precisa ser **≥ 12% da largura**. Abaixo
+  disso, não entra.
+- **Alvo:** a partir do pregão seguinte à entrada, ordem estruturada de recompra a **25% do crédito recebido**
+  (realiza ~75% do ganho máximo). Executa se, no dia, recomprar a vendida pela mínima e vender a comprada pela máxima
+  custaria até esse preço. Sem alvo, liquida no vencimento pelo valor intrínseco. **Sem stop.**
 - **Versões:** **BOVA11** (proposta original) e **6 papéis** (PETR4, VALE3, BOVA11, ITUB4, BBAS3, PRIO3).
 - Uma posição por papel. Perda máxima de 1% do capital por operação; o resto rende CDI. Custo de R$ 0,005 por opção
-  por perna na entrada e no vencimento.
+  por perna em cada execução.
 - O strike das pernas acompanha o ajuste que a B3 faz nos proventos.
 
 Dentro da amostra 2019 a 2022; **fora da amostra 01/2023 a 10/2026, de onde sai o veredito.**
@@ -32,7 +42,8 @@ Dentro da amostra 2019 a 2022; **fora da amostra 01/2023 a 10/2026, de onde sai 
 vencimentos de ~2 meses, não chega a 50) e 50 nos 6 papéis. 4. Queda máxima ≤ 15%. 5. Sem o melhor papel, acima do
 CDI (só na versão de 6 papéis). 6. Com o filtro de VRP, resultado por operação melhor que sem filtro.
 
-Comparações informativas: VRP ≥ 5; IV Rank ≥ 50 no lugar do VRP; entrada pelas ofertas (sem ordem estruturada).
+Comparações informativas: VRP ≥ 5; IV Rank ≥ 50 no lugar do VRP; sem alvo (só vencimento); entrada pelas ofertas
+(sem ordem estruturada); primeira versão do registro.
 
 ## Auditoria adversarial (`auditoria_o1.py --hipotese o6`)
 

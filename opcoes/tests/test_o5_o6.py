@@ -48,3 +48,13 @@ def test_wheel_ponta_a_ponta():
     assert all(o['strike'] < o['avista_entrada'] for o in res['operacoes'] if o['tipo'] == 'put')
     assert 0 <= m['quedaMax'] < 1 and res['curva']
     assert wheel.simular(dados, p, '20220101', '20261231', prov={})['final'] == res['final']
+
+
+def test_o6_proposta_com_alvo_casado():
+    dados = ta._dados()
+    p = {**vrp.VERSOES['6 papéis'][1], 'ativos': ['PETR4'], 'vrp_min': None, 'credito_min': 0}
+    res = travas.simular(dados, p, '20220101', '20261231')
+    assert res['operacoes'] and {o['motivo'] for o in res['operacoes']} <= {'alvo', 'vencimento'}
+    pos = {'pernas': [('pV', 'V', -1), ('pC', 'V', +1)]}
+    cad = [('pV', 'put', 95, 'V', 0.2, 0.3, 0.3, 0.15), ('pC', 'put', 90, 'V', 0.0, 0.1, 0.06, 0.02)]
+    assert travas.recompra_casada(pos, cad, 0.10) and not travas.recompra_casada(pos, cad, 0.05)

@@ -15,10 +15,13 @@ import cotahist as ch
 import debito
 import travas
 
+# Parâmetros da proposta (06/11/2026): vendida delta ~0,15, comprada delta ~0,05, 25 a 40 dias úteis (~35 a 56
+# corridos), crédito ≥ 12% da largura, recompra casada a 25% do crédito, senão até o vencimento.
 O6 = {**travas.BASE, 'gatilho': 'put', 'ivr_tendencia': None, 'ivr_lateral': None, 'vrp_min': 4.0,
-      'limite': True, 'casada': True, 'ate_vencimento': True, 'dte_min': 42, 'dte_max': 63, 'dte_alvo': 52}
+      'limite': True, 'casada': True, 'ate_vencimento': True, 'dte_min': 35, 'dte_max': 56, 'dte_alvo': 45,
+      'delta': 0.15, 'delta_compra': 0.05, 'credito_min': 0.12, 'alvo_casado': 0.25}
 
-# nome: (simulador, parâmetros, mínimo de operações)
+# nome: (simulador, parâmetros)
 VERSOES = {
     'BOVA11': (travas.simular, {**O6, 'nome': 'BOVA11', 'ativos': ['BOVA11']}),
     '6 papéis': (travas.simular, {**O6, 'nome': '6 papéis'}),
@@ -30,7 +33,12 @@ COMPARACOES = {
     'BOVA11 VRP >= 5': (travas.simular, {**VERSOES['BOVA11'][1], 'vrp_min': 5.0}),
     'BOVA11 IV Rank >= 50 no lugar do VRP': (travas.simular, {**VERSOES['BOVA11'][1], 'vrp_min': None,
                                                              'ivr_tendencia': 50}),
-    'BOVA11 pelas ofertas, até o vencimento': (travas.simular, {**VERSOES['BOVA11'][1], 'limite': False}),
+    'BOVA11 sem alvo, só vencimento': (travas.simular, {**VERSOES['BOVA11'][1], 'alvo_casado': None}),
+    'BOVA11 pelas ofertas, até o vencimento': (travas.simular, {**VERSOES['BOVA11'][1], 'limite': False,
+                                                               'alvo_casado': None}),
+    'BOVA11 primeiro registro (delta 0,25, largura 5%, 42-63 dias, sem alvo)': (travas.simular, {
+        **VERSOES['BOVA11'][1], 'delta': 0.25, 'delta_compra': None, 'credito_min': 0, 'alvo_casado': None,
+        'dte_min': 42, 'dte_max': 63, 'dte_alvo': 52}),
 }
 
 
