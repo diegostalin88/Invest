@@ -167,6 +167,11 @@ def simular(dados, p, inicio, fim):
             if a in pendentes and pendentes[a][1] <= 0:
                 pendentes.pop(a)
             # 2) saída (a partir do pregão seguinte à entrada)
+            if a in posicoes:                    # strikes ajustados pela B3 nos proventos
+                pernas = {(cod, venc) for cod, venc, _ in posicoes[a]['pernas']}
+                for c in cad:
+                    if (c[0], c[3]) in pernas:
+                        posicoes[a]['strikes'][c[0]] = c[2]
             if a in posicoes and posicoes[a]['entrada'] != d:
                 pos = posicoes[a]
                 dte = (ch._dia(pos['vencimento']) - ch._dia(d)).days

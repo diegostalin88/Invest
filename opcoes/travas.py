@@ -245,6 +245,22 @@ def custo_recompra(pos, cadeia_dia, custo, meio=False):
     return total + custo * len(pos['pernas'])
 
 
+def ajustar_strikes(pos, cadeia_dia):
+    """A B3 reduz o strike das opções em aberto pelo valor dos proventos na data ex. Atualiza o strike das pernas
+    pelo que aparece na cadeia do dia (mesmo código e vencimento)."""
+    pernas = {(cod, venc) for cod, venc, _ in pos['pernas']}
+    for c in cadeia_dia:
+        if (c[0], c[3]) in pernas:
+            pos['strikes'][c[0]] = (c[2], c[1])
+
+
+def vol_realizada(fech, n=21):
+    """Volatilidade realizada anualizada dos últimos n retornos diários (log)."""
+    r = [math.log(fech[i] / fech[i - 1]) for i in range(len(fech) - n, len(fech))]
+    m = sum(r) / n
+    return math.sqrt(sum((x - m) ** 2 for x in r) / (n - 1) * 252)
+
+
 def intrinseco(pos, cadeia_ref, s):
     """Valor de recompra no vencimento: só o valor intrínseco das pernas."""
     total = 0.0
@@ -281,6 +297,20 @@ def executa(pernas, limites, cadeia_dia, estrito=False):
     return 'todas' if feitas == len(pernas) else ('parte' if feitas else 'nenhuma')
 
 
+def executa_casada(pernas, limites, cadeia_dia):
+    """Ordem estruturada a preço líquido: executa se, no dia, as pernas negociaram em preços que somam o preço líquido
+    pedido (vendidas pela máxima, compradas pela mínima). Sem negócio em alguma perna, não executa."""
+    precos = {(c[0], c[3]): c for c in cadeia_dia}
+    alvo = possivel = 0.0
+    for cod, venc, lado in pernas:
+        c = precos.get((cod, venc))
+        if not c or len(c) < 8 or c[6] <= 0 or c[7] <= 0:
+            return 'nenhuma'
+        alvo += -lado * limites[(cod, venc)]
+        possivel += c[6] if lado < 0 else -c[7]
+    return 'todas' if possivel >= alvo - 1e-9 else 'nenhuma'
+
+
 def ordem_limite(montar_fn, ref, cad, p, ordens):
     """Monta a estrutura pela cadeia de referência `ref` = (data, à vista, cadeia, iv) com preço no meio das ofertas e
     devolve a montagem se a ordem limite executa hoje (em `cad`); conta o resultado em `ordens`."""
@@ -292,6 +322,8 @@ def ordem_limite(montar_fn, ref, cad, p, ordens):
         return None
     if p.get('limite_sempre'):        # auditoria: limite otimista, executa sempre
         st = 'todas'
+    elif p.get('casada'):             # O6: ordem estruturada (preço líquido), executa todas as pernas ou nenhuma
+        st = executa_casada(m['pernas'], limites_meio(m['pernas'], cad0), cad)
     else:
         st = executa(m['pernas'], limites_meio(m['pernas'], cad0), cad, estrito=bool(p.get('estrito')))
     ordens[st] += 1
@@ -302,6 +334,8 @@ def ordem_limite(montar_fn, ref, cad, p, ordens):
 
 def escolher(i, s, p):
     """Estrutura e IV Rank mínimo pelo gatilho da versão, só com dados até hoje. (None, None) = não entra."""
+    if p['gatilho'] == 'put':       # O6: só trava de alta com put; o filtro é o VRP
+        return 'trava_alta_put', p['ivr_tendencia']
     if p['gatilho'] == 'simples':
         if i.adx < p['adx_lateral']:
             return 'condor', p['ivr_lateral']
@@ -320,8 +354,9 @@ def escolher(i, s, p):
 
 def simular(dados, p, inicio, fim):
     pregoes, spot, ohlc, cadeia, ivs = dados
-    ativos = ch.UNIVERSO
+    ativos = p.get('ativos', ch.UNIVERSO)
     ind = {a: Indicadores(p['mme']) for a in ativos}
+    fech = {a: [] for a in ativos}            # O6: fechamentos para a volatilidade realizada
     hist_iv = {a: [] for a in ativos}
     caixa, travado = CAPITAL, 0.0
     posicoes, pendentes, operacoes, curva = {}, {}, [], []
@@ -348,6 +383,7 @@ def simular(dados, p, inicio, fim):
             s = spot[(d, a)]
             mx, mn = ohlc[(d, a)][:2]
             ind[a].atualizar(mx, mn, s, *ohlc[(d, a)][2:3])
+            fech[a].append(s)
             if (d, a) in ivs:
                 hist_iv[a].append(ivs[(d, a)])
             if not ativo_no_periodo:
@@ -374,6 +410,8 @@ def simular(dados, p, inicio, fim):
             if a in pendentes and pendentes[a][1] <= 0:
                 pendentes.pop(a)
             # 2) saída (nunca no mesmo pregão da entrada: as mesmas ofertas não dizem nada novo)
+            if a in posicoes:
+                ajustar_strikes(posicoes[a], cad)
             if a in posicoes and posicoes[a]['entrada'] != d:
                 pos = posicoes[a]
                 dte = (ch._dia(pos['vencimento']) - ch._dia(d)).days
@@ -409,12 +447,15 @@ def simular(dados, p, inicio, fim):
                     and (d, a) in ivs and not (a == 'PRIO3' and d < INICIO_PRIO3):
                 elegiveis += 1
                 rank = ch.iv_rank(hist_iv[a])
+                vrp_ok = p.get('vrp_min') is None or (
+                    len(fech[a]) > 21 and ivs[(d, a)] - vol_realizada(fech[a]) >= p['vrp_min'] / 100)
                 if sorteio:
-                    est = escolher(ind[a], s, {**p, 'gatilho': 'simples'})[0] if rng.random() < sorteio[0] else None
-                    minimo = None
+                    g = 'put' if p['gatilho'] == 'put' else 'simples'
+                    est = escolher(ind[a], s, {**p, 'gatilho': g})[0] if rng.random() < sorteio[0] else None
+                    minimo, vrp_ok = None, True
                 else:
                     est, minimo = escolher(ind[a], s, p)
-                if est and (minimo is None or rank >= minimo):
+                if est and vrp_ok and (minimo is None or rank >= minimo):
                     pendentes[a] = [est, atraso]
                     sinais += 1
             ultimo[a] = (d, s, cad, ivs.get((d, a), 0.3))

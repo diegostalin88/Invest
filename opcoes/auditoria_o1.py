@@ -64,10 +64,13 @@ def main(argv=None):
     ap.add_argument('--anos', default='2018-2026')
     ap.add_argument('--sorteios', type=int, default=100)
     ap.add_argument('--saida', default='../opcoes_resultado')
-    ap.add_argument('--hipotese', default='o1', choices=['o1', 'o2', 'o3'])
+    ap.add_argument('--hipotese', default='o1', choices=['o1', 'o2', 'o3', 'o6'])
     args = ap.parse_args(argv)
-    o3 = args.hipotese == 'o3'
-    if o3:
+    o3 = args.hipotese in ('o3', 'o6')
+    if args.hipotese == 'o6':
+        import vrp
+        versoes = vrp.VERSOES
+    elif o3:
         import vencimento
         versoes = vencimento.VERSOES
     elif args.hipotese == 'o2':

@@ -1,0 +1,46 @@
+name: "Opções - O6: trava de put com VRP"
+
+# Só leitura: hipótese O6 (docs/opcoes/hipotese-vrp.md) e sua auditoria adversarial
+# (mesmo documento). Não publica nada.
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/project-thread-ouh2hk]
+    paths: ["opcoes/vrp.py", ".github/workflows/opcoes-vrp.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  o6:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Testes (sem rede)
+        run: |
+          pip install pytest==9.2.0
+          python -m pytest -q opcoes/tests
+
+      - name: Backtest
+        working-directory: opcoes
+        run: python vrp.py --anos 2018-2026 --saida ../opcoes_resultado
+
+      - name: Auditoria
+        working-directory: opcoes
+        run: python auditoria_o1.py --hipotese o6 --sorteios 100 --saida ../opcoes_resultado
+
+      - name: Guardar o resultado
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opcoes-o6
+          path: opcoes_resultado/
+          if-no-files-found: ignore
