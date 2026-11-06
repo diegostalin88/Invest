@@ -66,4 +66,37 @@ continuar acima do CDI, e pelo menos 3 dos 4 anos fora da amostra ficarem acima 
 
 ## Resultado
 
-(preenchido depois da execução)
+**Veredito: REPROVADA.** Execução de 05/11/2026
+([run 42131554456](https://github.com/diegostalin88/Invest/actions/runs/42131554456)), com o CDI real.
+
+Fora da amostra (01/2023 a 10/2026), carteira de R$ 100 mil:
+
+| Variante | Boxes comprados | Retorno | CDI | Boxes acima do CDI | Taxa − CDI (mediana) | Com prejuízo nominal |
+| --- | --- | --- | --- | --- | --- | --- |
+| Base (melhor box do dia, pelas ofertas) | 16 | 56,5% | 59,8% | 0% | −7,0 p.p. ao ano | 0 |
+| Compra 1 pregão depois | 10 | 34,3% | 59,8% | 0% | −51,2 p.p. | 10 |
+| Custo × 4 | 9 | 57,1% | 59,8% | 0% | −10,2 p.p. | 0 |
+| Só pernas negociadas no dia | 16 | 56,5% | 59,8% | 0% | −7,0 p.p. | 0 |
+| Terceiro melhor box | 8 | 57,4% | 59,8% | 0% | −10,2 p.p. | 0 |
+
+- Em 46 meses × 6 papéis, só em **16 vezes** havia algum box com taxa positiva pelas ofertas; nas outras a regra
+  não comprava nada e o dinheiro ficou no CDI. Por isso o retorno fica perto do CDI: é quase todo CDI.
+- **Nenhum** dos 16 boxes rendeu mais que o CDI do mesmo período. O melhor box disponível rendeu, na mediana, 7
+  pontos percentuais ao ano abaixo do CDI (ex.: BOVA11 110/124 de 06/03/2025 a 17/04/2025, pago R$ 13,88 para
+  receber R$ 13,99: 6,9% ao ano contra 13,8% do CDI).
+- Considerando **todos** os boxes possíveis nos dias de escolha (cerca de 19 mil), o box típico comprado pelas
+  ofertas paga mais do que devolve no vencimento (mediana de −106 p.p. ao ano). Montar perna por perna pelas
+  ofertas do fechamento é caro demais.
+- Comprar um pregão depois piora (10 de 10 boxes com prejuízo nominal): as ofertas mudam de um dia para o outro e
+  o box deixa de valer a pena.
+- Todos os anos ficaram abaixo do CDI (2023: −5,7 p.p.; 2024: −4,7; 2025: −7,6; 2026: −7,9). Dentro da amostra
+  (2019 a 2022), o mesmo: 2 boxes, os dois abaixo do CDI.
+- **Meio das ofertas (informativo): sem significado.** Nas pernas fundas, as ofertas são tão largas que o meio dá
+  taxas absurdas (mediana de +20 p.p. e quartil de cima de +647 p.p. ao ano). Não são preços que alguém executaria;
+  o número não entra em nenhuma conclusão.
+- Reproduz o mesmo número ao rodar de novo: sim.
+
+**Leitura:** o box funciona como renda fixa (nenhuma perda nominal na regra base), mas rende **abaixo** do CDI para
+quem monta pelas ofertas da tela. Isso é o esperado: o box é um empréstimo, e quem tem acesso ao preço bom é quem
+toma dinheiro emprestado ou faz a ponta como formador de mercado. Um rendimento "fixo" acima do CDI com opções, como
+o do colega do Diego, só é possível assumindo algum risco que o box não tem.

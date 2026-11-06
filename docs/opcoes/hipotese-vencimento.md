@@ -71,4 +71,31 @@ sobre os mesmos dados fora da amostra.
 
 ## Resultado
 
-(preenchido depois da execução)
+**Veredito: as duas versões REPROVADAS.** Execução de 05/11/2026
+([run 42131554510](https://github.com/diegostalin88/Invest/actions/runs/42131554510)), com o CDI real.
+
+Fora da amostra (01/2023 a 10/2026), capital de R$ 100 mil, caixa livre rendendo CDI:
+
+| Versão | Operações | Acerto | Fator de lucro | P&L ÷ risco | Retorno | CDI | BOVA11 | Queda máx. | Ordens: executadas / parciais / sem execução |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Crédito | 62 | 73% | 0,68 | −5,2% | 54,1% | 59,8% | 58,9% | 2,2% | 66 / 95 / 10 |
+| Débito | 117 | 39% | 0,96 | −2,2% | 55,1% | 59,8% | 58,9% | 6,9% | 118 / 117 / 7 |
+| Crédito sem filtro de IV Rank | 222 | 72% | 0,48 | −9,8% | 29,6% | 59,8% | 58,9% | 4,2% | 227 / 382 / 23 |
+| Débito sem filtro de IV Rank | 162 | 40% | 1,05 | +2,5% | 63,1% | 59,8% | 58,9% | 15,8% | 168 / 147 / 12 |
+| Crédito pelas ofertas, até o vencimento | 68 | 71% | 0,43 | −8,6% | 50,9% | 59,8% | 58,9% | 2,1% | – |
+| Débito pelas ofertas, até o vencimento | 130 | 39% | 0,70 | −16,8% | 29,4% | 59,8% | 58,9% | 8,2% | – |
+
+Critérios: as duas falham em ficar acima do CDI, no fator de lucro ≥ 1,2 e sem o melhor ativo acima do CDI. O filtro
+de IV Rank ajuda no crédito (−5,2% contra −9,8% sem filtro) e atrapalha no débito (−2,2% contra +2,5% sem filtro).
+Dentro da amostra (2019 a 2022) o quadro é o mesmo: crédito −5,0%, débito +0,1% por operação, os dois abaixo do CDI.
+
+**O que mudou em relação à O1 e à O2:** a perda por operação caiu muito (crédito de −22% para −5%; débito de −70%
+para −2%). Ou seja, a maior parte da perda das hipóteses anteriores vinha mesmo da execução pelas ofertas e do stop
+curto. Mas, tirando esse custo, **não sobra vantagem**: as travas ficam no zero a zero e perdem para o CDI, porque
+o dinheiro em risco deixa de render juros.
+
+A única linha com P&L positivo (débito sem filtro, +2,5% por operação, fator de lucro 1,05) não foi registrada como
+versão a aprovar, fica abaixo do fator de lucro mínimo e, pela auditoria, não se distingue do acaso. Não muda o
+veredito.
+
+A auditoria está em `docs/opcoes/auditoria-o3.md`.
