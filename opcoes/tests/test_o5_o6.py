@@ -58,3 +58,16 @@ def test_o6_proposta_com_alvo_casado():
     pos = {'pernas': [('pV', 'V', -1), ('pC', 'V', +1)]}
     cad = [('pV', 'put', 95, 'V', 0.2, 0.3, 0.3, 0.15), ('pC', 'put', 90, 'V', 0.0, 0.1, 0.06, 0.02)]
     assert travas.recompra_casada(pos, cad, 0.10) and not travas.recompra_casada(pos, cad, 0.05)
+
+
+def test_strangle_o7():
+    import strangle
+    travas.CDI.clear()
+    dados = ta._dados()
+    p = {**strangle.BASE, 'ativos': ['PETR4'], 'ivr_max': 101}
+    res = strangle.simular(dados, p, '20220101', '20261231')
+    assert res['operacoes'] and all(o['saida'] >= o['venc'] and o['recebe'] >= 0 for o in res['operacoes'])
+    assert len({o['entrada'][:6] for o in res['operacoes']}) == len(res['operacoes'])   # um por mês
+    m = strangle.metricas(res)
+    assert m['strangles'] == len(res['operacoes']) and m['pagoTotal'] > 0
+    assert m['pagoTotal'] < 0.01 * 100000 * 60                                          # só parte dos juros
