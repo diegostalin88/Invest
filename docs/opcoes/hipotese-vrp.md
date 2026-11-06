@@ -54,4 +54,52 @@ do placebo, e pelo menos 3 dos 4 anos tiverem P&L positivo.
 
 ## Resultado
 
-(preenchido depois da execução)
+**Veredito: as duas versões REPROVADAS.** Execução de 06/11/2026
+([run 42144226904](https://github.com/diegostalin88/Invest/actions/runs/42144226904)), backtest e auditoria, com o
+CDI real.
+
+Fora da amostra (01/2023 a 10/2026), R$ 100 mil, caixa livre rendendo CDI:
+
+| Versão | Operações | Acerto | P&L ÷ risco | Retorno | CDI | Queda máx. | Ordens: executadas / sem execução |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **BOVA11** | 1 | 100% | +10,4% | 59,9% | 59,8% | 0,0% | 1 / 10 |
+| **6 papéis** | 27 | 100% | +18,2% | 67,1% | 59,8% | 0,8% | 27 / 136 |
+| BOVA11 sem filtro de VRP | 2 | 100% | +11,5% | 60,1% | 59,8% | 0,0% | 2 / 46 |
+| 6 papéis sem filtro de VRP | 57 | 100% | +15,1% | 73,2% | 59,8% | 0,9% | 59 / 423 |
+| BOVA11 VRP ≥ 5 | 1 | 100% | +10,4% | 59,9% | 59,8% | 0,0% | 1 / 7 |
+| BOVA11 IV Rank ≥ 50 no lugar do VRP | 0 | – | – | 59,8% | 59,8% | 0,0% | 0 / 7 |
+| BOVA11 sem alvo, só vencimento | 1 | 100% | +14,0% | 59,9% | 59,8% | 0,2% | 1 / 10 |
+| BOVA11 pelas ofertas, até o vencimento | 0 | – | – | 59,8% | 59,8% | 0,0% | – |
+| BOVA11 primeiro registro (delta 0,25, largura 5%, 42 a 63 dias, sem alvo) | 16 | 81% | +3,9% | 60,4% | 59,8% | 0,7% | 17 / 2 |
+
+Critérios:
+
+- **BOVA11:** uma única operação em quase quatro anos (mínimo de 20). Com delta 0,15 e 0,05, o crédito no meio das
+  ofertas raramente chega a 12% da largura, e das 11 ordens que chegaram a ser enviadas, 10 não executaram.
+- **6 papéis:** 27 operações (mínimo de 50). Passa em ficar acima do CDI, na queda máxima, sem o melhor papel
+  (65,0%) e no filtro de VRP melhorar o resultado (+18,2% contra +15,1%).
+- O script marcou também "fator de lucro ≥ 1,2" como falha nas duas, porque sem nenhuma perda o fator não é
+  definido (seria infinito). Esse critério não deve contar como falha; o veredito sai do número de operações.
+
+Auditoria dos 6 papéis: reproduz; ordem 2 pregões depois +13,3%; 3 pregões depois +13,4%; custo × 4 +11,1%; os
+quatro anos positivos (2023 +11%, 2024 +22%, 2025 +27%, 2026 +14%); **placebo: percentil 85** (mediana do placebo
++15,4%, também com 100% de acerto). Pela regra registrada, não resiste à auditoria (exigia percentil 95).
+
+**Leitura, e por que o resultado não é confiável:**
+
+- **Todas as 27 operações saíram pelo alvo, a maioria em 1 a 3 semanas, e o placebo (dias sorteados, sem VRP) também
+  acerta 100%.** Quando qualquer dia de entrada dá certo, quem gera o lucro não é o filtro, é a forma de simular a
+  ordem estruturada.
+- A ordem estruturada foi simulada, na entrada e na saída, com **o melhor preço do dia de cada perna, separadamente**
+  (máxima da vendida e mínima da comprada na entrada; o inverso no alvo). Esses preços muitas vezes aconteceram em
+  horários diferentes e em negócios de poucas opções. O registro já dizia que isso é a favor da estratégia; o
+  resultado mostra que é muito a favor: a diferença entre as ofertas, ida e volta, é **2 vezes o crédito** na
+  mediana, e pelas ofertas **nenhuma** operação consegue o crédito mínimo. O "limite otimista" (+138% por operação)
+  mostra o mesmo efeito, ainda maior.
+- Ou seja: com dados diários não dá para saber se uma ordem estruturada a esse preço seria atendida. O que o teste
+  mostra é que **o lucro existe só se a ordem for executada perto do meio das ofertas nas duas pontas**. Isso só se
+  verifica colocando a ordem de verdade no livro (teste para frente, com ordens reais ou simuladas na plataforma da
+  corretora), não no histórico.
+- A primeira versão do registro (delta 0,25, largura 5%, sem alvo) teve +3,9% por operação fora da amostra e −6,8%
+  dentro: sem consistência.
+
