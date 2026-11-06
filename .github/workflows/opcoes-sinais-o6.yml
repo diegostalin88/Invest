@@ -1,0 +1,36 @@
+name: "Opções - O6 para frente: lista do dia"
+
+# Só leitura: lista de sinais da O6 para o teste para frente (docs/opcoes/protocolo-o6-para-frente.md).
+# Não envia ordem nenhuma. A lista aparece no resumo da execução.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 23 * * 1-5"   # 20h30 em Brasília, depois de a B3 publicar o COTAHIST do dia
+
+permissions:
+  contents: read
+
+jobs:
+  sinais:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Lista do dia
+        working-directory: opcoes
+        run: python sinais_o6.py --saida ../sinais_o6.md
+
+      - name: Guardar a lista
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sinais-o6
+          path: sinais_o6.md
+          if-no-files-found: ignore

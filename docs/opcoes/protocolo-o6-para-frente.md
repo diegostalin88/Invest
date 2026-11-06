@@ -18,8 +18,10 @@ reais por operação. Sem robô: as ordens são enviadas à mão.
 
 - **Quando olhar:** todo dia útil, depois das 17h, para PETR4, VALE3, BOVA11, ITUB4, BBAS3 e PRIO3. Uma posição por
   papel.
-- **Sinal:** VRP ≥ 4 pontos (IV de 30 dias − volatilidade realizada de 21 pregões). Calculado por um script do repo,
-  que imprime a lista do dia (a fazer, só leitura).
+- **Sinal:** VRP ≥ 4 pontos (IV de 30 dias − volatilidade realizada de 21 pregões). A lista do dia sai do script
+  `opcoes/sinais_o6.py` (só leitura), que roda no GitHub Actions ("Opções - O6 para frente: lista do dia") e mostra,
+  para cada papel com sinal, as duas opções, as ofertas, o crédito a pedir e o preço da recompra no alvo. Enquanto o
+  pull request não for aceito, a lista roda quando acionada à mão; depois, todo dia útil às 20h30.
 - **Montagem:** put vendida com delta mais perto de 0,15; comprada com delta mais perto de 0,05; vencimento de 35 a
   56 dias. Crédito pedido = meio das ofertas do fechamento das duas pernas. Só envia se o crédito for ≥ 12% da
   largura.

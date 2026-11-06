@@ -71,3 +71,18 @@ def test_strangle_o7():
     m = strangle.metricas(res)
     assert m['strangles'] == len(res['operacoes']) and m['pagoTotal'] > 0
     assert m['pagoTotal'] < 0.01 * 100000 * 60                                          # só parte dos juros
+
+
+def test_sinais_o6_lista_do_dia():
+    import sinais_o6
+    travas.CDI.clear()
+    dados = ta._dados()
+    p = {**vrp.O6, 'ativos': ['PETR4'], 'credito_min': 0}
+    sem = sinais_o6.sinais(dados, {**p, 'vrp_min': -1000})
+    assert sem[0]['data'] == dados[0][-1] and sem[0]['sinal'] and sem[0]['trava']
+    t = sem[0]['trava']
+    assert [x['lado'] for x in t['pernas']] == ['vende', 'compra'] and t['pernas'][0]['strike'] > t['pernas'][1]['strike']
+    assert abs(t['alvo_recompra'] - 0.25 * t['credito']) < 1e-12 and t['credito'] > 0
+    com = sinais_o6.sinais(dados, {**p, 'vrp_min': 1000})
+    assert not com[0]['sinal'] and com[0]['vrp'] is not None
+    assert 'PETR4' in sinais_o6.markdown(sem)
