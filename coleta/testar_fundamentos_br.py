@@ -6,6 +6,7 @@ Uso: python coleta/testar_fundamentos_br.py [--saida fundamentos_br.json]
 """
 import argparse
 import io
+import warnings
 import json
 import os
 import random
@@ -320,7 +321,31 @@ def markdown(R):
     return '\n'.join(L)
 
 
+def diagnostico(P, B, empresa):
+    """Quantos papéis passam em cada etapa no fim de junho de cada ano (para entender a cobertura dos dados)."""
+    for i in tf.datas_reb(P.cal, (6,)):
+        dia = P.cal[i]
+        n = {'preço': 0, 'liquidez': 0, 'trimestres': 0, 'ações': 0, 'lucro>0': 0}
+        for t, b in B.items():
+            if t not in P.adj or P.adj[t][i] != P.adj[t][i]:
+                continue
+            n['preço'] += 1
+            a = P.adtv(t, i)
+            if not (a == a and a >= LIQ_MIN):
+                continue
+            n['liquidez'] += 1
+            if len(tf.disponivel(b['trim'], dia)) >= 4:
+                n['trimestres'] += 1
+            if tf.disponivel(b['acoes'], dia):
+                n['ações'] += 1
+            f = fundamentos_br(b, dia, lambda fim, t=t: P.fator(t, fim))
+            if f and f['ni'] > 0:
+                n['lucro>0'] += 1
+        print(f'  {dia}: {n}', flush=True)
+
+
 def main(argv=None):
+    warnings.filterwarnings('ignore')
     ap = argparse.ArgumentParser()
     ap.add_argument('--saida', default='fundamentos_br.json')
     a = ap.parse_args(argv)
@@ -344,6 +369,10 @@ def main(argv=None):
                 print(f"  {t}: ações {f['acoes']:.0f}, valor de mercado R$ {mc / 1e9:.1f} bi, lucro 12m "
                       f"R$ {f['ni'] / 1e9:.1f} bi, P/L {mc / f['ni']:.1f}, dividendos 12m "
                       f"{dy_12m(P, t, len(cal) - 1) * 100:.1f}%", flush=True)
+    diagnostico(P, B, mapa)
+    for t in ('PETR4', 'VALE3'):
+        if t in B:
+            print(f"  {t}: trimestres {[x['end'] for x in B[t]['trim']][:6]}..., ações {[x['end'] for x in B[t]['acoes']][:6]}...")
     cdi = cdi_diario(date.fromisoformat(cal[0]), date.fromisoformat(cal[-1]))
     R = hipotese(P, B, mapa, cdi)
     if not R:
