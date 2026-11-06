@@ -85,3 +85,50 @@ restrito às empresas que informam em unidades. O resultado não vale.
 de ações é tratada como informada em milhares e multiplicada por 1.000. Todas as empresas do universo valem mais de
 R$ 1 bilhão. O número de correções e os papéis corrigidos aparecem no resultado. A regra do P/L entre 1 e 100
 continua valendo como segunda proteção.
+
+## Resultado (execução válida de 06/11/2026, [run 42199211132](https://github.com/diegostalin88/Invest/actions/runs/42199211132))
+
+**Veredito: APROVADA nos cinco critérios registrados, mas num período bem mais curto que o previsto.** A CVM só
+publica a composição do capital (quantidade de ações) a partir de 2020; antes disso, nenhum papel tem valor de
+mercado e nenhuma data tem elegíveis. O teste cobre **06/2020 a 09/2026** (25 trimestres, ~54 elegíveis por data),
+não 2012 a 2026.
+
+| Carteira | Retorno | Ao ano | Queda máx. | Sharpe |
+| --- | --- | --- | --- | --- |
+| **Lucro/preço + dividendos (15 papéis)** | **190,1%** | **18,6%** | 14,6% | 1,07 |
+| BOVA11 | 100,9% | 11,8% | 22,0% | 0,65 |
+| CDI | 86,8% | 10,5% | 0,0% | – |
+| Pesos iguais, todos os elegíveis | 120,3% | 13,5% | 18,5% | 0,74 |
+| Acaso (200 carteiras de 15) | p5 55,7%, mediana 106,1%, p95 169,1% | | | |
+| Só lucro/preço | 204,2% | 19,5% | 18,9% | 0,99 |
+| Só dividendos | 199,6% | 19,2% | 11,9% | 1,09 |
+| 10 papéis | 144,4% | 15,4% | 12,9% | 0,94 |
+| 20 papéis | 175,8% | 17,6% | 15,0% | 1,00 |
+| Custo × 2 | 186,9% | 18,4% | 14,6% | 1,06 |
+| Semestral | 181,6% | 18,8% | 7,8% | 1,09 |
+
+- Percentil entre as carteiras sorteadas: **98**.
+- Metades: 06/2020 a 06/2023, carteira 70,1% contra pesos iguais 47,0%, BOVA11 24,6% e CDI 26,0%; 06/2023 a
+  09/2026, carteira 70,5% contra 49,9%, 61,2% e 48,2%.
+- Por ano (carteira / BOVA11 / CDI): 2020 (jul–dez) 14,6 / 25,1 / 1,0; 2021 10,1 / −12,1 / 4,3; 2022 17,0 / 5,1 /
+  12,3; 2023 34,4 / 23,1 / 13,0; 2024 1,4 / −10,1 / 10,8; 2025 38,6 / 34,7 / 14,1; 2026 (até set.) 3,9 / 16,5 / 10,5.
+  Em 2024 e 2026 a carteira perdeu para o CDI.
+- Todas as variantes de robustez ficaram acima do BOVA11 e dos pesos iguais.
+- Correções de escala: 450 datas em 27 papéis tiveram as ações tratadas como informadas em milhares; 5 datas
+  (GOAU4) ficaram de fora por P/L abaixo de 1.
+
+**Ressalvas, antes de chamar de vantagem:**
+
+1. **Seis anos só, e um período bom para valor e dividendos no Brasil** (juros altos, bancos, elétricas e
+   commodities pagando muito). Um único ciclo.
+2. **Viés de sobrevivência:** o universo é a carteira atual do IBOVESPA. As comparações com o acaso e os pesos
+   iguais do mesmo universo controlam parte disso, e a carteira ficou acima das duas.
+3. **Dados da CVM com problemas conhecidos:** quantidade de ações em escalas diferentes (corrigida pela regra acima)
+   e pelo menos um lucro suspeito: VALE3 aparece hoje com lucro de 12 meses de R$ 0,6 bilhão e P/L 459, e por isso
+   fica fora da carteira atual. Não foi conferido papel a papel.
+4. **Imposto fora:** a carteira gira a cada trimestre; com 15% sobre o ganho nas vendas acima de R$ 20 mil por mês,
+   o retorno líquido cai.
+
+**Próximo passo:** confirmar em 2012 a 2020, que este teste não viu, com a quantidade de ações tirada de outra fonte
+da CVM (formulário de referência, que tem o capital social desde 2010) e as mesmas regras. Só depois disso a
+carteira vira candidata ao app.
