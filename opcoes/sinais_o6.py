@@ -100,6 +100,10 @@ def main(argv=None):
         return 1
     dados = travas.carregar([hoje.year - 1, hoje.year])
     texto = markdown(sinais(dados))
+    pregoes, spot = dados[0], dados[1]
+    for at in ch.UNIVERSO:      # conferência: os 22 fechamentos usados na volatilidade realizada
+        f = [(x, spot[(x, at)]) for x in pregoes if (x, at) in spot][-22:]
+        print(at, ' '.join(f'{x[6:]}/{x[4:6]}:{v:.2f}' for x, v in f))
     with open(a.saida, 'w', encoding='utf-8') as fh:
         fh.write(texto)
     resumo = os.environ.get('GITHUB_STEP_SUMMARY')
