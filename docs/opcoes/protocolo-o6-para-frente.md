@@ -10,9 +10,12 @@ teste responde só isso: **com que frequência, e a que preço, essas ordens sã
 
 ## Onde
 
-Plataforma da XP com envio de estratégia (ordem de duas pernas com preço líquido), em **conta simulada** se houver;
-se não houver, com o menor lote possível (100 opções por perna) em conta real, risco máximo de algumas centenas de
-reais por operação. Sem robô: as ordens são enviadas à mão.
+Plataforma da XP, com o menor lote possível (100 opções por perna) em conta real, ou em conta simulada se houver.
+Sem robô: as ordens são enviadas à mão.
+
+**Sem ordem estruturada (preço único para as duas pernas), a trava é montada em duas etapas, sempre comprando a
+proteção primeiro** (decisão do Diego em 06/11/2026). Assim nunca se fica vendido sem proteção: se a segunda etapa
+não executar, sobra só uma put comprada barata, que no pior caso vira pó.
 
 ## Regras (iguais às da O6, versão 6 papéis)
 
@@ -25,24 +28,29 @@ reais por operação. Sem robô: as ordens são enviadas à mão.
 - **Montagem:** put vendida com delta mais perto de 0,15; comprada com delta mais perto de 0,05; vencimento de 35 a
   56 dias. Crédito pedido = meio das ofertas do fechamento das duas pernas. Só envia se o crédito for ≥ 12% da
   largura.
-- **Envio:** no dia seguinte, na abertura, ordem estruturada com o crédito pedido, **válida só no dia**. Não executou,
-  cancela e não persegue o preço.
-- **Alvo:** executada a entrada, deixa uma ordem estruturada de recompra a 25% do crédito, renovada todo dia até o
-  vencimento. Sem stop.
+- **Envio, etapa 1 (proteção):** no dia seguinte, na abertura, compra a put de baixo (delta ~0,05) pela oferta de
+  venda. Anota o preço pago.
+- **Envio, etapa 2 (venda):** logo depois, ordem limite de venda da put de cima no **meio das ofertas do fechamento
+  anterior mais o que a proteção custou acima do meio dela** (para o crédito líquido ficar o mesmo pedido), válida
+  só no dia. Não executou, cancela e não persegue o preço; a put comprada fica até o vencimento.
+- **Alvo:** com a trava montada, recompra em duas etapas também, na ordem inversa: primeiro a ordem limite de
+  recompra da put vendida; só depois de executada, a venda da put comprada. O preço da recompra é o que deixa o custo
+  líquido em 25% do crédito, dado o preço de tela da put comprada. Renovada todo dia até o vencimento. Sem stop.
 
 ## O que anotar (uma linha por ordem, numa planilha)
 
-Data, papel, as duas opções, crédito pedido, ofertas de compra e venda de cada perna no envio, se executou (sim, não
-ou parcial), horário e preço da execução. Para a recompra: data, preço pedido, se executou e a que preço. No
+Data, papel, as duas opções, crédito pedido, ofertas de compra e venda de cada perna no envio, preço pago na
+proteção, se a venda executou (sim ou não), horário e preço da execução. Quando a venda não executa, anota também o
+que a put comprada valeu no vencimento (é o custo das tentativas que não deram certo). Para a recompra: data, preço pedido, se executou e a que preço. No
 vencimento: valor intrínseco e resultado.
 
 ## Duração e critério
 
 - **Duração:** 3 meses ou 40 ordens de entrada enviadas, o que vier depois.
 - **A execução se confirma** se:
-  1. pelo menos 50% das ordens de entrada forem executadas no crédito pedido;
-  2. pelo menos 50% das entradas executadas tiverem a recompra a 25% executada antes do vencimento;
-  3. nenhuma execução parcial (uma perna sem a outra).
+  1. pelo menos 50% das vendas da etapa 2 forem executadas no preço pedido;
+  2. pelo menos 50% das travas montadas tiverem a recompra a 25% executada antes do vencimento;
+  3. o custo das proteções que sobraram sozinhas for menor que 25% do crédito recebido nas travas montadas.
 - Se confirmar, a O6 ganha um novo registro com o histórico desses 3 meses como fora da amostra. Se não confirmar, a
   linha de travas na B3 se encerra.
 
