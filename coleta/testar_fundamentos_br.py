@@ -20,6 +20,7 @@ import balancos_cvm as cvm            # noqa: E402
 import testar_fundamentos as tf       # noqa: E402
 
 N_CART, PRECO_MIN, LIQ_MIN, MIN_ELEG = 15, 1.0, 5e6, 30
+MCAP_ESCALA = 1e9      # valor de mercado abaixo de R$ 1 bi = quantidade de ações em milhares na CVM
 MESES_REB, MESES_SEM = (3, 6, 9, 12), (3, 9)
 SORTEIOS = int(os.environ.get('SORTEIOS_C', 200))
 CUSTO = tf.CUSTO
@@ -189,10 +190,14 @@ def elegiveis(P, B, empresa, i, excluidos=None):
         if not f or f['pl'] <= 0 or f['ni'] <= 0 or f['acoes'] <= 0:
             continue
         mcap = P.close[t][i] * f['acoes']
+        if mcap < MCAP_ESCALA:         # composição do capital informada em milhares (correção de 06/11, ver registro)
+            mcap *= 1000
+            if excluidos is not None:
+                excluidos.append((dia, t, 'ações em milhares'))
         pl_ratio = mcap / f['ni']
         if not (1 <= pl_ratio <= 100):
             if excluidos is not None and pl_ratio < 1:
-                excluidos.append((dia, t, round(pl_ratio, 3)))
+                excluidos.append((dia, t, round(float(pl_ratio), 3)))
             continue
         dy = dy_12m(P, t, i)
         out.append({'t': t, 'valor': f['ni'] / mcap, 'dividendos': 0.0 if dy != dy else dy, 'pl': round(pl_ratio, 1)})
@@ -258,8 +263,11 @@ def hipotese(P, B, empresa, cdi):
             'semestral': tf.metricas_p(tf.rodar(P, per_s, topo(N_CART)), 2) if per_s else None,
         },
         'porAno': {},
-        'excluidosPL': {'quantidade': len(excl), 'exemplos': excl[:15]},
-        'exemplosCarteira': [{'data': P.cal[p['i']], 'carteira': [(x['t'], x['pl'], round(x['dividendos'] * 100, 1))
+        'excluidosPL': {'quantidade': sum(1 for x in excl if x[2] != 'ações em milhares'),
+                        'exemplos': [x for x in excl if x[2] != 'ações em milhares'][:15]},
+        'corrigidosMilhares': {'quantidade': sum(1 for x in excl if x[2] == 'ações em milhares'),
+                               'papeis': sorted({x[1] for x in excl if x[2] == 'ações em milhares'})},
+        'exemplosCarteira': [{'data': P.cal[p['i']], 'carteira': [(x['t'], float(x['pl']), round(float(x['dividendos']) * 100, 1))
                                                                  for x in sorted(p['e'], key=lambda x: -x['nota'])[:N_CART]]}
                              for p in (periodos[0], periodos[len(periodos) // 2], periodos[-1])],
         'carteiraAtual': topo(N_CART)({'e': elegiveis(P, B, empresa, len(P.cal) - 1)}),
@@ -301,6 +309,8 @@ def markdown(R):
          '| Ano | Carteira | BOVA11 | CDI |', '| --- | --- | --- | --- |',
          *[f'| {a} | {v[0]}% | {v[1]}% | {v[2]}% |' for a, v in sorted(R['porAno'].items())], '',
          f"Excluídos por P/L < 1 (erro de escala): {R['excluidosPL']['quantidade']}; exemplos {R['excluidosPL']['exemplos']}",
+         f"Ações informadas em milhares, corrigidas: {R['corrigidosMilhares']['quantidade']} datas, papéis "
+         f"{R['corrigidosMilhares']['papeis']}",
          '', 'Carteiras de exemplo (papel, P/L, dividendos 12m %):',
          *[f"- {x['data']}: {x['carteira']}" for x in R['exemplosCarteira']],
          f"- hoje: {R['carteiraAtual']}", '']
@@ -330,6 +340,7 @@ def main(argv=None):
             f = fundamentos_br(B[t], cal[-1], lambda fim, t=t: P.fator(t, fim))
             if f:
                 mc = P.close[t][-1] * f['acoes']
+                mc = mc * 1000 if mc < MCAP_ESCALA else mc
                 print(f"  {t}: ações {f['acoes']:.0f}, valor de mercado R$ {mc / 1e9:.1f} bi, lucro 12m "
                       f"R$ {f['ni'] / 1e9:.1f} bi, P/L {mc / f['ni']:.1f}, dividendos 12m "
                       f"{dy_12m(P, t, len(cal) - 1) * 100:.1f}%", flush=True)

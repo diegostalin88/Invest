@@ -41,7 +41,8 @@ def test_fundamentos_sem_olhar_o_futuro():
     assert br.fundamentos_br(b, '2017-12-01', lambda _: 1.0) is None     # balanço velho demais
 
 
-def test_elegiveis_um_codigo_por_empresa_e_pl():
+def test_elegiveis_um_codigo_por_empresa_e_pl(monkeypatch):
+    monkeypatch.setattr(br, 'MCAP_ESCALA', 0)
     P, cal = _precos()
     i = len(cal) - 1
     b = lambda ni: {'trim': [{'end': e, 'filed': '2000-01-01', 'ni': ni} for e in
@@ -58,10 +59,16 @@ def test_elegiveis_um_codigo_por_empresa_e_pl():
             for x in v[k]:
                 x['end'] = x['end'].replace('2017', str(int(fim[:4]) - 1))
     empresa = {'AAAA3': 'A', 'AAAA4': 'A', 'BBBB3': 'B'}
-    br.LIQ_MIN = 1.0
+    monkeypatch.setattr(br, 'LIQ_MIN', 1.0)
     excl = []
     e = br.elegiveis(P, B, empresa, i, excl)
     assert [x['t'] for x in e] == ['AAAA4'] and excl and excl[0][1] == 'BBBB3'
+    # ações informadas em milhares: valor de mercado abaixo de R$ 1 bi é multiplicado por 1.000
+    monkeypatch.setattr(br, 'MCAP_ESCALA', 1e9)
+    B['BBBB3']['acoes'][0]['v'] = 1e8 / 1000 * 10        # P/L verdadeiro ~1,5 informado em milhares
+    excl = []
+    e = br.elegiveis(P, B, empresa, i, excl)
+    assert 'BBBB3' in [x['t'] for x in e] and any(x[2] == 'ações em milhares' for x in excl)
 
 
 def test_hipotese_ponta_a_ponta(monkeypatch):
@@ -84,6 +91,7 @@ def test_hipotese_ponta_a_ponta(monkeypatch):
                        'vol': [1e7] * n, 'splits': []}
     P = tf.Precos(bruto, cal)
     monkeypatch.setattr(br, 'MIN_ELEG', 4)
+    monkeypatch.setattr(br, 'MCAP_ESCALA', 0)
     monkeypatch.setattr(br, 'N_CART', 3)
     monkeypatch.setattr(br, 'SORTEIOS', 5)
     monkeypatch.setattr(br, 'LIQ_MIN', 1.0)

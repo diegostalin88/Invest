@@ -71,3 +71,17 @@ preço**.
 - **Dividendos do Yahoo:** incluem juros sobre capital próprio como provento; podem faltar em alguns papéis.
 - **Período:** cerca de 14 anos (2012 a 2026), com CDI alto em boa parte; um único período, sem amostra separada.
   Por isso o critério 3 olha as duas metades.
+
+## 1ª execução (06/11/2026, run 42198555992): descartada por erro nos dados
+
+A conferência à mão no próprio log mostrou que a quantidade de ações vinha errada para muitas empresas: VALE3 com
+4,07 milhões de ações (são 4,07 bilhões) e ITUB4 com 11 milhões (são cerca de 11 bilhões). Parte das companhias
+informa a composição do capital à CVM **em milhares de ações**, sem indicar a escala. O valor de mercado saía 1.000
+vezes menor e o P/L ficava abaixo de 1; essas empresas eram excluídas pela regra de "erro de escala" (452 exclusões).
+Com isso, antes de 2021 quase nenhuma data tinha 30 elegíveis, o teste só começou em 06/2021, e o universo ficou
+restrito às empresas que informam em unidades. O resultado não vale.
+
+**Correção (nenhuma outra regra mudou):** quando o valor de mercado calculado fica abaixo de R$ 1 bilhão, a quantidade
+de ações é tratada como informada em milhares e multiplicada por 1.000. Todas as empresas do universo valem mais de
+R$ 1 bilhão. O número de correções e os papéis corrigidos aparecem no resultado. A regra do P/L entre 1 e 100
+continua valendo como segunda proteção.
