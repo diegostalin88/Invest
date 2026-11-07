@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
   push:
     branches: [claude/project-thread-2grfnv]
-    paths: [coleta/estudo_quantico*.py, .github/workflows/estudo-quantico.yml]
+    paths: [coleta/estudo_quantico*.py, coleta/testar_volatilidade.py, .github/workflows/estudo-quantico.yml]
 
 permissions:
   contents: read
@@ -23,9 +23,9 @@ jobs:
       - name: Estudo
         run: |
           pip install -q yfinance pandas numpy
-          python coleta/estudo_quantico_hoje.py
-          cat estudo_quantico_hoje.md >> "$GITHUB_STEP_SUMMARY"
+          python coleta/testar_volatilidade.py
+          cat estudo_volatilidade.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
           name: estudo-quantico
-          path: estudo_quantico*.md
+          path: estudo_*.md
