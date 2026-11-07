@@ -76,3 +76,32 @@ O 50/50 do Brasil é medido só como informação (não entra nos critérios).
 - **Imposto fora:** no Brasil, ETF de ações não tem isenção de R$ 20 mil por mês nas vendas (15% sobre o ganho), e os
   dividendos recebidos pelo ETF são reinvestidos dentro dele. Para quem segura e não vende, o efeito é pequeno.
 - **ETFs que fecharam** não aparecem; os seis dos EUA são os sobreviventes mais populares.
+
+## Resultado (07/11/2026, [run 42331755030](https://github.com/diegostalin88/Invest/actions/runs/42331755030))
+
+**Veredito: nenhum ETF de dividendos substitui o índice no núcleo.** Retorno total com dividendos reinvestidos,
+comprando e segurando.
+
+| ETF × régua | Período | Ao ano | Sharpe | Queda máx. | Critérios 1 / 2 / 3 |
+| --- | --- | --- | --- | --- | --- |
+| DIVO11 × BOVA11 | 2012–2026 | 9,8% × 7,0% | 0,11 × 0,01 | −56% × −47% | passa / **falha** / passa |
+| SCHD × SPY | 2011–2026 | 13,6% × 14,7% | 0,80 × 0,81 | −33% × −34% | falha / passa / falha |
+| VIG × SPY | 2006–2026 | 10,2% × 10,8% | 0,56 × 0,54 | −47% × −55% | falha (2ª metade) / passa / passa |
+| DVY × SPY | 2003–2026 | 9,0% × 10,8% | 0,46 × 0,55 | −63% × −55% | falha / falha / falha |
+| SDY × SPY | 2005–2026 | 9,1% × 10,9% | 0,47 × 0,55 | −55% × −55% | falha / passa / falha |
+| HDV × SPY | 2011–2026 | 11,1% × 13,6% | 0,69 × 0,74 | −37% × −34% | falha / falha / falha |
+| NOBL × SPY | 2013–2026 | 10,8% × 13,8% | 0,61 × 0,73 | −35% × −34% | falha / falha / falha |
+
+- **Brasil:** o DIVO11 rendeu mais que o BOVA11 (+290% contra +167%) e teve Sharpe maior nas duas metades, mas caiu
+  mais no pior momento (−56% contra −47%). Pelo critério registrado, não substitui. **Os dois perderam para o CDI**
+  (+298% no mesmo período). O 50/50 (informação): 8,4% ao ano, queda de −48%.
+- **EUA:** os ETFs de dividendos pagam mais renda (SCHD, DVY e HDV cerca de 3% ao ano contra 1–2% do SPY), mas
+  todos renderam menos que o SPY no total. O VIG foi o mais perto: caiu menos (−47% contra −55%) e quase empatou
+  no Sharpe, mas perdeu na 2ª metade.
+- Os ETFs brasileiros de ações **reinvestem** os dividendos dentro da cota (renda medida = 0); quem quer renda em
+  dinheiro no Brasil recebe das ações diretamente ou de FIIs.
+
+**Leitura:** dividendo não é retorno extra; é parte do retorno que sai em dinheiro (o preço cai no valor pago). A
+carteira de dividendos troca crescimento por renda e por um perfil diferente de risco, sem ganhar do índice. Para o
+núcleo da holding, o índice continua sendo a régua. O DIVO11 pode entrar como **parte** do núcleo brasileiro para quem
+aceita uma queda maior, sabendo que não foi aprovado como substituto.
