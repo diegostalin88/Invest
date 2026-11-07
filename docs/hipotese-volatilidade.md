@@ -21,3 +21,11 @@ Registrado em **07/11/2026, antes de escrever o código e antes de ver qualquer 
 1. O Sharpe é maior que o de comprar e segurar no período inteiro **e** em cada metade.
 2. A queda máxima é pelo menos 20% menor que a da exposição fixa de mesma média.
 3. Com custo dobrado (0,2%), o critério 1 continua valendo no período inteiro.
+
+## Resultado (07/11/2026, run 42330953904): **REPROVADA**
+| Período inteiro | Sharpe segurar | Sharpe regra | Queda regra | Queda exposição fixa de mesma média |
+|---|---|---|---|---|
+| SPY 1994–2026 | 0,51 | 0,52 | −44% | −48% (83%) |
+| Ibovespa 1996–2026 (caixa CDI) | 0,10 | 0,05 | −57% | −61% (93%) |
+
+Critério 1: falhou nos dois (EUA perde na 1ª metade, 0,22 contra 0,26). Critério 2: falhou nos dois. Critério 3: passou nos EUA e falhou no Brasil. A regra só reduz o risco na mesma proporção que uma exposição fixa menor.
