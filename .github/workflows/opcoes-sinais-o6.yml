@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  issues: write   # só para avisar por e-mail nos dias com sinal
 
 jobs:
   sinais:
@@ -29,6 +30,15 @@ jobs:
       - name: Lista do dia
         working-directory: opcoes
         run: python sinais_o6.py --saida ../sinais_o6.md
+
+      - name: Avisar quando houver sinal (abre um aviso no GitHub, que chega por e-mail)
+        if: github.event_name == 'schedule' && hashFiles('sinais_o6.md') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if grep -q '^### ' sinais_o6.md; then
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "O6: sinal para amanhã ($(head -1 sinais_o6.md | grep -o '[0-9/]*$'))" --body-file sinais_o6.md
+          fi
 
       - name: Guardar a lista
         if: always()

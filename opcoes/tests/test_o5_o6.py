@@ -83,6 +83,9 @@ def test_sinais_o6_lista_do_dia():
     t = sem[0]['trava']
     assert [x['lado'] for x in t['pernas']] == ['vende', 'compra'] and t['pernas'][0]['strike'] > t['pernas'][1]['strike']
     assert abs(t['alvo_recompra'] - 0.25 * t['credito']) < 1e-12 and t['credito'] > 0
+    v, c = t['pernas']
+    assert abs(t['venda_limite'] - t['credito'] - c['oferta_venda']) < 1e-9   # crédito líquido igual ao pedido
+    assert abs(t['recompra_limite'] - c['oferta_compra'] - t['alvo_recompra']) < 1e-9
     com = sinais_o6.sinais(dados, {**p, 'vrp_min': 1000})
     assert not com[0]['sinal'] and com[0]['vrp'] is not None
     assert 'PETR4' in sinais_o6.markdown(sem)

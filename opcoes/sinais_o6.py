@@ -3,8 +3,8 @@ ordem nenhuma.
 
 Para cada papel, no último pregão disponível no COTAHIST: VRP (IV de 30 dias − volatilidade realizada de 21
 pregões) e, se VRP ≥ 4, a trava de alta com put da O6 (vendida delta ~0,15, comprada delta ~0,05, 35 a 56 dias),
-com as ofertas de cada perna, o crédito no meio das ofertas (o preço a pedir na ordem estruturada) e o preço da
-recompra no alvo (25% do crédito).
+com as ofertas de cada perna, o crédito no meio das ofertas e as instruções da montagem em duas etapas (compra da
+proteção pela oferta de venda, depois venda limite da put de cima) e da recompra no alvo (25% do crédito).
 
 Uso: python sinais_o6.py [--saida sinais_o6.md]
 """
@@ -52,10 +52,18 @@ def sinais(dados, p=None):
                            'vencimento': venc, 'oferta_compra': c[4], 'oferta_venda': c[5]})
         credito = sum((x['oferta_compra'] + x['oferta_venda']) / 2 * (1 if x['lado'] == 'vende' else -1)
                       for x in pernas)
+        vend, comp = pernas
+        meio = lambda x: (x['oferta_compra'] + x['oferta_venda']) / 2
+        alvo = p['alvo_casado'] * credito
         linha.update(sinal=True, motivo='enviar amanhã', trava={
             'pernas': pernas, 'credito': credito, 'largura': m['largura'],
-            'credito_largura': credito / m['largura'], 'alvo_recompra': p['alvo_casado'] * credito,
-            'risco_por_opcao': m['largura'] - credito})
+            'credito_largura': credito / m['largura'], 'alvo_recompra': alvo,
+            'risco_por_opcao': m['largura'] - credito,
+            # etapa 2: meio da vendida + o que a proteção custou acima do meio dela (pagando a oferta de venda)
+            'protecao_max': comp['oferta_venda'], 'meio_comprada': meio(comp),
+            'venda_limite': meio(vend) + comp['oferta_venda'] - meio(comp),
+            # recompra: custo líquido = 25% do crédito, vendendo a comprada pela oferta de compra do fechamento
+            'recompra_limite': alvo + comp['oferta_compra']})
         out.append(linha)
     return out
 
@@ -65,7 +73,8 @@ def markdown(linhas):
     f = lambda x, n=2: '–' if x is None else f'{x:.{n}f}'.replace('.', ',')
     pc = lambda x: '–' if x is None else f(x * 100, 1) + '%'
     l = [f'## O6 para frente: lista do pregão {d[6:]}/{d[4:6]}/{d[:4]}', '',
-         'Enviar no pregão seguinte, ordem estruturada válida só no dia. Não executou, cancela.', '',
+         'Enviar no pregão seguinte, em duas etapas, sempre a proteção primeiro. A venda vale só no dia: não '
+         'executou, cancela e não persegue o preço.', '',
          '| Papel | Preço | IV | Vol. realizada 21d | VRP | Situação |', '| --- | --- | --- | --- | --- | --- |']
     for x in linhas:
         l.append(f"| {x['ativo']} | {f(x['spot'])} | {pc(x['iv'])} | {pc(x['rv'])} | {f(x['vrp'], 1)} | {x['motivo']} |")
@@ -80,11 +89,22 @@ def markdown(linhas):
             v = p['vencimento']
             l.append(f"| {p['lado']} | {p['codigo']} | {f(p['strike'])} | {v[6:]}/{v[4:6]}/{v[:4]} | "
                      f"{f(p['oferta_compra'])} | {f(p['oferta_venda'])} |")
-        l += ['', f"- **Crédito a pedir (meio das ofertas):** R$ {f(t['credito'])} por opção "
+        vend, comp = t['pernas']
+        l += ['', f"- **Crédito pedido (meio das ofertas):** R$ {f(t['credito'])} por opção "
                   f"({f(t['credito_largura'] * 100, 0)}% da largura de R$ {f(t['largura'])})",
-              f"- **Recompra no alvo:** R$ {f(t['alvo_recompra'])} por opção",
               f"- **Perda máxima:** R$ {f(t['risco_por_opcao'])} por opção (R$ {f(t['risco_por_opcao'] * 100)} "
-              f"por lote de 100)"]
+              f"por lote de 100)", '',
+              '**Montagem, na abertura:**', '',
+              f"1. **Comprar** 100 {comp['codigo']} pela oferta de venda da tela (no fechamento era "
+              f"R$ {f(comp['oferta_venda'])}). Anote o preço pago.",
+              f"2. **Vender** 100 {vend['codigo']} com ordem limite, válida só no dia: "
+              f"**R$ {f(t['venda_limite'])}** se a proteção custou R$ {f(t['protecao_max'])}. Se custou outro "
+              f"preço, o limite é R$ {f(t['venda_limite'] - t['protecao_max'])} + o preço pago.", '',
+              '**Recompra no alvo (com a trava montada, renovar todo dia até o vencimento):**', '',
+              f"1. **Comprar** 100 {vend['codigo']} com ordem limite de **R$ {f(t['recompra_limite'])}**, "
+              f"isto é, R$ {f(t['alvo_recompra'])} + a oferta de compra de {comp['codigo']} na tela "
+              f"(R$ {f(comp['oferta_compra'])} no fechamento).",
+              f"2. Só depois de executada, **vender** 100 {comp['codigo']} pela oferta de compra."]
     return '\n'.join(l) + '\n'
 
 

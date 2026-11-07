@@ -1,6 +1,7 @@
 # Protocolo do teste para frente da O6: a ordem estruturada é executada?
 
-Rascunho de 06/11/2026, a ser confirmado pelo Diego antes de começar. Depois de começar, as regras não mudam.
+Escrito em 06/11/2026 e **confirmado pelo Diego em 07/11/2026**. Começa no primeiro pregão com sinal a partir de
+09/11/2026. Daqui em diante as regras não mudam.
 
 ## Pergunta
 
@@ -23,8 +24,9 @@ não executar, sobra só uma put comprada barata, que no pior caso vira pó.
   papel.
 - **Sinal:** VRP ≥ 4 pontos (IV de 30 dias − volatilidade realizada de 21 pregões). A lista do dia sai do script
   `opcoes/sinais_o6.py` (só leitura), que roda no GitHub Actions ("Opções - O6 para frente: lista do dia") e mostra,
-  para cada papel com sinal, as duas opções, as ofertas, o crédito a pedir e o preço da recompra no alvo. Enquanto o
-  pull request não for aceito, a lista roda quando acionada à mão; depois, todo dia útil às 20h30.
+  para cada papel com sinal, as duas opções, as ofertas, o preço de cada etapa e o preço da recompra no alvo. Depois
+  que o pull request for aceito, roda todo dia útil às 20h30 e, nos dias com sinal, abre um aviso no GitHub, que chega
+  por e-mail. Antes disso, roda só quando acionada à mão.
 - **Montagem:** put vendida com delta mais perto de 0,15; comprada com delta mais perto de 0,05; vencimento de 35 a
   56 dias. Crédito pedido = meio das ofertas do fechamento das duas pernas. Só envia se o crédito for ≥ 12% da
   largura.
@@ -39,8 +41,8 @@ não executar, sobra só uma put comprada barata, que no pior caso vira pó.
 
 ## O que anotar (uma linha por ordem, numa planilha)
 
-Data, papel, as duas opções, crédito pedido, ofertas de compra e venda de cada perna no envio, preço pago na
-proteção, se a venda executou (sim ou não), horário e preço da execução. Quando a venda não executa, anota também o
+Na planilha `registro-o6-para-frente.xlsx`: data, papel, as duas opções, crédito pedido, ofertas de compra e venda
+de cada perna no envio, preço pago na proteção, se a venda executou (sim ou não), horário e preço da execução. Quando a venda não executa, anota também o
 que a put comprada valeu no vencimento (é o custo das tentativas que não deram certo). Para a recompra: data, preço pedido, se executou e a que preço. No
 vencimento: valor intrínseco e resultado.
 
