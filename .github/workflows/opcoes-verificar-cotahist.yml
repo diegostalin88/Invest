@@ -11,7 +11,7 @@ on:
         default: "2018-2026"
   push:
     branches: [claude/project-thread-ouh2hk]
-    paths: ["opcoes/**", ".github/workflows/opcoes-verificar-cotahist.yml"]
+    paths: ["opcoes/cotahist.py", ".github/workflows/opcoes-verificar-cotahist.yml"]
 
 permissions:
   contents: read

@@ -1,0 +1,49 @@
+name: "Opções - O6 para frente: lista do dia"
+
+# Só leitura: lista de sinais da O6 para o teste para frente (docs/opcoes/protocolo-o6-para-frente.md).
+# Não envia ordem nenhuma. A lista aparece no resumo da execução.
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/project-thread-ouh2hk]
+    paths: ["opcoes/sinais_o6.py", ".github/workflows/opcoes-sinais-o6.yml"]
+  schedule:
+    - cron: "30 23 * * 1-5"   # 20h30 em Brasília, depois de a B3 publicar o COTAHIST do dia
+
+permissions:
+  contents: read
+  issues: write   # só para avisar por e-mail nos dias com sinal
+
+jobs:
+  sinais:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Lista do dia
+        working-directory: opcoes
+        run: python sinais_o6.py --saida ../sinais_o6.md
+
+      - name: Avisar quando houver sinal (abre um aviso no GitHub, que chega por e-mail)
+        if: github.event_name == 'schedule' && hashFiles('sinais_o6.md') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if grep -q '^### ' sinais_o6.md; then
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "O6: sinal para amanhã ($(head -1 sinais_o6.md | grep -o '[0-9/]*$'))" --body-file sinais_o6.md
+          fi
+
+      - name: Guardar a lista
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sinais-o6
+          path: sinais_o6.md
+          if-no-files-found: ignore

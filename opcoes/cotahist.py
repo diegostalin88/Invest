@@ -52,7 +52,11 @@ def ler_linha(linha):
         'codneg': linha[12:24].strip(),
         'tpmerc': linha[24:27],
         'especi': linha[39:49].strip(),
+        'premax': _preco(linha[69:82]),
+        'premin': _preco(linha[82:95]),
         'preult': _preco(linha[108:121]),
+        'preofc': _preco(linha[121:134]),
+        'preofv': _preco(linha[134:147]),
         'totneg': int(linha[147:152]),
         'voltot': _preco(linha[170:188]),
         'preexe': _preco(linha[188:201]),
@@ -66,13 +70,17 @@ def classe(especi):
     return especi.split()[0] if especi else ''
 
 
-def filtrar(linhas, universo=UNIVERSO):
-    """Separa os preços à vista do universo e as opções sobre eles. Devolve (spot, opcoes, ignoradas)."""
+def filtrar(linhas, universo=UNIVERSO, ohlc=None):
+    """Separa os preços à vista do universo e as opções sobre eles. Devolve (spot, opcoes, ignoradas).
+    Se `ohlc` for um dicionário, recebe também (máxima, mínima) do ativo à vista por (data, ativo)."""
     raizes = {t[:4]: t for t in universo}
     spot, classes, opcoes, ignoradas = {}, {}, [], 0
     for r in filter(None, map(ler_linha, linhas)):
         if r['tpmerc'] == '010' and r['codneg'] in universo:
             spot[(r['data'], r['codneg'])] = r['preult'] / max(r['fatcot'], 1)
+            if ohlc is not None:
+                f = max(r['fatcot'], 1)
+                ohlc[(r['data'], r['codneg'])] = (r['premax'] / f, r['premin'] / f, r['voltot'])
             classes[r['codneg']] = classe(r['especi'])
         elif r['tpmerc'] in ('070', '080') and r['codneg'][:4] in raizes:
             r['ativo'] = raizes[r['codneg'][:4]]
@@ -225,8 +233,16 @@ def _baixar(url, tentativas=4):
             time.sleep(2 ** (i + 1))
 
 
-def linhas_do_ano(ano):
-    dados = _baixar(URL_ANUAL.format(ano=ano))
+def linhas_do_ano(ano, tentativas=5):
+    # a B3 às vezes devolve uma página no lugar do zip quando muitos downloads chegam juntos: espera e tenta de novo
+    for i in range(tentativas):
+        dados = _baixar(URL_ANUAL.format(ano=ano))
+        if zipfile.is_zipfile(io.BytesIO(dados)):
+            break
+        if i == tentativas - 1:
+            raise zipfile.BadZipFile(f'COTAHIST {ano}: a B3 não devolveu um zip ({len(dados)} bytes)')
+        print(f'  {ano}: resposta da B3 não é zip; tentando de novo em {30 * 2 ** i}s', flush=True)
+        time.sleep(30 * 2 ** i)
     with zipfile.ZipFile(io.BytesIO(dados)) as z:
         nome = z.namelist()[0]
         with z.open(nome) as f:
