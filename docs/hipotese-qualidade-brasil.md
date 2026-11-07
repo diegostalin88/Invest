@@ -72,3 +72,46 @@ seleção por fundamentos e o núcleo segue no índice.
 - **Período já visto** pela C-BR (outros indicadores): por isso o critério 6.
 - **Lucro contábil:** itens não recorrentes (venda de ativos, impairment) entram no lucro dos 12 meses.
 - **Bancos** ficam sempre mal na segurança; a robustez sem eles mostra o efeito.
+
+## Resultado (07/11/2026, [run 42333421810](https://github.com/diegostalin88/Invest/actions/runs/42333421810))
+
+A 1ª execução (run 42332572888) calculou tudo, mas caiu ao gravar o JSON antes de imprimir os números (tipo do
+numpy); só a gravação foi corrigida, nenhuma regra mudou.
+
+**Veredito: REPROVADA.** Passou nos critérios 1 a 5 e falhou no 6. Período de 30/03/2012 a 30/09/2026, 58
+trimestres, ~52 elegíveis por data.
+
+| Carteira | Retorno | Ao ano | Queda máx. | Sharpe |
+| --- | --- | --- | --- | --- |
+| **Qualidade (15 papéis)** | **734,3%** | **15,8%** | 31,5% | 0,79 |
+| BOVA11 | 188,1% | 7,6% | 37,7% | 0,44 |
+| CDI | 281,3% | 9,7% | 0,0% | – |
+| Pesos iguais, todos os elegíveis | 510,1% | 13,3% | 35,8% | 0,65 |
+| Acaso (200 carteiras de 15) | p5 244,4%, mediana 450,2%, p95 716,3% | | | |
+| Só rentabilidade (ROE) | 749,6% | 15,9% | 34,3% | 0,82 |
+| Só segurança (passivo/ativo) | 371,1% | 11,3% | 34,4% | 0,58 |
+| 10 papéis | 524,1% | 13,5% | 34,3% | 0,68 |
+| 20 papéis | 764,1% | 16,0% | 29,5% | 0,82 |
+| Custo × 2 | 717,9% | 15,6% | 31,6% | 0,79 |
+| Sem bancos e seguradoras | 694,7% | 15,4% | 30,8% | 0,77 |
+
+- Percentil entre as carteiras sorteadas no período inteiro: **96** (critério 1 passou por pouco: 734% contra p95
+  de 716%).
+- **Metades (critério 6):**
+  - 2012 a 2019: carteira 193,4% contra pesos iguais 190,3% e acaso mediana 177,7% / p90 254,9%: **percentil 60**.
+    Falhou.
+  - 2019 a 2026: carteira 184,4% contra pesos iguais 110,1% e acaso p90 151,1%: percentil 97. Passou.
+- Por ano (carteira / BOVA11 / CDI): 2012 18,7/−6,6/5,7; 2013 −2,4/−15,8/7,9; 2014 9,4/−3,4/10,6;
+  2015 −7,2/−13,2/13,0; 2016 35,4/38,2/13,9; 2017 48,2/26,8/9,9; 2018 2,9/14,6/6,3; 2019 58,6/31,5/5,9;
+  2020 14,6/3,1/2,7; 2021 −8,2/−12,1/4,3; 2022 20,6/5,1/12,3; 2023 16,4/23,1/13,0; 2024 −2,9/−10,1/10,8;
+  2025 35,9/34,7/14,1; 2026 11,2/16,5/10,5.
+- Conferência à mão (balanço mais recente): PETR4 ROE 27,8%, passivo/ativo 62%; ITUB4 21,0% e 93%; WEGE3 31,3% e
+  53%. VALE3 aparece com lucro de 12 meses de R$ 0,6 bilhão (o mesmo problema da CVM visto na C-BR).
+- Carteira de hoje (só informação): CXSE3, BBSE3, ITSA4, WEGE3, VIVA3, MULT3, POMO4, ABEV3, TOTS3, CYRE3, B3SA3,
+  LREN3, CURY3, PETR4, HYPE3.
+
+**Leitura:** o mesmo desenho da C-BR. De 2012 a 2019 a seleção por qualidade empatou com os pesos iguais e com o
+acaso do mesmo universo; toda a vantagem veio de 2019 a 2026. Pela regra registrada, isso não conta como vantagem
+confirmada: a carteira **não entra no app como satélite** e não deve ser reaberta com outros pesos, indicadores ou
+número de papéis no mesmo período. Uma confirmação honesta só pode vir **para frente**: se o Diego quiser, a lista de
+hoje pode ser acompanhada por 12 meses contra o BOVA11 e os pesos iguais, sem dinheiro real.
