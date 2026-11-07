@@ -384,6 +384,7 @@
                 <button type="button" class="am-linha" data-sub="decisoes"><span class="am-avatar" style="background:#0e7490">✍️</span><span class="am-meio"><span class="am-tk block">Diário das minhas decisões</span><span class="am-nome block">Cada compra e venda contra o índice</span></span></button>
                 <button type="button" class="am-linha" data-sub="testado"><span class="am-avatar" style="background:#475569">🔬</span><span class="am-meio"><span class="am-tk block">O que já foi testado</span><span class="am-nome block">O que passou e o que reprovou</span></span></button>
                 <button type="button" class="am-linha" data-sub="imposto"><span class="am-avatar" style="background:#15803d">🧾</span><span class="am-meio"><span class="am-tk block">Imposto das vendas do mês</span><span class="am-nome block">Isenção de R$ 20 mil, prejuízo a compensar e DARF (Brasil)</span></span></button>
+                <button type="button" class="am-linha" data-sub="proventos"><span class="am-avatar" style="background:#a16207">💰</span><span class="am-meio"><span class="am-tk block">Proventos e declaração anual</span><span class="am-nome block">Dividendos, JCP, reinvestimento e resumo para o IR (Brasil)</span></span></button>
             </div>
             <div class="am-secao mt-4">Avançado <span class="text-xs font-normal" style="color:var(--mudo)">(estratégia técnica congelada em 04/11/2026: perdeu para o índice nos testes)</span></div>
             <div class="am-lista">
@@ -434,6 +435,7 @@
                 <div data-sub-slot="decisoes" class="hidden"></div>
                 <div data-sub-slot="testado" class="hidden"></div>
                 <div data-sub-slot="imposto" class="hidden"></div>
+                <div data-sub-slot="proventos" class="hidden"></div>
                 <div data-sub-slot="sinais" class="hidden">
                     <p class="text-sm mb-3" style="color:var(--mudo)">Score da estratégia técnica congelada. Nos testes de 04/11/2026 ela perdeu para o índice; serve só para acompanhar o teste até 11/2027.</p>
                     <button type="button" class="am-pilula mb-3" id="am-abrir-filtros"><svg class="am-ico" style="width:1.1rem;height:1.1rem"><use href="#i-filtro"/></svg>Filtros</button>
@@ -3562,7 +3564,8 @@
     // Com aportes, o rebalanceamento é feito comprando o que está abaixo da meta, sem vender (sem imposto e sem custo).
     const CHAVE_PLANO = 'invest-plano';
     const ETFS_INDICE = new Set(['BOVA11', 'BOVV11', 'BRAX11', 'IVVB11', 'SMAL11', 'PIBB11', 'ECOO11', 'XBOV11', 'NASD11', 'SPXI11', 'WRLD11', 'ACWI11',
-        'SPY', 'VOO', 'IVV', 'VTI', 'QQQ', 'VT', 'VXUS', 'VEA', 'VWO', 'SCHB', 'SCHX', 'ITOT', 'SPLG', 'IWM', 'DIA', 'RSP']);
+        'SPY', 'VOO', 'IVV', 'VTI', 'QQQ', 'VT', 'VXUS', 'VEA', 'VWO', 'SCHB', 'SCHX', 'ITOT', 'SPLG', 'IWM', 'DIA', 'RSP',
+        'DIVO11', 'SCHD', 'VIG', 'DVY', 'SDY', 'HDV', 'NOBL']);   // ETFs de dividendos também são fundos de índice (teste H: não substituem o índice amplo)
     const CLASSES_PLANO = [['rf', 'Renda fixa e reserva'], ['indice', 'Fundos de índice (núcleo)'], ['acoes', 'Ações escolhidas (satélite)']];
     function lerPlano() { try { const v = JSON.parse(localStorage.getItem(CHAVE_PLANO) || '{}'); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } }
     function gravarPlano(p) { try { localStorage.setItem(CHAVE_PLANO, JSON.stringify(p)); return true; } catch (e) { return false; } }
@@ -3705,6 +3708,142 @@
             const ap = e.target.closest('[data-ir-apagar]'); if (ap) { reg.vendas.splice(+ap.dataset.irApagar, 1); gravarIR(d); desenharIR(); }
         });
     }
+    // ----- Proventos (dividendos, JCP, FII) e resumo para a declaração anual (Brasil) -----
+    // Holding: o provento recebido vira aporte e segue o plano de alocação (compra o que está abaixo da meta).
+    // Imposto em 2026 (Lei 15.270/2025): dividendos seguem isentos, mas se uma mesma empresa pagar mais de R$ 50 mil no
+    // mês à mesma pessoa, ela retém 10% sobre o total (lucros até 2025 aprovados até 31/12/2025 ficam de fora). JCP:
+    // 15% retido na fonte (tributação exclusiva). Rendimento de FII: isento para pessoa física nas regras atuais.
+    const CHAVE_PROVENTOS = 'invest-proventos', LIMITE_DIV_MES = 50000;
+    const TIPOS_PROV = { div: 'Dividendo', jcp: 'JCP', fii: 'Rendimento de FII' };
+    function lerProventos() { try { const v = JSON.parse(localStorage.getItem(CHAVE_PROVENTOS) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+    function gravarProventos(l) { try { localStorage.setItem(CHAVE_PROVENTOS, JSON.stringify(l)); return true; } catch (e) { return false; } }
+    const raizEmpresa = t => String(t).replace(/\.SA$/, '').replace(/\d+$/, '');   // PETR3 e PETR4 = mesma empresa
+    function irSugeridoProvento(p, lista) {
+        if (p.tipo === 'jcp') return 0.15 * p.bruto;
+        if (p.tipo !== 'div') return 0;
+        const mes = p.data.slice(0, 7), emp = raizEmpresa(p.t);
+        const doMes = lista.filter(x => x.tipo === 'div' && x.data.slice(0, 7) === mes && raizEmpresa(x.t) === emp).reduce((s, x) => s + x.bruto, 0) + p.bruto;
+        return doMes > LIMITE_DIV_MES ? 0.10 * p.bruto : 0;
+    }
+    function resumoProventos(lista, ano) {
+        const doAno = lista.filter(x => x.data.slice(0, 4) === String(ano));
+        const tot = { div: 0, jcp: 0, fii: 0 }, ir = { div: 0, jcp: 0, fii: 0 };
+        doAno.forEach(x => { tot[x.tipo] += x.bruto; ir[x.tipo] += x.ir || 0; });
+        const bruto = tot.div + tot.jcp + tot.fii, retido = ir.div + ir.jcp + ir.fii;
+        const porEmpresaMes = {};
+        doAno.filter(x => x.tipo === 'div').forEach(x => { const k = raizEmpresa(x.t) + ' ' + x.data.slice(0, 7); porEmpresaMes[k] = (porEmpresaMes[k] || 0) + x.bruto; });
+        const acimaLimite = Object.entries(porEmpresaMes).filter(([, v]) => v > LIMITE_DIV_MES).map(([k, v]) => ({ chave: k, valor: v }));
+        const naoReinvestido = lista.filter(x => !x.reinvestido).reduce((s, x) => s + x.bruto - (x.ir || 0), 0);
+        return { tot, ir, bruto, retido, liquido: bruto - retido, acimaLimite, naoReinvestido, n: doAno.length };
+    }
+    // Bens e direitos: posição em 31/12 pelo custo (quantidade × preço médio), não pelo preço de mercado.
+    function tipoAtivoBR(t) { const s = String(t).replace(/\.SA$/, ''); return ETFS_INDICE.has(s) || ['DIVO11', 'BOVA11'].includes(s) ? 'etf' : /11$/.test(s) ? 'fii?' : 'acao'; }
+    function montarDeclaracao(ano, carteira, proventos, ir) {
+        const fim = `${ano}-12-31`;
+        const bens = carteira.filter(x => x.m === 'br' && (!x.data || x.data <= fim)).map(x => {
+            const t = String(x.t).replace(/\.SA$/, ''), tipo = tipoAtivoBR(t);
+            const cod = tipo === 'acao' ? 'Grupo 03 (Participações societárias), código 01 (Ações)' : tipo === 'etf' ? 'Grupo 07 (Fundos), tipo fundo de índice (ETF)' : 'Grupo 07 (Fundos): FII, ou 03-01 se for unit de ação';
+            return { t, tipo, cod, qtd: x.qtd, custo: x.qtd * x.pm, texto: `${fmtNumM(x.qtd, 0)} ${tipo === 'acao' ? 'ações' : 'cotas'} de ${t}, preço médio de R$ ${fmtNumM(x.pm, 2)}, custódia na corretora.` };
+        });
+        const doAno = proventos.filter(x => x.data.slice(0, 4) === String(ano));
+        const agrupar = tipo => { const m = {}; doAno.filter(x => x.tipo === tipo).forEach(x => { const t = String(x.t).replace(/\.SA$/, ''); m[t] = m[t] || { t, bruto: 0, ir: 0 }; m[t].bruto += x.bruto; m[t].ir += x.ir || 0; }); return Object.values(m); };
+        const meses = Object.entries((ir && ir.meses) || {}).filter(([m]) => m.slice(0, 4) === String(ano)).sort(([a], [b]) => a < b ? -1 : 1);
+        const rv = meses.map(([mes, reg]) => { const R = calcularIR(reg.vendas || [], reg.prejComum, reg.prejFII, mes); return { mes, R }; });
+        const lucroIsento = rv.reduce((s, x) => s + x.R.lucroIsento, 0);
+        return { ano, bens, dividendos: agrupar('div'), jcp: agrupar('jcp'), fii: agrupar('fii'), rv: rv.filter(x => (x.R.lucroAcoes || x.R.lucroETF || x.R.lucroFII)), lucroIsento };
+    }
+    function textoDeclaracao(D) {
+        const din = v => `R$ ${fmtNumM(v, 2)}`, L = [];
+        L.push(`RESUMO PARA A DECLARAÇÃO (ano-base ${D.ano}), gerado pelo app Invest. Confira com os informes da corretora e das empresas.`, '');
+        L.push('BENS E DIREITOS (situação em 31/12 pelo custo):');
+        D.bens.forEach(b => L.push(`- ${b.cod}: ${b.texto} Situação em 31/12/${D.ano}: ${din(b.custo)}`));
+        if (!D.bens.length) L.push('- (nenhuma posição)');
+        L.push('', 'RENDIMENTOS ISENTOS E NÃO TRIBUTÁVEIS:');
+        D.dividendos.forEach(x => L.push(`- Código 09 (lucros e dividendos): ${x.t} ${din(x.bruto)}${x.ir ? ` (retido ${din(x.ir)}: informar conforme o informe da empresa)` : ''}`));
+        D.fii.forEach(x => L.push(`- Rendimentos de FII: ${x.t} ${din(x.bruto)}`));
+        if (D.lucroIsento > 0) L.push(`- Código 20 (ganhos em vendas de ações até R$ 20 mil no mês): ${din(D.lucroIsento)}`);
+        L.push('', 'RENDIMENTOS SUJEITOS À TRIBUTAÇÃO EXCLUSIVA:');
+        D.jcp.forEach(x => L.push(`- Código 10 (juros sobre capital próprio): ${x.t} ${din(x.bruto - x.ir)} líquido (bruto ${din(x.bruto)}, retido ${din(x.ir)})`));
+        L.push('', 'RENDA VARIÁVEL (operações comuns, mês a mês):');
+        D.rv.forEach(({ mes, R }) => L.push(`- ${mes.split('-').reverse().join('/')}: ações ${din(R.isento ? Math.min(R.lucroAcoes, 0) : R.lucroAcoes)}${R.isento && R.lucroAcoes > 0 ? ' (lucro isento vai no código 20)' : ''}, ETFs ${din(R.lucroETF)}, FIIs ${din(R.lucroFII)}, imposto devido ${din(R.total)}`));
+        if (!D.rv.length) L.push('- (nenhuma venda registrada no Imposto do mês)');
+        return L.join('\n');
+    }
+    function htmlProventos() {
+        const lista = lerProventos(); const anoAtual = new Date().getFullYear();
+        const anoSel = +(sessionStorage.getItem('invest-prov-ano') || anoAtual);
+        const S = resumoProventos(lista, anoSel);
+        const din = v => `R$ ${fmtNumM(v, 2)}`;
+        const D = montarDeclaracao(anoSel, lerCarteira(), lista, lerIR());
+        const linhas = lista.map((x, k) => ({ x, k })).filter(o => o.x.data.slice(0, 4) === String(anoSel)).reverse().map(({ x, k }) => `<div class="am-card" data-prov-item><div class="flex items-center justify-between"><span><span class="am-tk">${escapeHtmlM(x.t)}</span> <span class="am-chip">${TIPOS_PROV[x.tipo]}</span>${x.reinvestido ? ' <span class="am-chip verde">reinvestido</span>' : ''}</span><button type="button" class="am-chip" data-prov-apagar="${k}">Apagar</button></div>
+            <div class="text-sm mt-1">${fmtDataBR(x.data)} · bruto <b>${din(x.bruto)}</b>${x.ir ? ` · retido ${din(x.ir)}` : ''} · líquido <b>${din(x.bruto - (x.ir || 0))}</b></div></div>`).join('');
+        const anos = [...new Set([anoAtual, anoAtual - 1, ...lista.map(x => +x.data.slice(0, 4))])].sort((a, b) => b - a);
+        return `<div class="space-y-3" data-proventos>
+            <div class="am-card"><div class="font-bold">Lançar provento recebido</div>
+                <div class="grid grid-cols-2 gap-2 mt-2 text-sm">
+                    <label class="block"><span class="text-xs" style="color:var(--mudo)">Papel</span><input id="prov-t" type="text" autocomplete="off" autocapitalize="characters" class="w-full mt-1" placeholder="ITUB4"></label>
+                    <label class="block"><span class="text-xs" style="color:var(--mudo)">Tipo</span><select id="prov-tipo" class="w-full mt-1"><option value="div">Dividendo</option><option value="jcp">JCP</option><option value="fii">Rendimento de FII</option></select></label>
+                    <label class="block"><span class="text-xs" style="color:var(--mudo)">Data do pagamento</span><input id="prov-data" type="date" class="w-full mt-1" value="${new Date().toISOString().slice(0, 10)}"></label>
+                    <label class="block"><span class="text-xs" style="color:var(--mudo)">Valor bruto (R$)</span><input id="prov-bruto" type="number" inputmode="decimal" step="any" min="0" class="w-full mt-1"></label>
+                    <label class="block col-span-2"><span class="text-xs" style="color:var(--mudo)">Imposto retido (R$, deixe vazio para o app calcular: JCP 15%; dividendo 10% só acima de R$ 50 mil no mês da mesma empresa)</span><input id="prov-ir" type="number" inputmode="decimal" step="any" min="0" class="w-full mt-1"></label>
+                </div>
+                <p class="text-sm mt-2" style="color:#fca5a5" id="prov-erro"></p>
+                <button type="button" class="am-botao mt-1" id="prov-salvar">Adicionar provento</button></div>
+            <div class="am-card" data-prov-resumo><div class="flex items-center justify-between"><span class="font-bold">Resumo de ${anoSel}</span><select id="prov-ano" class="text-sm">${anos.map(a => `<option value="${a}"${a === anoSel ? ' selected' : ''}>${a}</option>`).join('')}</select></div>
+                <div class="am-grade mt-2">
+                    <div class="am-dado"><div class="r">Dividendos</div><div class="v">${din(S.tot.div)}</div></div>
+                    <div class="am-dado"><div class="r">JCP (bruto)</div><div class="v">${din(S.tot.jcp)}</div></div>
+                    <div class="am-dado"><div class="r">FIIs</div><div class="v">${din(S.tot.fii)}</div></div>
+                    <div class="am-dado"><div class="r">Retido · líquido</div><div class="v">${din(S.retido)} · ${din(S.liquido)}</div></div>
+                </div>
+                ${S.acimaLimite.length ? `<p class="text-sm mt-2" style="color:var(--baixa)" data-prov-limite>⚠️ ${S.acimaLimite.map(a => `${a.chave.split(' ')[0]} pagou ${din(a.valor)} em ${a.chave.split(' ')[1].split('-').reverse().join('/')}`).join('; ')}: acima de R$ 50 mil no mês, a empresa retém 10% sobre o total (Lei 15.270/2025), salvo lucros até 2025 já aprovados.</p>` : ''}
+            </div>
+            <div class="am-card" data-prov-reinvestir><div class="font-bold">Reinvestir</div>
+                <p class="text-sm mt-1">${S.naoReinvestido > 0 ? `Há <b>${din(S.naoReinvestido)}</b> de proventos líquidos ainda não reinvestidos. Somar ao próximo aporte do plano de alocação faz o app dividir esse dinheiro entre o que está abaixo da meta, sem vender nada.` : 'Todos os proventos lançados já foram reinvestidos.'}</p>
+                ${S.naoReinvestido > 0 ? `<button type="button" class="am-botao mt-2" id="prov-reinvestir">Somar ao próximo aporte</button>` : ''}
+                <p class="text-xs mt-2" style="color:var(--mudo)">Nos testes, o dividendo não foi ganho extra: o preço cai no valor pago. O que faz a renda crescer é reinvestir e seguir o plano.</p></div>
+            ${linhas}
+            <div class="am-card" data-prov-declaracao><div class="font-bold">Resumo para a declaração (ano-base ${anoSel})</div>
+                <p class="text-sm mt-1" style="color:var(--mudo)">Usa a Carteira (posição a custo), os proventos lançados aqui e as vendas do Imposto do mês. Bens e direitos usam o preço médio, nunca o preço de mercado.</p>
+                <pre class="text-xs mt-2" style="white-space:pre-wrap;background:var(--fundo2, rgba(127,127,127,.08));padding:.6rem;border-radius:.5rem" id="prov-texto">${escapeHtmlM(textoDeclaracao(D))}</pre>
+                <button type="button" class="am-botao sec mt-2" id="prov-copiar">Copiar resumo</button></div>
+            <p class="text-xs" style="color:var(--mudo)">Códigos do programa da Receita mais usados: ações em Bens e Direitos 03-01; dividendos em Isentos 09; ganho em vendas de ações até R$ 20 mil no mês em Isentos 20; JCP em Tributação Exclusiva 10. Os códigos de ETF e FII mudaram nos últimos anos: escolha pelo nome no programa. A carteira guarda a posição de hoje: se vendeu parte depois de 31/12, ajuste. Quem tem renda total acima de R$ 600 mil no ano entra no imposto mínimo (IRPFM) a partir de 2026. Os números ficam só neste aparelho; confira com um contador.</p>
+        </div>`;
+    }
+    function desenharProventos() { const box = document.querySelector('[data-sub-slot="proventos"]'); if (box) box.innerHTML = htmlProventos(); }
+    function prepararProventos() {
+        const box = document.querySelector('[data-sub-slot="proventos"]'); if (!box || box.dataset.pronto) return; box.dataset.pronto = '1';
+        box.addEventListener('change', e => {
+            if (e.target.id === 'prov-ano') { try { sessionStorage.setItem('invest-prov-ano', e.target.value); } catch (er) { } desenharProventos(); }
+            if (e.target.id === 'prov-t') { const t = e.target.value.trim().toUpperCase(); if (/11$/.test(t) && tipoAtivoBR(t) !== 'etf') document.getElementById('prov-tipo').value = 'fii'; }
+        });
+        box.addEventListener('click', e => {
+            const lista = lerProventos();
+            if (e.target.id === 'prov-salvar') {
+                const t = (document.getElementById('prov-t').value || '').trim().toUpperCase().replace(/\.SA$/, '');
+                const p = { t, tipo: document.getElementById('prov-tipo').value, data: document.getElementById('prov-data').value, bruto: +document.getElementById('prov-bruto').value };
+                if (!t || !/^\d{4}-\d{2}-\d{2}$/.test(p.data) || !(p.bruto > 0)) { document.getElementById('prov-erro').textContent = 'Preencha papel, data e valor bruto.'; return; }
+                const irDig = document.getElementById('prov-ir').value;
+                p.ir = irDig === '' ? +irSugeridoProvento(p, lista).toFixed(2) : Math.max(0, +irDig || 0);
+                // dividendo que faz a empresa passar de R$ 50 mil no mês: os anteriores do mesmo mês também ficam com 10%
+                if (p.tipo === 'div' && irDig === '' && p.ir > 0) lista.forEach(x => { if (x.tipo === 'div' && x.data.slice(0, 7) === p.data.slice(0, 7) && raizEmpresa(x.t) === raizEmpresa(p.t) && !x.irManual) x.ir = +(0.10 * x.bruto).toFixed(2); });
+                if (irDig !== '') p.irManual = true;
+                lista.push(p); lista.sort((a, b) => a.data < b.data ? -1 : a.data > b.data ? 1 : 0); gravarProventos(lista);
+                try { sessionStorage.setItem('invest-prov-ano', p.data.slice(0, 4)); } catch (er) { }
+                desenharProventos(); return;
+            }
+            if (e.target.id === 'prov-reinvestir') {
+                const valor = resumoProventos(lista, 0).naoReinvestido; if (!(valor > 0)) return;
+                const planos = lerPlano(); const pl = planos.br || { rf: 40, indice: 45, acoes: 15, valorRF: 0, valorIndice: 0, aporte: 0 };
+                pl.aporte = +((+pl.aporte || 0) + valor).toFixed(2); planos.br = pl; gravarPlano(planos);
+                lista.forEach(x => { x.reinvestido = true; }); gravarProventos(lista); desenharProventos();
+                const msg = document.querySelector('[data-prov-reinvestir] p'); if (msg) msg.innerHTML = `Somado: o próximo aporte do plano (Brasil) agora é de <b>R$ ${fmtNumM(pl.aporte, 2)}</b>. Veja a divisão na Carteira → Plano de alocação.`;
+                return;
+            }
+            if (e.target.id === 'prov-copiar') { const txt = document.getElementById('prov-texto').textContent; if (navigator.clipboard) navigator.clipboard.writeText(txt).then(() => { e.target.textContent = 'Copiado'; }, () => { }); return; }
+            const ap = e.target.closest('[data-prov-apagar]'); if (ap) { lista.splice(+ap.dataset.provApagar, 1); gravarProventos(lista); desenharProventos(); }
+        });
+    }
     // ----- Diário das minhas decisões (salvo só neste aparelho) -----
     const CHAVE_DECISOES = 'invest-decisoes';
     function lerDecisoes() { try { const v = JSON.parse(localStorage.getItem(CHAVE_DECISOES) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
@@ -3768,6 +3907,9 @@
     const escapeHtmlM = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     // ----- O que já foi testado (registro honesto; números em docs/ no GitHub) -----
     const TESTES_FEITOS = [
+        ['Ações de qualidade no Brasil (ROE alto e pouca dívida)', 'REPROVADA', '2012–2026: 15,8% ao ano contra 7,6% do BOVA11 e 13,3% dos pesos iguais, mas de 2012 a 2019 empatou com o acaso do mesmo universo (percentil 60). Toda a vantagem veio de 2019 em diante, o mesmo desenho da carteira de lucro/preço e dividendos.', 'docs/hipotese-qualidade-brasil.md'],
+        ['Holding com ETFs de dividendos no lugar do índice', 'REPROVADA', 'Comprar e segurar, 2003–2026. Brasil: DIVO11 9,8% ao ano contra 7,0% do BOVA11, mas com queda de 56% contra 47%; os dois perderam para o CDI. EUA: SCHD, VIG, DVY, SDY, HDV e NOBL pagam mais renda, mas todos renderam menos que o SPY. Dividendo é parte do retorno, não ganho extra.', 'docs/hipotese-holding-dividendos.md'],
+        ['Ações baratas e boas pagadoras no Brasil (lucro/preço + dividendos)', 'REPROVADA', 'Ganhou do acaso em 2020–2026 (18,6% ao ano), mas em 2012–2020 ficou abaixo da mediana de carteiras sorteadas e perdeu para os pesos iguais do mesmo universo. Resultado de um período só.', 'docs/hipotese-fundamentos-brasil.md'],
         ['Estratégia do app (Score + 6 regras do Relatório)', 'REPROVADA', 'Não bateu o índice: EUA +2% a +18% contra SPY +19%; Brasil +10% a +27% contra BOVA11 +28%, com quedas maiores. Entradas sorteadas dão quase o mesmo. Está congelada e em teste para frente até 04/11/2027.', 'docs/congelamento.md'],
         ['Momento de 12 meses (carteira dos que mais subiram)', 'REPROVADA', 'EUA: +45,9% contra SPY +28,1%, acima do acaso, mas com queda de 33,9% contra 7,6%. Brasil: +28,5% contra BOVA11 +50,1%.', 'docs/hipotese-momento-tendencia.md'],
         ['Tendência no índice (média de 10 meses)', 'REPROVADA', 'Reduz as quedas, mas desde 2010 rendeu 7,8% ao ano contra 13,9% de ficar comprado no S&P 500. No Brasil perdeu para o CDI.', 'docs/hipotese-momento-tendencia.md'],
@@ -4211,7 +4353,8 @@
                 if (sub.dataset.sub === 'testado') document.querySelector('[data-sub-slot="testado"]').innerHTML = htmlTestado();
                 if (sub.dataset.sub === 'simulacao') desenharSimulacao();
                 if (sub.dataset.sub === 'imposto') { prepararIR(); desenharIR(); }
-                const titulos = { imposto: 'Imposto das vendas do mês', sinais: 'Ranking técnico', simulacao: 'Simulação da estratégia congelada', decisoes: 'Diário das minhas decisões', testado: 'O que já foi testado', estrategias: 'Screener de Estratégias', fundamentos: 'Técnica × Fundamentos', correlacao: 'Correlação (Pearson)', relatorio: 'Relatório' };
+                if (sub.dataset.sub === 'proventos') { prepararProventos(); desenharProventos(); }
+                const titulos = { imposto: 'Imposto das vendas do mês', proventos: 'Proventos e declaração anual', sinais: 'Ranking técnico', simulacao: 'Simulação da estratégia congelada', decisoes: 'Diário das minhas decisões', testado: 'O que já foi testado', estrategias: 'Screener de Estratégias', fundamentos: 'Técnica × Fundamentos', correlacao: 'Correlação (Pearson)', relatorio: 'Relatório' };
                 document.querySelectorAll('[data-sub-slot]').forEach(sl => sl.classList.toggle('hidden', sl.dataset.subSlot !== sub.dataset.sub));
                 document.getElementById('am-sub-titulo').textContent = titulos[sub.dataset.sub];
                 abrirTela('am-sub-tela');
@@ -4373,7 +4516,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { lerJsonTolerante, calcularIR, lerIR, carregarBalancos, get balancos() { return balancosDados; }, reacaoBalanco, prepararBalancos, calcularPlano, lerPlano, htmlPlano, retornoRendaFixa, nomeRendaFixa, volFinanceiro, quedaDoTopo, volAnual, resumoBussola, get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio, get estrategiasConfluencia() { return confluenceStrategies; }, get indice() { return indiceDados; }, set indice(v) { indiceDados = v; }, retornoIndice, comparacaoIndiceSim, htmlDiario, termometroIndice, saudeCarteira, avaliarDecisao, htmlTestado, htmlDecisoes, lerDecisoes, gravarDecisoes };
+    window.investDebug = { lerJsonTolerante, calcularIR, irSugeridoProvento, resumoProventos, montarDeclaracao, textoDeclaracao, lerProventos, gravarProventos, lerIR, carregarBalancos, get balancos() { return balancosDados; }, reacaoBalanco, prepararBalancos, calcularPlano, lerPlano, htmlPlano, retornoRendaFixa, nomeRendaFixa, volFinanceiro, quedaDoTopo, volAnual, resumoBussola, get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio, get estrategiasConfluencia() { return confluenceStrategies; }, get indice() { return indiceDados; }, set indice(v) { indiceDados = v; }, retornoIndice, comparacaoIndiceSim, htmlDiario, termometroIndice, saudeCarteira, avaliarDecisao, htmlTestado, htmlDecisoes, lerDecisoes, gravarDecisoes };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).

@@ -654,6 +654,31 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     await cel.page.click('[data-ir-apagar="0"]');
     ok(/Sem DARF/.test(await cel.page.textContent('[data-ir-resultado]')), 'celular: apagar a venda zera o imposto');
     await cel.page.goBack(); await cel.page.waitForSelector('#am-sub-tela', { state: 'hidden', timeout: 5000 });
+    // Proventos e declaração anual (Brasil): contas
+    const PV = await cel.page.evaluate(() => {
+        const D = window.investDebug, p = (t, tipo, data, bruto, ir = 0) => ({ t, tipo, data, bruto, ir });
+        const base = [p('ITUB4', 'div', '2026-03-10', 30000)];
+        const a = D.irSugeridoProvento(p('ITUB3', 'div', '2026-03-20', 25000), base);   // mesma empresa no mês passa de 50 mil: 10%
+        const b = D.irSugeridoProvento(p('PETR4', 'div', '2026-03-20', 25000), base);   // outra empresa: isento
+        const c = D.irSugeridoProvento(p('BBAS3', 'jcp', '2026-03-20', 1000), base);    // JCP: 15%
+        const R = D.resumoProventos([p('ITUB4', 'div', '2026-03-10', 30000), p('ITUB3', 'div', '2026-03-20', 25000, 2500), p('BBAS3', 'jcp', '2026-04-01', 1000, 150), p('HGLG11', 'fii', '2025-12-15', 100)], 2026);
+        const dec = D.montarDeclaracao(2026, [{ t: 'PETR4', m: 'br', qtd: 100, pm: 30, data: '2026-01-05' }, { t: 'BOVA11', m: 'br', qtd: 10, pm: 120, data: '2027-01-05' }, { t: 'AAPL', m: 'us', qtd: 1, pm: 100 }],
+            [p('BBAS3', 'jcp', '2026-04-01', 1000, 150)], { meses: { '2026-05': { vendas: [{ t: 'X', tipo: 'acao', qtd: 100, preco: 150, pm: 120 }], prejComum: 0, prejFII: 0 } } });
+        const txt = D.textoDeclaracao(dec);
+        return { a, b, c, r: [R.tot.div, R.retido, R.acimaLimite.length, R.naoReinvestido], bens: dec.bens.map(x => [x.t, x.custo]), isento: dec.lucroIsento, txt: /código 01 \(Ações\)/.test(txt) && /Código 10/.test(txt) && /850,00/.test(txt) && /Código 20/.test(txt) };
+    });
+    ok(JSON.stringify(PV) === JSON.stringify({ a: 2500, b: 0, c: 150, r: [55000, 2650, 1, 53450], bens: [['PETR4', 3000]], isento: 3000, txt: true }), `celular: proventos seguem a retenção de 10% acima de R$ 50 mil por empresa, JCP 15% e a declaração usa o custo em 31/12 (${JSON.stringify(PV)})`);
+    await cel.page.click('.am-nav [data-ir-pagina="mais"]');
+    await cel.page.click('[data-pagina="mais"] [data-sub="proventos"]');
+    await cel.page.fill('#prov-t', 'ITUB4'); await cel.page.fill('#prov-data', '2026-03-10'); await cel.page.fill('#prov-bruto', '1000');
+    await cel.page.click('#prov-salvar');
+    const pvTxt = await cel.page.textContent('[data-proventos]');
+    ok(/Resumo de 2026/.test(pvTxt) && /1\.000,00/.test(pvTxt) && /Código 09/.test(pvTxt), 'celular: lançar dividendo aparece no resumo do ano e na declaração');
+    await cel.page.click('#prov-reinvestir');
+    const aporte = await cel.page.evaluate(() => (window.investDebug.lerPlano().br || {}).aporte);
+    ok(aporte >= 1000 && /Todos os proventos|Somado/.test(await cel.page.textContent('[data-prov-reinvestir]')), `celular: reinvestir soma o provento ao próximo aporte do plano (${aporte})`);
+    await cel.page.click('[data-prov-apagar="0"]');
+    await cel.page.goBack(); await cel.page.waitForSelector('#am-sub-tela', { state: 'hidden', timeout: 5000 });
     // Histórico de balanços (EUA): aba Balanços na tela do ativo
     await cel.page.goto(BASE + '?mercado=us');
     await cel.page.waitForFunction(() => window.investDebug && Object.keys(window.investDebug.allData || {}).length > 0, null, { timeout: 60000 });
