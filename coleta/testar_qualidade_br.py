@@ -242,9 +242,9 @@ def main(argv=None):
         print('nenhuma data com elegíveis suficientes')
         return 1
     R['registro'] = 'docs/hipotese-qualidade-brasil.md'
-    json.dump(R, open(a.saida, 'w'), ensure_ascii=False, indent=1)
     md = markdown(R)
     print(md)
+    json.dump(R, open(a.saida, 'w'), ensure_ascii=False, indent=1, default=lambda o: o.item() if hasattr(o, 'item') else str(o))
     resumo = os.environ.get('GITHUB_STEP_SUMMARY')
     if resumo:
         open(resumo, 'a', encoding='utf-8').write(md)
