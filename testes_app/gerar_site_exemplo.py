@@ -46,6 +46,24 @@ def tendencia_com_spike(n, preco0, volume_medio):
     return {'open': opn, 'high': high, 'low': low, 'close': close, 'volume': volume}
 
 
+def queda_com_acumulacao(n, preco0, volume_medio):
+    """Sobe até 60 pregões do fim, cai ~35% e nos últimos 20 pregões anda de lado/cai fechando perto da
+    máxima do dia (ADL sobe com o preço caindo): exercita o Radar de sugestões."""
+    close = []
+    for i in range(n):
+        if i < n - 60:
+            close.append(preco0 * (1.0005 ** i))
+        elif i < n - 20:
+            close.append(close[-1] * 0.989)
+        else:
+            close.append(close[-1] * (0.996 if i % 2 else 0.999))
+    opn = [close[0]] + close[:-1]
+    high = [max(o, c) * 1.002 for o, c in zip(opn, close)]
+    low = [min(o, c) * 0.985 for o, c in zip(opn, close)]
+    volume = [volume_medio] * n
+    return {'open': opn, 'high': high, 'low': low, 'close': close, 'volume': volume}
+
+
 def fundamento(rng, nome, bom=True, critico=False):
     f = {
         'pe': rng.uniform(8, 20) if bom else rng.uniform(30, 80), 'pb': rng.uniform(1, 4),
@@ -56,6 +74,8 @@ def fundamento(rng, nome, bom=True, critico=False):
         'recommendationKey': 'buy', 'fiftyTwoWeekHigh': 130.0, 'fiftyTwoWeekLow': 80.0,
         'nextEarningsDate': '2026-11-20', 'fonte': 'yfinance', 'atualizadoEm': date.today().isoformat(),
         'alertaEvento': None, 'eventosCorporativos': [],
+        'totalDebt': 8e9, 'totalCash': 2e9, 'ebitda': rng.uniform(1.2e9, 4e9), 'freeCashflow': 5e8,
+        'sharesOutstanding': 5e8,
     }
     if critico:
         f['alertaEvento'] = 'critico'
@@ -94,6 +114,11 @@ def main(destino):
         fund_br[t] = fundamento(rng, f'Empresa {t} S.A.', bom=rng.random() < 0.6)
     s = tendencia_com_spike(N_DIAS, 30, 3_000_000)
     precos_br['PETR4'] = {'dates': datas, **s}
+    # Radar: três papéis em sobrevenda com acumulação (saudável, alavancado e alto risco de dívida)
+    for t, eb, fcf in (('RADR3', 4e9, 5e8), ('ALAV3', 1.7e9, 3e8), ('RISC3', 1.1e9, -2e8)):
+        precos_br[t] = {'dates': datas, **queda_com_acumulacao(N_DIAS, 20, 3_000_000)}
+        fund_br[t] = fundamento(rng, f'{t} S.A.', bom=True)
+        fund_br[t].update({'ebitda': eb, 'freeCashflow': fcf, 'nextEarningsDate': (date.today() + __import__('datetime').timedelta(days=9)).isoformat()})
     gravar_mercado(os.path.join(destino, 'data', 'br'), precos_br, fund_br, datas[-1], 'br', 'BRL')
     # Vendidos sintéticos (como o arquivo da B3): 10 dias de volume vendidos em todos os papéis, para o
     # alerta de short squeeze aparecer onde houver sinal de reversão.

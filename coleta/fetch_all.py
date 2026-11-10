@@ -648,6 +648,12 @@ def fetch_from_yfinance(ticker):
             'recommendationKey': info.get('recommendationKey'),
             'fiftyTwoWeekHigh': info.get('fiftyTwoWeekHigh'),
             'fiftyTwoWeekLow': info.get('fiftyTwoWeekLow'),
+            # Radar de sugestões (aba Radar do app): dívida líquida / EBITDA, caixa livre e nº de ações
+            'totalDebt': info.get('totalDebt'),
+            'totalCash': info.get('totalCash'),
+            'ebitda': info.get('ebitda'),
+            'freeCashflow': info.get('freeCashflow'),
+            'sharesOutstanding': info.get('sharesOutstanding'),
         }
         result['nextEarningsDate'] = get_next_earnings_date(t)
         return result
