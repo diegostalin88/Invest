@@ -6,7 +6,7 @@ Depois da auditoria de 04/11/2026, os testes mostraram que a estratégia técnic
 (nem nos EUA, nem no Brasil). Desde 05/11/2026 o app deixou de prometer previsão e virou uma bússola: descreve o
 mercado e a carteira com números que se pode conferir, e cobra cada decisão contra o índice e contra o CDI.
 
-O que o app mostra (barra de baixo: Início · Ativos · Carteira · Mais):
+O que o app mostra (barra de baixo: Início · Ativos · Radar · Carteira · Mais):
 
 - **Termômetro do índice** (SPY / BOVA11): média de 10 meses, distância da média de 200 dias, queda desde o topo,
   retorno de 1, 3 e 12 meses, a renda fixa (CDI / T-bill) no mesmo período e a volatilidade. Descreve; não prevê.
@@ -14,6 +14,13 @@ O que o app mostra (barra de baixo: Início · Ativos · Carteira · Mais):
 - **Ativos:** o mercado todo, por volume, altas, quedas, distância do topo ou volatilidade (sem score).
 - **Tela do papel:** retorno de 1 ano contra o índice, oscilação, queda do topo, peso na sua carteira, fundamentos e,
   nos EUA, os **últimos 12 balanços trimestrais** (SEC), com a data de divulgação e a reação do preço.
+- **Radar de sugestões (técnica do caso MOVI3):** papéis líquidos em sobrevenda (IFR14 < 30 ou banda inferior de
+  Keltner) com divergência de alta no ADL, aluguel/short interest (% das ações e dias para zerar), dívida líquida /
+  EBITDA (🟢 < 3x, 🟡 3–4,5x, 🔴 > 4,5x ou EBITDA negativo), data do balanço e clima (volatilidade histórica). Cada
+  cartão tem 3 rotas: plano à vista (entrada, alvo, stop abaixo de onde a acumulação começou), trava de alta e call
+  fora do dinheiro, com preços de opção **estimados** (Black-Scholes; o app não tem as ofertas reais). O setup técnico
+  foi testado em 04/11/2026 e não foi favorável (`docs/cenario-queda-reversao.md`); os filtros de aluguel e dívida
+  ainda não foram testados. Não usa nem muda o motor congelado.
 - **Carteira:** saúde (concentração, papéis "efetivos", setor, correlação, beta, queda máxima), o mesmo dinheiro de
   cada compra no índice e no CDI, e um **plano de alocação** (renda fixa, fundo de índice, ações escolhidas) com
   faixas de rebalanceamento e a divisão do próximo aporte.

@@ -210,7 +210,20 @@
             .am-filtros::-webkit-scrollbar { display: none; }
             .am-pilula { flex-shrink: 0; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.55rem 0.95rem; border-radius: 999px; border: 1px solid var(--borda); background: var(--sup); color: var(--txt); font-size: 0.9rem; font-weight: 600; }
             .am-pilula.ativa { background: #eef0ff; color: #111827; border-color: #eef0ff; }
-            .am-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: repeat(4, 1fr);
+            .rd-chips .am-chip { white-space: normal; max-width: 100%; }
+            .rd-pilares { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.75rem; }
+            .rd-pilar { background: var(--sup2); border-radius: 0.9rem; padding: 0.65rem 0.75rem; font-size: 0.82rem; }
+            .rd-pilar .r { color: var(--mudo); font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+            .rd-pilar .v { font-weight: 700; margin-top: 0.15rem; }
+            .rd-rotas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; margin-top: 0.8rem; }
+            .rd-rotas button { border: 1px solid var(--borda); border-radius: 0.8rem; padding: 0.55rem 0.3rem; font-size: 0.78rem; font-weight: 700; background: var(--sup2); color: var(--txt); line-height: 1.15; }
+            .rd-rotas button.ativa { background: #eef0ff; color: #111827; border-color: #eef0ff; }
+            .rd-tab { width: 100%; font-size: 0.8rem; border-collapse: collapse; margin-top: 0.5rem; }
+            .rd-tab td, .rd-tab th { padding: 0.3rem 0.25rem; border-bottom: 1px solid var(--borda); text-align: right; }
+            .rd-tab td:first-child, .rd-tab th:first-child { text-align: left; }
+            .rd-alerta { border-radius: 0.9rem; padding: 0.65rem 0.8rem; font-size: 0.82rem; margin-top: 0.6rem; background: rgba(240,82,82,0.12); color: #fecaca; }
+            .rd-nota { border-radius: 0.9rem; padding: 0.65rem 0.8rem; font-size: 0.8rem; margin-top: 0.6rem; background: rgba(245,158,11,0.10); color: #fde68a; }
+            .am-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-template-columns: repeat(5, 1fr);
                 background: rgba(11,13,18,0.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--borda); padding: 0.45rem 0.5rem calc(0.45rem + env(safe-area-inset-bottom)); }
             .am-nav button { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; padding: 0.35rem 0; color: var(--mudo); font-size: 0.75rem; font-weight: 600; }
             .am-nav button.ativa { color: var(--txt); }
@@ -361,6 +374,22 @@
             <button type="button" class="am-botao sec mt-3 hidden" id="am-ranking-mais">Mostrar mais</button>
         </section>
 
+        <section class="am-pagina" data-pagina="radar">
+            <div id="am-radar-cab"></div>
+            <div class="am-filtros" id="am-radar-filtros">
+                <button type="button" class="am-pilula ativa" data-radar-filtro="todos">Todos</button>
+                <button type="button" class="am-pilula" data-radar-filtro="aluguel">🔥 Aluguel alto</button>
+                <button type="button" class="am-pilula" data-radar-filtro="adl">📈 Divergência ADL</button>
+                <button type="button" class="am-pilula" data-radar-filtro="balanco">📅 Balanço &lt; 15 dias</button>
+                <button type="button" class="am-pilula" data-radar-filtro="verde">🟢 Saudável</button>
+                <button type="button" class="am-pilula" data-radar-filtro="amarelo">🟡 Alavancada operacional</button>
+                <button type="button" class="am-pilula" data-radar-filtro="vermelho">🔴 Alto risco</button>
+            </div>
+            <div class="text-sm mb-2" style="color:var(--mudo)" id="am-radar-info"></div>
+            <div id="am-radar" class="space-y-3"></div>
+            <p class="am-aviso">Lista para estudo, não ordem de compra. Ferramenta de apoio à análise; não é recomendação de investimento.</p>
+        </section>
+
         <section class="am-pagina" data-pagina="carteira">
             <div id="am-cart-minha">
                 <div id="am-carteira"></div>
@@ -402,6 +431,7 @@
         <nav class="am-nav" aria-label="Navegação">
             <button type="button" data-ir-pagina="inicio" class="ativa"><svg class="am-ico"><use href="#i-inicio"/></svg>Início</button>
             <button type="button" data-ir-pagina="ranking"><svg class="am-ico"><use href="#i-busca"/></svg>Ativos</button>
+            <button type="button" data-ir-pagina="radar"><svg class="am-ico"><use href="#i-alvo"/></svg>Radar</button>
             <button type="button" data-ir-pagina="carteira"><svg class="am-ico"><use href="#i-carteira"/></svg>Carteira</button>
             <button type="button" data-ir-pagina="mais"><svg class="am-ico"><use href="#i-mais"/></svg>Mais</button>
         </nav>
@@ -3139,11 +3169,218 @@
         document.getElementById('am-top').innerHTML = filteredScreenerResults.slice(0, 10).map(r => linhaAtivo(r.ticker, r)).join('')
             || '<div class="p-5 text-center" style="color:var(--mudo)">Nenhum ativo passou nos filtros.</div>';
         desenharRanking();
+        try { desenharRadar(); } catch (e) { console.warn('Radar:', e); }
+    }
+    // =================== RADAR DE SUGESTÕES (técnica do caso MOVI3) ===================
+    // Cruza 4 pilares com os dados publicados: (1) sobrevenda (IFR14 < 30 ou fechamento na banda inferior de Keltner nos
+    // últimos 3 pregões) + divergência no ADL (preço caiu em 20 pregões e o ADL subiu); (2) posição alugada / vendida
+    // (aluguel da B3 ou short interest da FINRA, em % das ações e dias para zerar); (3) saúde da dívida
+    // (dívida líquida / EBITDA do Yahoo); (4) balanço (data do Yahoo) e clima (volatilidade histórica).
+    // Só descreve. O setup técnico (queda forte + Otimista) foi testado em 04/11/2026 e não foi favorável
+    // (docs/cenario-queda-reversao.md); os filtros de aluguel e de dívida ainda não foram testados.
+    // Não usa nem muda o motor congelado (docs/congelamento.md).
+    const RADAR = { ifr: 30, janelaGatilho: 3, janelaAdl: 20, aluguelPct: 7, aluguelDias: 5, balancoDias: 15, dlVerde: 3, dlVermelho: 4.5 };
+    const estadoRadar = { filtro: 'todos', rota: {}, chave: null, lista: [] };
+    function radarIndicadores(t) {
+        const d0 = allData[t]; if (!d0 || !d0.close || d0.close.length < 80) return null;
+        const ini = Math.max(0, d0.close.length - 300);
+        const d = { close: d0.close.slice(ini), high: d0.high.slice(ini), low: d0.low.slice(ini), volume: d0.volume.slice(ini), dates: d0.dates.slice(ini) };
+        const n = d.close.length, p = getIndicatorParameters();
+        const ifr = v14_calculateIFR(d, p.ifr.period), kel = calculateKeltnerChannels(d, p.keltner.ema, p.keltner.atr, 2), adl = calculateADL(d);
+        let gatilho = null;
+        for (let j = n - 1; j >= n - RADAR.janelaGatilho; j--) {
+            const motivos = [];
+            if (ifr[j] !== null && ifr[j] < RADAR.ifr) motivos.push(`IFR14 ${fmtNumM(ifr[j], 0)}`);
+            if (kel.lower[j] && d.low[j] <= kel.lower[j]) motivos.push('tocou a banda inferior de Keltner');
+            if (motivos.length) { gatilho = { data: d.dates[j], motivos }; break; }
+        }
+        const J = RADAR.janelaAdl, retPreco = d.close[n - 1] / d.close[n - 1 - J] - 1;
+        // ADL em "dias de volume médio" para comparar papéis diferentes
+        let vm = 0; for (let j = n - J; j < n; j++) vm += d.volume[j]; vm /= J;
+        const varAdl = vm > 0 ? (adl[n - 1] - adl[n - 1 - J]) / vm : 0;
+        const divergencia = retPreco <= 0 && varAdl > 0;
+        // Onde a acumulação começou: mínima do ADL nos últimos 40 pregões. O stop fica 1% abaixo da menor mínima desde lá.
+        let kMin = n - 40; for (let j = n - 40; j < n; j++) if (adl[j] < adl[kMin]) kMin = j;
+        let suporte = Infinity; for (let j = kMin; j < n; j++) suporte = Math.min(suporte, d.low[j]);
+        return { n, fech: d.close[n - 1], data: d.dates[n - 1], ifr: ifr[n - 1], kel: { inf: kel.lower[n - 1], meio: kel.middle[n - 1], sup: kel.upper[n - 1] },
+            gatilho, divergencia, retPreco, varAdl, inicioAcum: d.dates[kMin], suporte, stop: suporte * 0.99 };
+    }
+    function radarAluguel(t) {
+        const v = dadosVendido(t); if (!v) return null;
+        const f = fundamentalsData && fundamentalsData[t], preco = ultimoPreco(t);
+        const acoes = f && (f.sharesOutstanding || (f.marketCap && preco ? f.marketCap / preco : null));
+        const pct = acoes ? v.qtd / acoes * 100 : null;
+        return { ...v, pct, alto: (pct !== null && pct >= RADAR.aluguelPct) || (v.dias !== null && v.dias >= RADAR.aluguelDias) };
+    }
+    function radarSaude(t) {
+        const f = fundamentalsData && fundamentalsData[t];
+        if (!f) return { nivel: 'sem', texto: 'Sem fundamentos' };
+        const fin = /financ|bank|banco|insur|segur/i.test((f.sector || '') + ' ' + (f.industry || ''));
+        if (!Number.isFinite(f.ebitda) || !Number.isFinite(f.totalDebt)) return { nivel: 'sem', texto: fin ? 'Não se aplica (banco/seguradora)' : 'Sem dívida/EBITDA nos dados ainda' };
+        const dl = f.totalDebt - (Number.isFinite(f.totalCash) ? f.totalCash : 0);
+        const queima = Number.isFinite(f.freeCashflow) && f.freeCashflow < 0;
+        if (f.ebitda <= 0) return { nivel: 'vermelho', dlEbitda: null, dl, queima, texto: 'EBITDA negativo' };
+        const x = dl / f.ebitda;
+        const nivel = x < RADAR.dlVerde ? 'verde' : x <= RADAR.dlVermelho ? 'amarelo' : 'vermelho';
+        return { nivel, dlEbitda: x, dl, queima, texto: dl < 0 ? 'Caixa maior que a dívida' : `${fmtNumM(x, 1)}x` };
+    }
+    function radarBalanco(t) {
+        const f = fundamentalsData && fundamentalsData[t]; if (!f) return null;
+        const inf = f.nextEarningsDate && daysUntil(f.nextEarningsDate) >= 0 ? f.nextEarningsDate : null;
+        const data = inf || (f.balancoEstimado && daysUntil(f.balancoEstimado) >= 0 ? f.balancoEstimado : null);
+        return data ? { data, dias: daysUntil(data), estimado: !inf } : null;
+    }
+    function radarClima(t, dias) {
+        const c = allData[t] && allData[t].close; if (!c || c.length < 300) return null;
+        const vol21 = k => { const r = []; for (let j = k - 20; j <= k; j++) r.push(Math.log(c[j] / c[j - 1])); const m = r.reduce((a, b) => a + b, 0) / r.length; return Math.sqrt(r.reduce((a, b) => a + (b - m) ** 2, 0) / (r.length - 1) * 252); };
+        const n = c.length, hoje = vol21(n - 1); let menor = 0, tot = 0;
+        for (let k = n - 252; k < n; k++) { tot++; if (vol21(k) <= hoje) menor++; }
+        const rank = menor / tot * 100;
+        const uteis = dias !== null && dias !== undefined ? Math.max(1, Math.round(dias * 5 / 7) + 1) : null;
+        return { vol: hoje, rank, movimento: uteis ? hoje * Math.sqrt(uteis / 252) : null, uteis,
+            texto: rank >= 80 ? 'Agitado: oscilação perto da maior do ano' : rank <= 30 ? 'Calmaria' : 'Normal' };
+    }
+    function radarJuros() {
+        const hoje = ultimoPregaoDados(); if (!hoje) return mercadoAtual === 'br' ? 0.14 : 0.04;
+        const d = new Date(hoje + 'T12:00:00'); d.setFullYear(d.getFullYear() - 1);
+        const r = retornoRendaFixa(d.toISOString().slice(0, 10), hoje);
+        return Number.isFinite(r) && r > 0 && r < 0.5 ? r : (mercadoAtual === 'br' ? 0.14 : 0.04);
+    }
+    function radarCall(S, K, anos, vol, r) {
+        if (anos <= 0) return Math.max(0, S - K);
+        const d1 = (Math.log(S / K) + (r + vol * vol / 2) * anos) / (vol * Math.sqrt(anos)), d2 = d1 - vol * Math.sqrt(anos);
+        const N = x => { const k = 1 / (1 + 0.2316419 * Math.abs(x)), w = 0.3989423 * Math.exp(-x * x / 2) * k * (0.3193815 + k * (-0.3565638 + k * (1.781478 + k * (-1.821256 + k * 1.330274)))); return x > 0 ? 1 - w : w; };
+        return S * N(d1) - K * Math.exp(-r * anos) * N(d2);
+    }
+    function radarStrike(S, alvo) {
+        const passo = S < 10 ? 0.25 : S < 50 ? 0.5 : S < 200 ? 1 : 5;
+        return Math.round(alvo / passo) * passo;
+    }
+    function radarAvaliar(t) {
+        const ind = radarIndicadores(t); if (!ind || !ind.gatilho) return null;
+        const alug = radarAluguel(t), saude = radarSaude(t), bal = radarBalanco(t), clima = radarClima(t, bal ? bal.dias : null);
+        const pontos = 1 + (ind.divergencia ? 1 : 0) + (alug && alug.alto ? 1 : 0) + (saude.nivel === 'verde' || saude.nivel === 'amarelo' ? 1 : 0) - (saude.nivel === 'vermelho' ? 2 : 0);
+        return { t, ind, alug, saude, bal, clima, pontos };
+    }
+    function radarLista() {
+        const chave = mercadoAtual + ':' + ultimoPregaoDados() + ':' + Object.keys(allData || {}).length + ':' + (fundamentalsData ? Object.keys(fundamentalsData).length : 0) + ':' + (vendidosDados ? vendidosDados.data : '');
+        if (estadoRadar.chave === chave) return estadoRadar.lista;
+        const lista = [];
+        for (const t in (allData || {})) {
+            if (volFinanceiro(t) < MERCADO.adtvPadrao) continue;
+            const f = fundamentalsData && fundamentalsData[t]; if (f && f.alertaEvento === 'critico') continue;
+            const a = radarAvaliar(t); if (a) lista.push(a);
+        }
+        lista.sort((a, b) => b.pontos - a.pontos || ((b.alug && b.alug.dias) || 0) - ((a.alug && a.alug.dias) || 0));
+        estadoRadar.chave = chave; estadoRadar.lista = lista;
+        return lista;
+    }
+    function radarPassaFiltro(a, f) {
+        if (f === 'aluguel') return a.alug && a.alug.alto;
+        if (f === 'adl') return a.ind.divergencia;
+        if (f === 'balanco') return a.bal && a.bal.dias <= RADAR.balancoDias;
+        if (['verde', 'amarelo', 'vermelho'].includes(f)) return a.saude.nivel === f;
+        return true;
+    }
+    function radarValorCarteira() {
+        const tot = lerCarteira().filter(x => x.mercado ? x.mercado === mercadoCodigo() : true).reduce((s, x) => s + (x.qtd || 0) * (ultimoPreco(x.t) || 0), 0);
+        return tot > 0 ? tot : null;
+    }
+    function htmlRadarRota(a, rota) {
+        const S = a.ind.fech, vol = a.clima ? a.clima.vol : volAnual(a.t), r = radarJuros();
+        const alvo1 = a.ind.kel.meio > S * 1.01 ? a.ind.kel.meio : a.ind.kel.sup, alvo2 = Math.max(a.ind.kel.sup, alvo1 * 1.03);
+        const stop = Math.min(a.ind.stop, S * 0.995);
+        const cart = radarValorCarteira();
+        const aviso = 'Preços de opção <b>estimados</b> pelo modelo de Black-Scholes com a volatilidade histórica de 21 pregões (o app não tem as ofertas reais). Strike aproximado: use o mais perto na grade da B3 e confira as ofertas na XP antes de montar.';
+        if (rota === 'vista') {
+            const risco = S - stop, ganho1 = alvo1 - S;
+            const qtdRisco = cart && risco > 0 ? Math.floor(cart * 0.01 / risco) : null;
+            return `${a.saude.nivel === 'vermelho' ? `<div class="rd-alerta">🔴 <b>Não compre à vista neste grupo.</b> Dívida em estresse (${a.saude.texto}${a.saude.queima ? ', queimando caixa' : ''}). Aqui o aluguel alto costuma ter motivo: quem vendeu aposta na piora do balanço.</div>` : ''}
+                <table class="rd-tab"><tbody>
+                <tr><td>Entrada (último fechamento)</td><td><b>${fmtPrecoM(S)}</b></td></tr>
+                <tr><td>Alvo 1 (média de 20 / meio de Keltner)</td><td style="color:var(--alta)">${fmtPrecoM(alvo1)} (${fmtPctM((alvo1 / S - 1) * 100)})</td></tr>
+                <tr><td>Alvo 2 (banda superior de Keltner)</td><td style="color:var(--alta)">${fmtPrecoM(alvo2)} (${fmtPctM((alvo2 / S - 1) * 100)})</td></tr>
+                <tr><td>Stop (1% abaixo da mínima desde ${fmtDataBR(a.ind.inicioAcum)}, quando a acumulação começou)</td><td style="color:var(--baixa)">${fmtPrecoM(stop)} (${fmtPctM((stop / S - 1) * 100)})</td></tr>
+                <tr><td>Ganho até o alvo 1 ÷ risco</td><td>${risco > 0 ? fmtNumM(ganho1 / risco, 1) + ' por 1' : '—'}</td></tr>
+                ${qtdRisco !== null ? `<tr><td>Qtd. para arriscar 1% da carteira</td><td>${qtdRisco} ações</td></tr>` : ''}
+                </tbody></table>
+                ${(S - stop) / S > 0.15 ? '<div class="rd-nota">Stop longe (mais de 15%): o risco por ação é grande; a call fora do dinheiro pode caber melhor.</div>' : ''}
+                ${a.bal && a.bal.dias <= RADAR.balancoDias ? '<div class="rd-nota">Balanço antes do alvo provável: o preço pode abrir com salto e passar do stop.</div>' : ''}`;
+        }
+        // vencimento: depois do balanço (se houver) e com pelo menos 30 dias corridos
+        const diasVenc = Math.max(30, a.bal ? a.bal.dias + 10 : 30), anos = diasVenc / 365;
+        const venc = new Date(); venc.setDate(venc.getDate() + diasVenc); const vencTxt = fmtDataBR(venc.toISOString().slice(0, 10));
+        if (!vol) return '<div class="rd-nota">Sem histórico suficiente para estimar o preço das opções.</div>';
+        const cenarios = [-0.2, -0.1, 0, 0.1, 0.2, 0.3];
+        if (rota === 'trava') {
+            const K1 = radarStrike(S, S), K2 = Math.max(radarStrike(S, alvo2), radarStrike(S, K1 * 1.05));
+            const deb = radarCall(S, K1, anos, vol, r) - radarCall(S, K2, anos, vol, r);
+            const lin = cenarios.map(c => { const P = S * (1 + c), v = Math.min(Math.max(P - K1, 0), K2 - K1) - deb; return `<tr><td>${fmtPctM(c * 100)} (${fmtPrecoM(P)})</td><td style="color:${v >= 0 ? 'var(--alta)' : 'var(--baixa)'}">${fmtPrecoM(v)} (${fmtPctM(v / deb * 100)})</td></tr>`; }).join('');
+            return `<div class="text-sm mt-2">Trava de alta com calls (débito), vencimento por volta de <b>${vencTxt}</b>: compra call strike <b>${fmtPrecoM(K1)}</b> e vende call strike <b>${fmtPrecoM(K2)}</b>.</div>
+                <table class="rd-tab"><tbody>
+                <tr><td>Custo estimado por ação (perda máxima)</td><td style="color:var(--baixa)">${fmtPrecoM(deb)}</td></tr>
+                <tr><td>Ganho máximo por ação</td><td style="color:var(--alta)">${fmtPrecoM(K2 - K1 - deb)} (${fmtPctM((K2 - K1 - deb) / deb * 100)})</td></tr>
+                <tr><td>Empata em</td><td>${fmtPrecoM(K1 + deb)} (${fmtPctM(((K1 + deb) / S - 1) * 100)})</td></tr>
+                ${cart ? `<tr><td>Travas com 1% da carteira</td><td>${fmtNumM(Math.floor(cart * 0.01 / deb / 100), 0)} lotes de 100</td></tr>` : ''}
+                </tbody></table>
+                <table class="rd-tab"><thead><tr><th>Papel no vencimento</th><th>Resultado por ação</th></tr></thead><tbody>${lin}</tbody></table>
+                <div class="rd-nota">${aviso} No teste O2 (travas de débito direcionais, 2023–2026), a diferença entre as ofertas de compra e venda e o stop curto levaram a −70% por operação: monte com ordem limite e leve até o vencimento.</div>`;
+        }
+        const K = radarStrike(S, Math.max(alvo2, S * 1.10)), premio = radarCall(S, K, anos, vol, r);
+        const lin = [alvo1, alvo2, S * 1.2, S * 1.3].map(P => { const v = Math.max(P - K, 0); return `<tr><td>${fmtPrecoM(P)} (${fmtPctM((P / S - 1) * 100)})</td><td>${premio > 0 ? fmtNumM(v / premio, 1) + 'x' : '—'}</td></tr>`; }).join('');
+        const orc = cart ? [0.005, 0.01].map(p => `${fmtNumM(p * 100, 1)}%: ${fmtPrecoM(cart * p)} ≈ ${fmtNumM(Math.floor(cart * p / premio / 100) * 100, 0)} opções`).join(' · ') : null;
+        return `<div class="text-sm mt-2">Compra de call fora do dinheiro, strike <b>${fmtPrecoM(K)}</b> (${fmtPctM((K / S - 1) * 100)}), vencimento por volta de <b>${vencTxt}</b>${a.bal ? ', depois do balanço' : ''}.</div>
+            <table class="rd-tab"><tbody>
+            <tr><td>Prêmio estimado por opção (perda máxima)</td><td style="color:var(--baixa)">${fmtPrecoM(premio)}</td></tr>
+            <tr><td>Empata em (no vencimento)</td><td>${fmtPrecoM(K + premio)} (${fmtPctM(((K + premio) / S - 1) * 100)})</td></tr>
+            <tr><td>Quanto usar</td><td>${orc || 'de 0,5% a 1% da carteira (cadastre a carteira para ver o valor)'}</td></tr>
+            </tbody></table>
+            <table class="rd-tab"><thead><tr><th>Papel no vencimento</th><th>Multiplica o prêmio</th></tr></thead><tbody>${lin}<tr><td>Abaixo de ${fmtPrecoM(K)}</td><td style="color:var(--baixa)">perde 100%</td></tr></tbody></table>
+            <div class="rd-nota">${aviso} Sem stop: a perda fica limitada ao prêmio, mas na maioria das vezes ele vira zero (no estudo da queda forte, 2 em cada 3 casos não repicaram).</div>`;
+    }
+    function htmlRadarCartao(a) {
+        const chipSaude = { verde: ['verde', '🟢 Saudável'], amarelo: ['amarelo', '🟡 Alavancada operacional'], vermelho: ['vermelho', '🔴 Alto risco de balanço'], sem: ['', '⚪ Saúde sem dado'] }[a.saude.nivel];
+        const p = (r, v, cor, sub) => `<div class="rd-pilar"><div class="r">${r}</div><div class="v"${cor ? ` style="color:${cor}"` : ''}>${v}</div>${sub ? `<div style="color:var(--mudo)">${sub}</div>` : ''}</div>`;
+        const al = a.alug, bal = a.bal, cl = a.clima, rota = estadoRadar.rota[a.t] || null;
+        const nomeVend = mercadoAtual === 'br' ? 'Ações alugadas' : 'Short interest';
+        return `<div class="am-card">
+            <button type="button" class="w-full text-left" data-ativo="${a.t}">
+                <div class="flex items-center justify-between gap-2"><span class="am-tk" style="font-size:1.15rem;font-weight:700">${a.t}</span><span class="am-chip ${chipSaude[0]}">${chipSaude[1]}</span></div>
+                <div class="text-sm" style="color:var(--mudo)">${nomeAtivo(a.t) || ''}</div>
+                <div class="rd-chips flex flex-wrap gap-1 mt-2"><span class="am-chip amarelo">⚡ ${a.ind.gatilho.motivos.join(' + ')} (${fmtDataBR(a.ind.gatilho.data)})</span>${a.ind.divergencia ? '<span class="am-chip verde">📈 Divergência de alta no ADL</span>' : ''}${al && al.alto ? '<span class="am-chip vermelho">🔥 Aluguel alto</span>' : ''}</div>
+            </button>
+            <div class="rd-pilares">
+                ${p('Fluxo (ADL, 20 pregões)', a.ind.divergencia ? 'Comprando na queda' : a.ind.varAdl > 0 ? 'ADL subindo' : 'Sem acumulação', a.ind.divergencia ? 'var(--alta)' : '', `Preço ${fmtPctM(a.ind.retPreco * 100)} · ADL ${a.ind.varAdl >= 0 ? '+' : ''}${fmtNumM(a.ind.varAdl, 1)} dias de volume`)}
+                ${p(nomeVend, al ? (al.pct !== null ? `${fmtNumM(al.pct, 1)}% das ações` : fmtGrandeM(al.qtd) + ' ações') : 'Sem dado', al && al.alto ? 'var(--baixa)' : '', al ? `${al.dias === null ? '—' : fmtNumM(al.dias, 1)} dias para zerar · ${al.fonte || ''} ${fmtDataBR(al.data)}` : '')}
+                ${p('Dívida líquida / EBITDA', a.saude.texto, a.saude.nivel === 'vermelho' ? 'var(--baixa)' : a.saude.nivel === 'verde' ? 'var(--alta)' : '', a.saude.queima ? 'Fluxo de caixa livre negativo' : 'Yahoo, últimos 12 meses')}
+                ${p('Balanço e clima', bal ? (bal.dias === 0 ? 'Hoje' : `Em ${bal.dias} dias`) : 'Data sem dado', bal && bal.dias <= RADAR.balancoDias ? '#fcd34d' : '', `${bal ? fmtDataBR(bal.data) + (bal.estimado ? ' (estimada)' : ' (Yahoo; confira no RI/CVM)') + ' · ' : ''}${cl ? `${cl.texto} (vol. ${fmtNumM(cl.vol * 100, 0)}% a.a., maior que ${fmtNumM(cl.rank, 0)}% do ano)${cl.movimento ? ` · movimento esperado até o balanço ±${fmtNumM(cl.movimento * 100, 1)}%` : ''}` : ''}`)}
+            </div>
+            <div class="rd-rotas">
+                <button type="button" data-radar-rota="vista" data-radar-t="${a.t}" class="${rota === 'vista' ? 'ativa' : ''}">Plano à vista</button>
+                <button type="button" data-radar-rota="trava" data-radar-t="${a.t}" class="${rota === 'trava' ? 'ativa' : ''}">Trava de alta</button>
+                <button type="button" data-radar-rota="call" data-radar-t="${a.t}" class="${rota === 'call' ? 'ativa' : ''}">Call fora do dinheiro</button>
+            </div>
+            ${rota ? `<div class="mt-2">${htmlRadarRota(a, rota)}</div>` : ''}
+        </div>`;
+    }
+    function desenharRadar() {
+        const box = document.getElementById('am-radar'); if (!box || !allData || !Object.keys(allData).length) return;
+        const lista = radarLista(), vis = lista.filter(a => radarPassaFiltro(a, estadoRadar.filtro));
+        const semDivida = !Object.values(fundamentalsData || {}).some(f => f && Number.isFinite(f.ebitda));
+        document.getElementById('am-radar-cab').innerHTML = `<div class="am-card">
+            <div class="font-bold">Técnica do caso MOVI3: sobrevenda + aluguel alto + acumulação no ADL, com filtro de dívida</div>
+            <div class="text-sm mt-1" style="color:var(--mudo)">Entram os papéis líquidos com IFR14 abaixo de ${RADAR.ifr} ou na banda inferior de Keltner nos últimos ${RADAR.janelaGatilho} pregões. A lista põe primeiro quem soma divergência no ADL, aluguel alto e dívida sob controle.</div>
+            <div class="rd-nota">⚠️ <b>Ainda sem vantagem comprovada.</b> O setup técnico (queda forte + sinal Otimista, inspirado na MOVI3 de 2025) foi testado em 04/11/2026 e <b>não foi favorável</b>: acertou 37% no Brasil, com mediana de −4,5% e ganhos grandes só de vez em quando. Os filtros de aluguel e de dívida ainda não foram testados. A MOVI3 saiu do Ibovespa e não está nos dados do app.</div>
+            ${semDivida ? '<div class="rd-nota">Dívida e EBITDA entram a partir da próxima coleta (o cache dos fundamentos renova em até 7 dias). Até lá, a saúde aparece como "sem dado".</div>' : ''}
+            ${vendidosDados ? '' : '<div class="rd-nota">O arquivo de aluguel/short interest não veio nesta coleta.</div>'}
+        </div>`;
+        document.getElementById('am-radar-info').textContent = `${vis.length} de ${lista.length} papel(éis) em sobrevenda · dados de ${fmtDataBR(ultimoPregaoDados())}`;
+        box.innerHTML = vis.map(htmlRadarCartao).join('') || '<div class="am-card text-center" style="color:var(--mudo)">Nenhum papel passou neste filtro hoje.</div>';
     }
     function agendarAtualizacaoMovel() { if (APP_MOVEL) setTimeout(atualizarAppMovel, 0); }
 
     // Navegação entre páginas e telas sobrepostas (com suporte ao botão "voltar" do Android)
-    const TITULOS = { inicio: 'Início', ranking: 'Ranking', carteira: 'Carteira', testes: 'Testes', mais: 'Mais' };
+    const TITULOS = { inicio: 'Início', ranking: 'Ranking', radar: 'Radar de sugestões', carteira: 'Carteira', testes: 'Testes', mais: 'Mais' };
     function mostrarPagina(nome) {
         document.querySelectorAll('#app-movel .am-pagina').forEach(p => p.classList.toggle('ativa', p.dataset.pagina === nome));
         document.querySelectorAll('.am-nav button').forEach(b => b.classList.toggle('ativa', b.dataset.irPagina === nome));
@@ -4244,6 +4481,15 @@
             estadoRanking.ordem = b.dataset.ordem; desenharRanking();
         });
         document.getElementById('am-ranking-mais').addEventListener('click', () => { estadoRanking.limite += 30; desenharRanking(); });
+        document.getElementById('am-radar-filtros').addEventListener('click', e => {
+            const b = e.target.closest('[data-radar-filtro]'); if (!b) return;
+            document.querySelectorAll('#am-radar-filtros .am-pilula').forEach(x => x.classList.toggle('ativa', x === b));
+            estadoRadar.filtro = b.dataset.radarFiltro; desenharRadar();
+        });
+        document.getElementById('am-radar').addEventListener('click', e => {
+            const b = e.target.closest('[data-radar-rota]'); if (!b) return;
+            const t = b.dataset.radarT; estadoRadar.rota[t] = estadoRadar.rota[t] === b.dataset.radarRota ? null : b.dataset.radarRota; desenharRadar();
+        });
         const folha = document.getElementById('am-folha'), fundo = document.getElementById('am-folha-fundo');
         const abrirFolha = (sim) => { folha.classList.toggle('aberta', sim); fundo.classList.toggle('aberta', sim); document.body.classList.toggle('travado', sim || pilhaTelas.length > 0); };
         document.getElementById('am-abrir-filtros').addEventListener('click', () => abrirFolha(true));
@@ -4373,7 +4619,7 @@
     // Ao abrir a página: carrega sozinho os dados publicados pela coleta diária.
     // Acesso de leitura para os testes automáticos (e para conferir cálculos pelo console do navegador).
     montarAppMovel();
-    window.investDebug = { lerJsonTolerante, calcularIR, lerIR, carregarBalancos, get balancos() { return balancosDados; }, reacaoBalanco, prepararBalancos, calcularPlano, lerPlano, htmlPlano, retornoRendaFixa, nomeRendaFixa, volFinanceiro, quedaDoTopo, volAnual, resumoBussola, get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio, get estrategiasConfluencia() { return confluenceStrategies; }, get indice() { return indiceDados; }, set indice(v) { indiceDados = v; }, retornoIndice, comparacaoIndiceSim, htmlDiario, termometroIndice, saudeCarteira, avaliarDecisao, htmlTestado, htmlDecisoes, lerDecisoes, gravarDecisoes };
+    window.investDebug = { lerJsonTolerante, calcularIR, lerIR, carregarBalancos, get balancos() { return balancosDados; }, reacaoBalanco, prepararBalancos, calcularPlano, lerPlano, htmlPlano, retornoRendaFixa, nomeRendaFixa, volFinanceiro, quedaDoTopo, volAnual, resumoBussola, get graficos() { return graficos; }, analyzeAllSignals, computeStrategyScore, getCurrentWeights, get fundamentos() { return fundamentalsData; }, get allData() { return allData; }, getIndicatorParameters, v14_precomputarIndicadores, v14_analisarSinais, estrategiasV14, runCoreBacktest, getBacktestRiskParams, perfilDoAtivo, monteCarloTrades, gerarRelatorio, analisarCarteira, vereditoEntrada, atualizarDiario, recalibrar, precisaRecalibrar, get calibracao() { return calibracaoDados; }, set calibracao(v) { calibracaoDados = v; }, regraRp: id => (regrasRelatorio(getBacktestRiskParams()).find(r => r.id === id) || {}).rp, get diario() { return diarioDados; }, set diario(v) { diarioDados = v; }, get relatorio() { return relatorioDados; }, get vendidos() { return vendidosDados; }, precomputeAllIndicators, simularSaida, seguirNaSimulacao, estadoSim, lerSim, gravarSim, desenharSimulacao, seloSim, sugestaoAporte, vsMme200, balancoProximo, desenharRelatorio, get estrategiasConfluencia() { return confluenceStrategies; }, get indice() { return indiceDados; }, set indice(v) { indiceDados = v; }, retornoIndice, comparacaoIndiceSim, htmlDiario, termometroIndice, saudeCarteira, avaliarDecisao, htmlTestado, htmlDecisoes, lerDecisoes, gravarDecisoes, radarLista, radarAvaliar, desenharRadar, htmlRadarRota };
     carregarAutomaticamente();
 
     // PWA: permite instalar no celular. O service worker nunca guarda os arquivos de dados (ver sw.js).

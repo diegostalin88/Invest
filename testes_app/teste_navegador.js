@@ -273,6 +273,28 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
     const navTxt = await cel.page.textContent('.am-nav');
     ok(await cel.page.isVisible('.am-nav') && await cel.page.isHidden('#tabs') && /Ativos/.test(navTxt) && !/Testes|Ranking/.test(navTxt), 'celular: barra de baixo com Início / Ativos / Carteira / Mais');
     ok(/Brasil/.test(await cel.page.textContent('#am-sub')) && (await cel.page.$$('#am-melhores .am-opcao')).length > 0, 'celular: Início com data dos dados, clima e Melhores Opções');
+    // Radar de sugestões (técnica do caso MOVI3): 3 papéis sintéticos em sobrevenda com acumulação no ADL
+    ok(/Radar/.test(navTxt), 'celular: barra de baixo com a aba Radar');
+    await cel.page.click('.am-nav [data-ir-pagina="radar"]');
+    const rd = await cel.page.evaluate(() => { const L = window.investDebug.radarLista(), por = t => L.find(a => a.t === t);
+        return { tks: L.map(a => a.t), niveis: ['RADR3', 'ALAV3', 'RISC3'].map(t => por(t) && por(t).saude.nivel), dl: ['RADR3', 'ALAV3', 'RISC3'].map(t => por(t) && +por(t).saude.dlEbitda.toFixed(2)),
+                 div: ['RADR3', 'ALAV3', 'RISC3'].every(t => por(t) && por(t).ind.divergencia), alto: por('RADR3') && por('RADR3').alug.alto, dias: por('RADR3') && +por('RADR3').alug.dias.toFixed(1),
+                 bal: por('RADR3') && por('RADR3').bal.dias, ordem: L.findIndex(a => a.t === 'RISC3') > L.findIndex(a => a.t === 'RADR3'),
+                 titulo: document.getElementById('am-titulo').textContent, txt: document.querySelector('[data-pagina="radar"]').textContent }; });
+    ok(rd.niveis.join() === 'verde,amarelo,vermelho' && rd.dl.join() === '1.5,3.53,5.45' && rd.div && rd.alto && rd.dias === 10 && rd.bal === 9 && rd.ordem,
+        `celular: Radar classifica a dívida (${rd.dl.join(' / ')}x), acha a divergência no ADL, o aluguel (${rd.dias} dias) e o balanço (${rd.bal} dias) ${JSON.stringify(rd.niveis)} ${rd.div} ${rd.alto} ${rd.ordem}`);
+    ok(rd.titulo === 'Radar de sugestões' && /não foi favorável/.test(rd.txt) && /RISC3/.test(rd.txt), 'celular: aba Radar mostra os cartões e o aviso do teste de 04/11');
+    const rota = async (t, r) => { await cel.page.click(`[data-radar-rota="${r}"][data-radar-t="${t}"]`); return cel.page.evaluate(t => [...document.querySelectorAll('#am-radar .am-card')].find(c => c.querySelector(`[data-ativo="${t}"]`)).textContent, t); };
+    const vistaRisc = await rota('RISC3', 'vista'), vistaBoa = await rota('RADR3', 'vista');
+    ok(/Não compre à vista/.test(vistaRisc) && !/Não compre à vista/.test(vistaBoa) && /Stop/.test(vistaBoa) && /Alvo 1/.test(vistaBoa), 'celular: Plano à vista com entrada, alvo e stop; alto risco avisa para não comprar');
+    const trava = await rota('RADR3', 'trava'), call = await rota('ALAV3', 'call');
+    ok(/Ganho máximo/.test(trava) && /−70%/.test(trava) && /estimados/.test(trava) && /Multiplica o prêmio/.test(call) && /perde 100%/.test(call), 'celular: rotas de trava de alta e call fora do dinheiro com payoff estimado e avisos');
+    await cel.page.click('[data-radar-filtro="vermelho"]');
+    const soVermelho = await cel.page.$$eval('#am-radar .am-card [data-ativo]', b => b.map(x => x.dataset.ativo));
+    ok(soVermelho.length >= 1 && soVermelho.includes('RISC3') && !soVermelho.includes('RADR3'), `celular: filtro "Alto risco" mostra só o grupo vermelho (${soVermelho.join(', ')})`);
+    await cel.page.click('[data-radar-filtro="todos"]'); await cel.page.waitForTimeout(200);
+    await cel.page.screenshot({ path: path.join(SHOTS, 'celular_radar.png'), fullPage: true });
+    await cel.page.click('.am-nav [data-ir-pagina="inicio"]');
     const termo = await cel.page.textContent('#am-termometro');
     ok(/Termômetro do BOVA11/.test(termo) && /média de 10 meses/.test(termo) && /Volatilidade/.test(termo) && /não prevê/.test(termo), 'celular: Início abre com o termômetro do índice (contexto, sem previsão)');
     ok(!(await cel.page.$('[data-pagina="inicio"] #am-melhores')) && !/Score/.test(await cel.page.textContent('[data-pagina="inicio"]')), 'celular: Início sem ranking técnico (foi para o Avançado)');
@@ -357,12 +379,12 @@ async function abrir(browser, url, bloquearManifesto = false, viewport = { width
         const achados = cards.filter(c => /Abaixo da média de 200 dias/.test(c.textContent)).length; return { esperado, achados, total: cards.length }; });
     ok(mme.total > 0 && mme.esperado === mme.achados, `celular: cartões abaixo da MME 200 mostram o aviso só como contexto (${mme.achados} de ${mme.total})`);
     const bal = await cel.page.evaluate(() => { const I = window.investDebug, F = I.fundamentos;
-        const t = document.querySelector('#am-relatorio .rel-card[data-ativo]').dataset.ativo;
+        const t = [...document.querySelectorAll('#am-relatorio .rel-card[data-ativo]')].find(c => /Confirmado fora da amostra/.test(c.textContent)).dataset.ativo;
         const em = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
         const antes = { ...F[t] }; F[t].nextEarningsDate = null; F[t].balancoEstimado = em(30);
         const longe = I.balancoProximo(t); F[t].balancoEstimado = em(3); const perto = I.balancoProximo(t);
         F[t].nextEarningsDate = em(2); const inf = I.balancoProximo(t); I.desenharRelatorio();
-        const card = [...document.querySelectorAll('#am-relatorio .rel-card[data-ativo]')].find(c => c.dataset.ativo === t);
+        const card = [...document.querySelectorAll('#am-relatorio .rel-card[data-ativo]')].find(c => c.dataset.ativo === t && /Confirmado fora da amostra/.test(c.textContent));
         const txt = card ? card.textContent : ''; Object.keys(F[t]).forEach(k => delete F[t][k]); Object.assign(F[t], antes); I.desenharRelatorio();
         return { longe, perto, inf, txt }; });
     ok(bal.longe === null && bal.perto && bal.perto.estimado && bal.inf && !bal.inf.estimado && bal.inf.dias === 2 && /Balanço em 2 dias/.test(bal.txt) && /Só aviso/.test(bal.txt),
