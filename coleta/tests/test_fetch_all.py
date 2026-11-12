@@ -360,7 +360,7 @@ def test_main_ponta_a_ponta(monkeypatch, tmp_path, fake_yf):
     assert fa.main(['--saida', str(saida), '--url-publicado', 'https://exemplo.invalid/data/']) == 0
 
     m = json.loads((saida / 'manifest.json').read_text())
-    assert m['versao'] == 2 and m['ultimoPregao'] == hoje.isoformat() and m['anosHistorico'] == 5
+    assert m['versao'] == 2 and m['ultimoPregao'] == pd.bdate_range(end=pd.Timestamp(hoje), periods=1)[0].date().isoformat() and m['anosHistorico'] == 5
     assert m['arquivosPrecos'] == ['precos_000.json']
     # AAA (~US$ 50 mi/dia) e BBB (~US$ 10 mi/dia) passam; CCC e DDD-B são ilíquidos; ETFX é ETF
     assert m['stats']['tickersPrecos'] == 2

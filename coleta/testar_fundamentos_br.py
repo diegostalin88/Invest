@@ -142,11 +142,14 @@ def acoes_fre(conteudo, ano, cnpjs):
     nomes = z.namelist()
     idx = next((n for n in nomes if n.lower() == f'fre_cia_aberta_{ano}.csv'), None)
     cap = next((n for n in nomes if 'capital_social' in n.lower() and 'classe' not in n.lower()), None)
-    receb = {}
+    receb, receb_ver = {}, {}   # (cnpj, ref) -> (versão, data) da mais recente; (cnpj, ref, versão) -> data
     for r in cvm.linhas(z, idx) if idx else []:
         c, ref, dt = r.get('CNPJ_CIA'), r.get('DT_REFER'), r.get('DT_RECEB')
         if c in cnpjs and ref and dt:
-            receb[(c, ref)] = min(receb.get((c, ref), dt), dt)
+            ver = int(_num(r.get('VERSAO')) or 0)
+            receb_ver[(c, ref, ver)] = min(receb_ver.get((c, ref, ver), dt), dt)
+            if (c, ref) not in receb or (ver, dt) > receb[(c, ref)]:
+                receb[(c, ref)] = (ver, dt)
     out, melhor = {}, {}
     cab = None
     for r in cvm.linhas(z, cap) if cap else []:
@@ -169,8 +172,9 @@ def acoes_fre(conteudo, ano, cnpjs):
         k = (c, ref)
         if k not in melhor or (prio, ver) >= melhor[k][0]:
             melhor[k] = ((prio, ver), q)
-    for (c, ref), (_, q) in melhor.items():
-        filed = receb.get((c, ref)) or f'{ano}-06-30'
+    for (c, ref), ((_, ver), q) in melhor.items():
+        # data de entrega da versão usada (correção de 07/11/2026: antes era a da primeira entrega)
+        filed = receb_ver.get((c, ref, ver)) or (receb.get((c, ref)) or (None, None))[1] or f'{ano}-06-30'
         out.setdefault(c, []).append({'end': ref, 'filed': filed, 'v': q})
     return out
 
