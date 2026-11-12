@@ -7,8 +7,7 @@ on:
   push:
     branches: [claude/project-thread-ouh2hk]
     paths: ["opcoes/sinais_o6.py", ".github/workflows/opcoes-sinais-o6.yml"]
-  schedule:
-    - cron: "30 23 * * 1-5"   # 20h30 em Brasília, depois de a B3 publicar o COTAHIST do dia
+  # Agendamento desligado em 12/11/2026 a pedido do Diego (nada agendado no GitHub; ainda roda à mão).
 
 permissions:
   contents: read
