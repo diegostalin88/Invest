@@ -1,7 +1,7 @@
 # Referências do projeto (livros do Diego)
 
 Livros e textos que o Diego usou para montar o GRAFICO16, na pasta do Drive
-"Invest" (`1WpEUwDfxKik70qhpnNUbAYSffF1Fivz7`). Este arquivo liga cada um ao
+"Invest" (`ID-DA-PASTA-DO-DRIVE`). Este arquivo liga cada um ao
 que o app faz hoje e ao que ainda falta. **Nada da lista "Lacunas" foi
 implementado:** cada item muda a lógica quantitativa e precisa do aval do Diego.
 

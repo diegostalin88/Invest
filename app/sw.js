@@ -1,8 +1,8 @@
 // Service worker simples do Invest.
 // - Dados (data/*.json): SEMPRE da rede, nunca do cache — para nunca mostrar dados velhos.
 // - App (index.html, manifesto, ícones): rede primeiro; o cache só é usado se estiver offline.
-const CACHE = 'invest-app-v1';
-const APP = ['./', 'index.html', 'manifest.webmanifest', 'icone.svg', 'icone-192.png', 'icone-512.png'];
+const CACHE = 'invest-app-v2';
+const APP = ['./', 'index.html', 'manifest.webmanifest', 'icone.svg', 'icone-192.png', 'icone-512.png', 'motor-carteira.js', 'js/telas.js', 'ajuda.html'];
 
 self.addEventListener('install', e => {
     e.waitUntil(caches.open(CACHE).then(c => c.addAll(APP)).then(() => self.skipWaiting()));

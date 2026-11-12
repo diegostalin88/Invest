@@ -1,0 +1,17 @@
+{
+  "name": "Invest — bússola de investimentos",
+  "short_name": "Invest",
+  "description": "Termômetro do mercado, saúde da carteira contra o índice e o CDI, balanços e imposto. Dados atualizados todo dia útil (EUA e Brasil).",
+  "lang": "pt-BR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#111827",
+  "icons": [
+    { "src": "icone-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icone-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icone.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

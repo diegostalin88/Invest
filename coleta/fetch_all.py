@@ -27,6 +27,8 @@ USO:
 Variáveis de ambiente:
     SEC_USER_AGENT   obrigatório no GitHub Actions. Ex.: "InvestDiego seu-email@exemplo.com"
     TICKER_LIMIT     opcional. Processa só os N primeiros tickers do universo (modo teste).
+    UNIVERSO_ARQUIVO opcional. Arquivo com um ticker por linha; substitui a lista completa da Nasdaq
+                     (desde 12/11/2026 a VM coleta só os mais negociados; ver coleta/universo_liquido.py).
     SITE_URL         opcional. URL base dos dados publicados (padrão: URL_DADOS_PUBLICADOS).
 
 AVISO: ferramenta de apoio à análise, não é recomendação de investimento. Fontes gratuitas podem
@@ -133,6 +135,13 @@ def parse_other_listed(text):
         log(f"  Removidos {n - len(df)} ETFs/fundos da lista NYSE/AMEX/ARCA.")
     df = df[~df['ACT Symbol'].str.contains(r'\$')]
     return [normalize_for_yfinance(s) for s in df['ACT Symbol'].tolist()]
+
+
+def ler_universo_arquivo(caminho):
+    """Um ticker por linha (linhas vazias e com # são ignoradas), sem repetição, na ordem do arquivo."""
+    with open(caminho, encoding='utf-8') as f:
+        linhas = [l.split('#')[0].strip().upper() for l in f]
+    return list(dict.fromkeys(normalize_for_yfinance(l) for l in linhas if l))
 
 
 def baixar_universo():
@@ -852,12 +861,16 @@ def montar_manifesto(gerado_em, ultimo_pregao, anos, arquivos_precos, stats, avi
     }
 
 
-def portao_qualidade(manifesto, manifesto_anterior, fundamentos, hoje):
-    """Devolve a lista de motivos para bloquear a publicação (vazia = pode publicar)."""
+def portao_qualidade(manifesto, manifesto_anterior, fundamentos, hoje, n_universo=None):
+    """Devolve a lista de motivos para bloquear a publicação (vazia = pode publicar).
+    n_universo: tamanho do universo pedido quando ele vem de uma lista fixa (UNIVERSO_ARQUIVO). A queda é
+    medida contra o menor entre a execução anterior e esse tamanho, para a troca de universo não bloquear."""
     erros = []
     n = manifesto['stats'].get('tickersPrecos', 0)
     if manifesto_anterior:
         n_ant = (manifesto_anterior.get('stats') or {}).get('tickersPrecos') or 0
+        if n_universo:
+            n_ant = min(n_ant, n_universo)
         if n_ant and n < (1 - QUEDA_MAXIMA_TICKERS) * n_ant:
             erros.append(f"Tickers com preço caíram de {n_ant} para {n} (queda maior que "
                          f"{int(QUEDA_MAXIMA_TICKERS * 100)}%). Possível bloqueio do Yahoo.")
@@ -943,7 +956,14 @@ def main(argv=None):
     log(f"  Cache de fundamentos: {len(cache)} tickers.")
 
     log("=== 2/6 Universo ===")
-    universo = baixar_universo()
+    arq_universo = os.environ.get('UNIVERSO_ARQUIVO', '').strip()
+    universo_fixo = bool(arq_universo and os.path.isfile(arq_universo))
+    if universo_fixo:
+        universo = ler_universo_arquivo(arq_universo)
+        log(f"Universo da lista {arq_universo}: {len(universo)} tickers (os mais negociados).")
+    if not universo_fixo or not universo:
+        universo_fixo = False
+        universo = baixar_universo()
     if limite:
         universo = universo[:limite]
         log(f"MODO TESTE: TICKER_LIMIT={limite} → processando só {len(universo)} tickers.")
@@ -1002,7 +1022,8 @@ def main(argv=None):
         json.dump(manifesto, f, ensure_ascii=False, indent=2)
 
     log("=== 6/6 Portão de qualidade ===")
-    erros = portao_qualidade(manifesto, manifesto_anterior, fundamentos, hoje)
+    erros = portao_qualidade(manifesto, manifesto_anterior, fundamentos, hoje,
+                             n_universo=len(universo) if universo_fixo else None)
     duracao = time.monotonic() - t0
     total_bytes = bytes_precos + len(fund_bytes)
 
@@ -1011,7 +1032,7 @@ def main(argv=None):
         "",
         "| Item | Valor |", "|---|---|",
         f"| Último pregão | {ultimo} |",
-        f"| Universo{' (modo teste)' if limite else ''} | {len(universo)} tickers |",
+        f"| Universo{' (modo teste)' if limite else ' (lista dos mais negociados)' if universo_fixo else ''} | {len(universo)} tickers |",
         f"| Baixados do Yahoo | {n_baixados} (lotes com falha: {lotes_falhos}; duplicados removidos: {len(duplicados)}) |",
         f"| Tickers com preço (após pré-filtro) | {stats['tickersPrecos']} |",
         f"| Pool de fundamentos | {stats['tickersFundamentos']} (com dados: {stats['fundamentosComDados']}) |",

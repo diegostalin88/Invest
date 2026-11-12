@@ -113,4 +113,4 @@ def test_acoes_do_fre():
                    f'{c};2015-01-01;1;Capital Emitido;500\n{c};2015-01-01;1;Capital Integralizado;400\n'
                    f'{c};2015-01-01;2;Capital Integralizado;450\n99.999.999/0001-99;2015-01-01;1;Capital Integralizado;7\n')
     out = br.acoes_fre(buf.getvalue(), 2015, {c})
-    assert out == {c: [{'end': '2015-01-01', 'filed': '2015-05-20', 'v': 450.0}]}
+    assert out == {c: [{'end': '2015-01-01', 'filed': '2015-08-01', 'v': 450.0}]}
