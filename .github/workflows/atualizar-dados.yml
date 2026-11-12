@@ -1,17 +1,7 @@
 name: Atualizar dados
 
 on:
-  schedule:
-    # Seg a sex, 22:30 UTC: depois do fechamento da bolsa americana tanto no horário de verão
-    # (fecha 20:00 UTC) quanto no de inverno (fecha 21:00 UTC). O GitHub pode atrasar alguns minutos.
-    - cron: "30 22 * * 1-5"
-    # Dia 1 de cada mês: só o job "manter-ativo" (evita que o GitHub desative os agendamentos
-    # depois de 60 dias sem atividade no repositório).
-    - cron: "0 12 1 * *"
-  # Mudou só o app (app/**) ou os extras (vendidos, relatório): republica o app reaproveitando os dados já publicados, sem nova coleta.
-  push:
-    branches: [main]
-    paths: ["app/**", "coleta/vendidos.py", "coleta/gerar_relatorio.js"]
+  # Agendamento desligado em 12/11/2026 a pedido do Diego: a coleta roda na VM Oracle (vm/coletar.sh).
   workflow_dispatch:
     inputs:
       ticker_limit:

@@ -5,8 +5,7 @@ name: Aluguel B3 (coletor no Brasil)
 # no cache do Actions. A coleta principal (atualizar-dados.yml) usa essa cópia se ela for recente.
 # Só roda se a variável do repositório COLETOR_BRASIL = sim (assim nada fica na fila sem o coletor).
 on:
-  schedule:
-    - cron: "45 21 * * 1-5"   # 45 min antes da coleta principal
+  # Agendamento desligado em 12/11/2026 a pedido do Diego: a coleta roda na VM Oracle (vm/coletar.sh).
   workflow_dispatch:
 
 permissions:
