@@ -431,3 +431,16 @@ def test_estimar_proximo_balanco():
     # pouco histórico: último + 91 dias
     assert fa.estimar_proximo_balanco(['2026-09-01'], hoje) == '2026-12-01'
     assert fa.estimar_proximo_balanco([], hoje) is None
+
+
+def test_portao_nao_bloqueia_troca_para_universo_menor():
+    # execução anterior com 3481 papéis; hoje a lista fixa pede 500 e vieram 480
+    assert fa.portao_qualidade(_manif(480), _manif(3481), FUND_OK, HOJE, n_universo=500) == []
+    # mas uma queda real dentro da lista fixa continua bloqueando
+    assert fa.portao_qualidade(_manif(300), _manif(3481), FUND_OK, HOJE, n_universo=500)
+
+
+def test_ler_universo_arquivo(tmp_path):
+    p = tmp_path / 'u.txt'
+    p.write_text('aapl\n# comentário\nBRK.B\n\nAAPL\nmsft  # nota\n', encoding='utf-8')
+    assert fa.ler_universo_arquivo(str(p)) == ['AAPL', 'BRK-B', 'MSFT']
