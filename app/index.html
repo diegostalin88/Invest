@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Invest · Carteira</title>
+<title>Invest</title>
 <meta name="theme-color" content="#0b1220">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icone.svg" type="image/svg+xml">
@@ -67,26 +67,57 @@ details summary{cursor:pointer;color:var(--acento);font-size:15px}
 .vazio{text-align:center;padding:28px 12px}
 .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--txt);color:var(--fundo);padding:10px 16px;border-radius:12px;font-size:15px;z-index:9;display:none;max-width:90vw}
 @media (min-width:700px){.grade.tres{grid-template-columns:1fr 1fr 1fr}}
+/* app único (fase 2) */
+header{flex-wrap:wrap;gap:8px}
+.topo-linha{display:flex;align-items:center;gap:8px;width:100%}
+.topo-linha h1{flex:1}
+#busca{flex:1;min-width:0;padding:8px 12px;font-size:16px}
+.merc{display:flex;border:1px solid var(--borda);border-radius:999px;overflow:hidden;flex-shrink:0}
+.merc button{background:none;border:0;color:var(--mudo);padding:6px 10px;font-size:14px}
+.merc button.ativa{background:var(--acento);color:#fff}
+.icone{background:var(--cartao2);border:1px solid var(--borda);color:var(--txt);border-radius:10px;padding:6px 10px;font-size:15px;flex-shrink:0}
+#sub-carteira{display:none}
+body[data-aba="carteira"] #sub-carteira{display:flex}
+.carrossel{display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}
+.mini-card{flex:0 0 auto;min-width:96px;background:var(--cartao2);border:1px solid var(--borda);border-radius:12px;padding:8px 10px;color:var(--txt);display:flex;flex-direction:column;align-items:flex-start;gap:2px;font-size:14px;cursor:pointer}
+.item-alerta{display:block;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--borda);color:var(--txt);padding:9px 0;font-size:15px;cursor:pointer}
+.item-alerta:first-of-type{border-top:0}
+.congelado{border-color:var(--mudo);background:repeating-linear-gradient(135deg,var(--cartao),var(--cartao) 12px,var(--cartao2) 12px,var(--cartao2) 24px)}
+body.oculto .din{filter:blur(7px);user-select:none}
+@media (min-width:1024px){
+  nav#barra{top:0;bottom:0;right:auto;width:190px;flex-direction:column;border-top:0;border-right:1px solid var(--borda);padding-top:70px}
+  nav#barra button{flex:0 0 auto;flex-direction:row;gap:10px;justify-content:flex-start;padding:12px 18px;font-size:16px}
+  body{padding-bottom:0;padding-left:190px}
+}
 </style>
 </head>
 <body>
-<header><div><h1>Minha carteira</h1><small id="cab-data">carregando…</small></div><button class="botao sec" id="btn-tema" style="padding:6px 10px" aria-label="Trocar tema">◐</button></header>
+<header>
+  <div class="topo-linha"><h1>Invest</h1><span class="chip" id="selo-dados">carregando…</span><div class="merc"><button data-merc="br">BR</button><button data-merc="us">EUA</button></div></div>
+  <div class="topo-linha"><input id="busca" type="search" placeholder="Buscar papel" autocomplete="off" enterkeyhint="search" aria-label="Buscar papel"><button class="icone" id="btn-tema" aria-label="Trocar tema">☀︎</button><button class="icone" data-tela="mais" aria-label="Mais">☰</button></div>
+  <small id="cab-data" class="mudo" style="width:100%">carregando…</small>
+</header>
 <main>
-  <section class="tela ativa" id="tela-resumo"></section>
-  <section class="tela" id="tela-lancar"></section>
-  <section class="tela" id="tela-carteira"></section>
-  <section class="tela" id="tela-ir"></section>
-  <section class="tela" id="tela-mais"></section>
+  <div class="abas" id="sub-carteira"><button data-tela="resumo">Posições e rentabilidade</button><button data-tela="lancar">Lançar e importar</button><button data-tela="carteira">Rebalancear</button><button data-tela="ir">Imposto</button></div>
+  <section class="tela ativa" id="tela-inicio" data-aba="inicio"></section>
+  <section class="tela" id="tela-mercado" data-aba="mercado"></section>
+  <section class="tela" id="tela-lab" data-aba="lab"></section>
+  <section class="tela" id="tela-ativo" data-aba="ativo"></section>
+  <section class="tela" id="tela-resumo" data-aba="carteira"></section>
+  <section class="tela" id="tela-lancar" data-aba="carteira"></section>
+  <section class="tela" id="tela-carteira" data-aba="carteira"></section>
+  <section class="tela" id="tela-ir" data-aba="carteira"></section>
+  <section class="tela" id="tela-mais" data-aba="mais"></section>
 </main>
 <nav id="barra">
-  <button class="ativa" data-tela="resumo"><span>📈</span>Resumo</button>
-  <button data-tela="lancar"><span>➕</span>Lançar</button>
-  <button data-tela="carteira"><span>⚖</span>Rebalancear</button>
-  <button data-tela="ir"><span>🧾</span>Imposto</button>
-  <button data-tela="mais"><span>☰</span>Mais</button>
+  <button class="ativa" data-aba="inicio"><span>🏠</span>Início</button>
+  <button data-aba="mercado"><span>📊</span>Mercado</button>
+  <button data-aba="carteira"><span>💼</span>Carteira</button>
+  <button data-aba="lab"><span>🧪</span>Laboratório</button>
 </nav>
 <div class="toast" id="toast"></div>
 <script src="motor-carteira.js"></script>
+<script src="js/telas.js"></script>
 <script>
 'use strict';
 const C = window.Carteira;
@@ -128,7 +159,7 @@ function desenharTudo() {
     recalcular();
     const ult = DADOS.ativos && DADOS.ativos.BOVA11 ? DADOS.ativos.BOVA11.datas.slice(-1)[0] : null;
     document.getElementById('cab-data').textContent = DADOS.erro ? 'sem dados de mercado (só os lançamentos)' : `preços até ${dBR(ult)} · IPCA até ${DADOS.ipca.meses.slice(-1)[0] ? DADOS.ipca.meses.slice(-1)[0].split('-').reverse().join('/') : '—'}`;
-    telaResumo(); telaLancar(); telaCarteira(); telaIR(); telaMais();
+    telaResumo(); telaLancar(); telaCarteira(); telaIR(); telaMais(); desenharNovas();
 }
 
 // ---------- RESUMO ----------
@@ -1058,10 +1089,28 @@ async function importarB3(arquivos) {
 }
 
 // ---------- eventos ----------
-function irTela(t) { document.querySelectorAll('.tela').forEach(s => s.classList.toggle('ativa', s.id === 'tela-' + t)); document.querySelectorAll('#barra button').forEach(b => b.classList.toggle('ativa', b.dataset.tela === t)); window.scrollTo(0, 0); try { sessionStorage.setItem('invest-tela', t); } catch (e) { } }
+let subCarteira = 'resumo';
+function mostrarTela(t) {
+    document.querySelectorAll('.tela').forEach(s => s.classList.toggle('ativa', s.id === 'tela-' + t));
+    const sec = document.getElementById('tela-' + t), aba = sec ? sec.dataset.aba : 'inicio';
+    document.body.dataset.aba = aba;
+    document.querySelectorAll('#barra button').forEach(b => b.classList.toggle('ativa', b.dataset.aba === aba));
+    document.querySelectorAll('#sub-carteira button').forEach(b => b.classList.toggle('ativa', b.dataset.tela === t));
+    if (aba === 'carteira') subCarteira = t;
+    window.scrollTo(0, 0); try { sessionStorage.setItem('invest-tela', t); } catch (e) { }
+}
+function irTela(t) { mostrarTela(t); }
+function irAba(a, sub) { mostrarTela(a === 'carteira' ? (sub || subCarteira) : a); }
 let apagarArmado = null;
 document.addEventListener('click', (ev) => {
     const b = ev.target.closest('button, a'); if (!b) return;
+    if (b.dataset.aba && b.closest('#barra, .cartao, #tela-ativo')) return irAba(b.dataset.aba, b.dataset.sub);
+    if (b.dataset.merc) { MERC = b.dataset.merc; try { localStorage.setItem('invest-mercado', MERC); } catch (e) { } return desenharNovas(); }
+    if (b.dataset.ativo) return abrirAtivo(b.dataset.ativo, b.dataset.m);
+    if (b.dataset.abaAtivo) { abaAtivo = b.dataset.abaAtivo; return telaAtivo(); }
+    if (b.hasAttribute('data-voltar')) return irAba(voltarPara);
+    if (b.id === 'btn-olho') { document.body.classList.toggle('oculto'); try { localStorage.setItem('invest-oculto', document.body.classList.contains('oculto') ? '1' : ''); } catch (e) { } return telaInicio(); }
+    if (b.dataset.alvo) { const a = b.dataset.alvo; if (a.startsWith('ativo:')) { const [, t, mk] = a.split(':'); return abrirAtivo(t, mk); } return irAba(a === 'resumo' || a === 'ir' ? 'carteira' : a, a === 'carteira' ? 'carteira' : a); }
     if (b.dataset.tela) return irTela(b.dataset.tela);
     if (b.dataset.irTela) return irTela(b.dataset.irTela);
     if (b.dataset.graf) { abaGrafico = b.dataset.graf; document.querySelectorAll('#abas-grafico button').forEach(x => x.classList.toggle('ativa', x === b)); return desenharGrafico(); }
@@ -1121,10 +1170,13 @@ try { if (localStorage.getItem('invest-tema') === 'claro') document.documentElem
 
 (async function iniciar() {
     ESTADO = ler();
-    await carregarDados();
+    try { if (localStorage.getItem('invest-oculto')) document.body.classList.add('oculto'); } catch (e) { }
+    await Promise.all([carregarDados(), carregarAgente()]);
     desenharTudo();
-    try { const t = sessionStorage.getItem('invest-tela'); if (t) irTela(t); } catch (e) { }
-    window.investDebug = { get R() { return R; }, get ESTADO() { return ESTADO; }, C };
+    let t0 = 'inicio'; try { const t = sessionStorage.getItem('invest-tela'); if (t && t !== 'ativo' && document.getElementById('tela-' + t)) t0 = t; } catch (e) { }
+    mostrarTela(t0);
+    document.getElementById('busca').addEventListener('keydown', (e) => { if (e.key === 'Enter') { buscarAtivo(e.target.value); e.target.blur(); } });
+    window.investDebug = { get R() { return R; }, get ESTADO() { return ESTADO; }, C, get AG() { return AG; }, abrirAtivo, irAba, buscarAtivo };
 })();
 </script>
 </body>
