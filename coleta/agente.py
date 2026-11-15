@@ -157,6 +157,8 @@ def episodios_queda(c, limiar=QUEDA_SITUACAO, janela=JANELA_SITUACAO, espaco=ESP
 def situacoes(precos, vend, indice):
     s_ind = ((indice or {}).get('series') or {}).get((indice or {}).get('principal')) or {}
     idx = dict(zip(s_ind.get('dates') or [], s_ind.get('close') or []))
+    di, ci = s_ind.get('dates') or [], s_ind.get('close') or []
+    ret_idx = {di[k]: ci[k] / ci[k - 1] - 1 for k in range(1, len(ci)) if ci[k] and ci[k - 1]}  # queda do mercado no dia
     out = []
     for t, s in precos.items():
         d, c, v = s.get('dates') or [], s.get('close') or [], s.get('volume') or []
@@ -181,7 +183,7 @@ def situacoes(precos, vend, indice):
                 else:
                     caso += [None, None]
             hist.append(caso)
-        saltos = [(d[k], c[k] / c[k - 1] - 1) for k in range(max(1, len(c) - JANELA_SITUACAO), len(c)) if c[k - 1] and c[k] / c[k - 1] - 1 <= -SALTO_SUSPEITO]
+        saltos = [(d[k], c[k] / c[k - 1] - 1) for k in range(max(1, len(c) - JANELA_SITUACAO), len(c)) if c[k - 1] and c[k] / c[k - 1] - 1 - min(0, ret_idx.get(d[k], 0)) <= -SALTO_SUSPEITO]  # desconta a queda do índice no dia (26/10/2026: queda real e geral)
         v5, v60 = media([x for x in v[-5:] if x]), media([x for x in v[-JANELA_SITUACAO - 5:-5] if x])  # 5 pregões contra os 60 anteriores
 
         def resumo_h(k):  # k = posição do excesso sobre o índice no caso
@@ -357,7 +359,7 @@ def montar(site, hoje=None):
                     'vol': 'volatilidade anualizada de 21 pregões', 'volFinMi': 'volume financeiro médio de 20 pregões, milhões na moeda do mercado',
                     'vendido.dias': 'dias de volume para zerar a posição vendida (aluguel B3 ou short interest FINRA)',
                     'ref13': '1/3 BOVA11 + 1/3 IVVB11 + 1/3 CDI', 'macro.focus': 'boletim Focus do Banco Central: mediana das expectativas em % (selic no fim do ano, ipca e pib do ano, cambio em R$/US$ no fim do ano); antes = 4 semanas atrás', 'testeParaFrente': 'placar da estratégia congelada (regras de 04/11/2026)',
-                    'situacoes': 'papéis hoje ≥30% abaixo da máxima de 60 pregões; historico = vezes anteriores do MESMO papel: [data, ret20, excesso20 sobre o índice, ret60, excesso60]; saltoSuspeito = queda ≥45% num pregão (confirmar se é evento real ou erro de ajuste); contexto, não sinal'},
+                    'situacoes': 'papéis hoje ≥30% abaixo da máxima de 60 pregões; historico = vezes anteriores do MESMO papel: [data, ret20, excesso20 sobre o índice, ret60, excesso60]; saltoSuspeito = queda ≥45% num pregão além da queda do índice no dia (confirmar se é evento real ou erro de ajuste); contexto, não sinal'},
     }
 
 

@@ -87,3 +87,16 @@ def test_episodios_respeitam_espaco():
     c = [10] * 60 + [6] * 30 + [10] * 10 + [5] * 100
     eps = agente.episodios_queda(c)
     assert eps[0] == 60 and all(b - a >= agente.ESPACO_EPISODIOS for a, b in zip(eps, eps[1:]))
+
+
+def test_salto_suspeito_desconta_queda_do_indice():
+    n = 120
+    datas = [f'2026-{1 + k // 28:02d}-{1 + k % 28:02d}' for k in range(n)]
+    c = [10.0] * (n - 5) + [4.3] * 5                     # -57% num dia
+    ind_geral = [100.0] * (n - 5) + [85.0] * 5           # índice -15% no mesmo dia (queda geral)
+    ind_calmo = [100.0] * n
+    p = {'VAMO3': {'dates': datas, 'close': c, 'volume': [1000] * n}}
+    geral = agente.situacoes(p, {}, {'principal': 'IBOV', 'series': {'IBOV': {'dates': datas, 'close': ind_geral}}})
+    calmo = agente.situacoes(p, {}, {'principal': 'IBOV', 'series': {'IBOV': {'dates': datas, 'close': ind_calmo}}})
+    assert 'saltoSuspeito' not in geral[0]               # -57% - (-15%) = -42%: não é suspeito
+    assert calmo[0]['saltoSuspeito'][0][0] == datas[n - 5]
