@@ -89,7 +89,7 @@ Laboratório (`docs/protocolo-laboratorio.md`: registro antes do teste, critéri
 de tentativas). Já julgadas: estratégia técnica do app (congelada 04/11/2026, perdeu para o índice); A momento 12
 meses; B tendência no índice; controle de exposição pela volatilidade; C fundamentos EUA e BR; D surpresa do balanço
 (só informação); Q-BR qualidade; H ETFs de dividendos; opções O1–O7; K regras de trade em cripto; queda ≥30% +
-Otimista; direção intradiária dos quânticos; Radar de sugestões (técnica do caso MOVI3). Passou só para acompanhar:
+Otimista; direção intradiária dos quânticos; Radar de sugestões (usa a técnica do caso MOVI3, já reprovada). Passou só para acompanhar:
 5% de BTC na carteira 1/3. Registrada e não rodada: P (HRP no lugar de 1/3).
 
 ## 4. Princípios dos livros-base (Kaufman, Fitschen, Chan, Malheiros, Rockefeller)
@@ -107,8 +107,8 @@ Diego contrariar um princípio, **avise qual e proponha a versão alinhada** ant
    Nível 4 → *"Parecer não validado (placar em andamento). Não é recomendação de investimento."*
 
 ## 6. Registrar o parecer (só nível 4; protocolo em `docs/protocolo-agente.md`)
-Na planilha **"Consultor — pareceres"** (pasta Invest; crie com o conector do Google Sheets se não existir), aba
-`pareceres`, colunas: `data | papel | mercado | tese | confianca | preco_ref | indice | indice_ref |
+Na planilha **"Consultor — pareceres"** (pasta Invest; crie com o conector do Google Sheets se não existir), **primeira** aba,
+chamada `pareceres` (a VM lê a primeira aba), colunas: `data | papel | mercado | tese | confianca | preco_ref | indice | indice_ref |
 mudaria_opiniao | data_agente_json`. Uma linha por papel com tese; `preco_ref` = `papeis[TICKER].p`; `indice_ref` =
 `termometro.ult` do mercado. Sem conector, mostre a tabela para o Diego colar. **Nunca altere linhas antigas**;
 mudar o método recomeça o placar.
