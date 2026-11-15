@@ -122,6 +122,22 @@ function telaInicio() {
         ${cartaoConsultor()}`;
 }
 
+function cartaoSituacoes(m) {
+    const S = m.situacoes;
+    if (!S) return '';
+    const corpo = S.length ? S.map(o => {
+        const H = o.historico || {}, h = H.h60 || {}, h2 = H.h20 || {};
+        const hist = H.casos ? `${H.casos > 1 ? 'Nas ' + H.casos + ' vezes anteriores' : 'Na única vez anterior'} em que caiu assim${H.casos < 5 ? ' (poucos casos, vale pouco)' : ''}: em 20 pregões, mediana ${pctN(h2.mediana)} contra o índice; em 60 pregões, ${pctN(h.mediana)} (bateu o índice em ${h.n ? nf(h.acimaIndice * h.n, 0) + ' de ' + h.n : '—'}).` : 'Sem queda parecida antes no histórico deste papel.';
+        const salto = (o.saltoSuspeito || []).map(([d, x]) => `<div class="mini" style="color:var(--amarelo,#d9a400)">⚠ ${pctN(x, 0)} num pregão em ${dBR(d)}: confirme se foi um evento real (resultado, aumento de capital) ou erro de ajuste do preço.</div>`).join('');
+        return `<button class="item-alerta" data-ativo="${esc(o.p)}" data-m="${MERC}" style="display:block;text-align:left">
+            <b>${esc(o.p)}</b> <span class="baixa">${pctN(-o.queda60, 0)}</span> <span class="mudo peq">desde a máxima de 60 pregões${o.diasVendido !== undefined && o.diasVendido !== null ? ` · ${nf(o.diasVendido, 1)} dias de volume vendidos` : ''}${o.volumeRel ? ` · volume ${nf(o.volumeRel, 1)}× o normal` : ''}</span>
+            <div class="mini mudo">${hist}</div>${salto}</button>`;
+    }).join('') : '<p class="mudo peq">Nenhum papel está 30% ou mais abaixo da máxima dos últimos 60 pregões.</p>';
+    return `<div class="cartao"><h2>Situações parecidas hoje</h2>
+        <p class="peq mudo" style="margin-top:0">Papéis em queda forte agora, com o que <b>cada um</b> fez nas vezes anteriores em que caiu assim (cada papel tem a sua cara).</p>
+        ${corpo}
+        <p class="mini mudo" style="margin:8px 0 0">Contexto para você decidir, não sinal. Medido em todos os papéis juntos, "queda forte + Otimista" foi reprovado em 04/11 (perfil de loteria: 1 acerto em 3). Poucos casos do mesmo papel dizem pouco. Se operar, use a ficha da parte tática.</p></div>`;
+}
 // ---------- MERCADO: o que está acontecendo? ----------
 const NOMES_LISTA = { altas: 'Maiores altas do dia', quedas: 'Maiores quedas do dia', maisNegociados: 'Mais negociados', longeDoTopo: 'Mais longe do topo', maisVolateis: 'Mais voláteis' };
 function cartaoLista(titulo, itens, fmt, mk = MERC) {
@@ -137,6 +153,7 @@ function telaMercado() {
     const watch = (ESTADO.acompanhar || []).filter(Boolean);
     const W = (AG && AG.watchlist) || {};
     el.innerHTML = `
+        ${cartaoSituacoes(m)}
         ${cartaoLista(NOMES_LISTA.altas, L.altas, fP)}
         ${cartaoLista(NOMES_LISTA.quedas, L.quedas, fP)}
         ${cartaoLista(NOMES_LISTA.maisNegociados, L.maisNegociados, (v) => `${nf(v, 0)} mi`)}

@@ -75,6 +75,9 @@ Rode os papéis em sequência, numa resposta só:
 - **Fundamentos**: `papeis[TICKER]` (P/L, P/VP, ROE, margem, crescimento, dívida/PL, `balanco`). Graham e Bazin são
   "informação, não testado".
 - **Vendidos e fluxo**: `vendidos`, `papeis[TICKER].vendido`. Posição vendida alta = risco de volatilidade nos dois sentidos.
+- **Situação parecida**: se o papel estiver em `mercados.<br|us>.situacoes` (queda ≥30% da máxima de 60 pregões),
+  mostre o histórico **do próprio papel** (`historico.h20`/`h60`: mediana contra o índice e quantas vezes bateu) e diga
+  quantos casos são; menos de 5 vale pouco. `saltoSuspeito` = confira o preço (B3/RI) antes de qualquer conclusão.
 - **Notícias**: fato relevante, 8-K, guidance, regulação, com fonte e data. `alerta8k` primeiro.
 - **Otimista** e **pessimista**: os melhores argumentos de cada lado, só com fatos levantados.
 - **Risco e livros**: retorno sempre ao lado do índice (BOVA11 ou SPY), do CDI e da `ref13`; peso do papel na carteira;

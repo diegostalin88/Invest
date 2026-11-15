@@ -134,6 +134,69 @@ def termometro(indice):
     return o
 
 
+# ---------------- situações parecidas (15/11/2026, pedido do Diego) ----------------
+# "Quem está passando pela mesma situação" da MGLU3 em 03/11: queda forte desde a máxima de 60 pregões, com o
+# histórico DO PRÓPRIO PAPEL nas vezes anteriores em que caiu assim (cada papel tem a sua cara; não mistura cestas).
+# É contexto para o Diego decidir. NÃO é sinal: o cenário "queda ≥ 30% + Otimista" foi reprovado em 04/11
+# (docs/cenario-queda-reversao.md, perfil de loteria). Nada aqui foi escolhido olhando o resultado.
+QUEDA_SITUACAO, JANELA_SITUACAO, HORIZONTES, ESPACO_EPISODIOS, N_SITUACOES, SALTO_SUSPEITO = 0.30, 60, (20, 60), 60, 15, 0.45
+
+
+def episodios_queda(c, limiar=QUEDA_SITUACAO, janela=JANELA_SITUACAO, espaco=ESPACO_EPISODIOS):
+    """Índices dos dias em que o fechamento ficou `limiar` abaixo da máxima dos `janela` pregões (contando o dia);
+    um novo episódio só começa `espaco` pregões depois do anterior."""
+    eps, ult = [], -10 ** 9
+    for i in range(janela - 1, len(c)):
+        pico = max(c[i - janela + 1:i + 1])
+        if pico and c[i] <= (1 - limiar) * pico and i - ult >= espaco:
+            eps.append(i)
+            ult = i
+    return eps
+
+
+def situacoes(precos, vend, indice):
+    s_ind = ((indice or {}).get('series') or {}).get((indice or {}).get('principal')) or {}
+    idx = dict(zip(s_ind.get('dates') or [], s_ind.get('close') or []))
+    out = []
+    for t, s in precos.items():
+        d, c, v = s.get('dates') or [], s.get('close') or [], s.get('volume') or []
+        if len(c) < JANELA_SITUACAO + 5 or not all(c[-JANELA_SITUACAO:]):
+            continue
+        pico = max(c[-JANELA_SITUACAO:])
+        queda = 1 - c[-1] / pico if pico else 0
+        if queda < QUEDA_SITUACAO:
+            continue
+        eps = episodios_queda(c)
+        atual = eps[-1] if eps and eps[-1] >= len(c) - ESPACO_EPISODIOS else None
+        hist = []
+        for i in eps:
+            if i == atual:
+                continue
+            caso = [d[i]]
+            for h in HORIZONTES:
+                if i + h < len(c) and c[i]:
+                    rp = c[i + h] / c[i] - 1
+                    ri = idx[d[i + h]] / idx[d[i]] - 1 if d[i] in idx and d[i + h] in idx and idx[d[i]] else None
+                    caso += [r(rp), r(rp - ri) if ri is not None else None]
+                else:
+                    caso += [None, None]
+            hist.append(caso)
+        saltos = [(d[k], c[k] / c[k - 1] - 1) for k in range(max(1, len(c) - JANELA_SITUACAO), len(c)) if c[k - 1] and c[k] / c[k - 1] - 1 <= -SALTO_SUSPEITO]
+        v5, v60 = media([x for x in v[-5:] if x]), media([x for x in v[-JANELA_SITUACAO - 5:-5] if x])  # 5 pregões contra os 60 anteriores
+
+        def resumo_h(k):  # k = posição do excesso sobre o índice no caso
+            xs = [h[k] for h in hist if h[k] is not None]
+            return {'n': len(xs), 'mediana': r(sorted(xs)[len(xs) // 2]) if xs else None, 'acimaIndice': r(sum(x > 0 for x in xs) / len(xs), 2) if xs else None}
+        o = {'p': t, 'queda60': r(queda, 3), 'desde': d[atual] if atual is not None else None,
+             'diasVendido': (vend.get(t) or {}).get('dias'), 'volumeRel': r(v5 / v60, 2) if v5 and v60 else None,
+             'historico': {'casos': len(hist), 'h20': resumo_h(2), 'h60': resumo_h(4), 'ultimos': hist[-5:]}}
+        if saltos:
+            o['saltoSuspeito'] = [[dt, r(x, 3)] for dt, x in saltos]
+        out.append(o)
+    out.sort(key=lambda o: -o['queda60'])
+    return out[:N_SITUACOES]
+
+
 def placar_diario(diario, indice):
     if not diario or not isinstance(diario.get('sinais'), list):
         return None
@@ -212,6 +275,7 @@ def mercado(pasta, nome, hoje, n_papeis=None, extras=()):
         'amplitude': {'acimaMM200': r(sum(acima) / len(acima), 3), 'papeis': len(acima)} if acima else None,
         'listas': listas, 'vendidos': vendidos, 'balancosProximos': balancos[:30],
         'testeParaFrente': placar_diario(diario, indice),
+        'situacoes': situacoes(precos, vend, indice),
         'papeis': {t: resumos[t] for t in sorted(escolhidos)},
     }
 
@@ -292,7 +356,8 @@ def montar(site, hoje=None):
                     'mm200': 'distância do preço para a média de 200 pregões', 'topo52': 'queda desde a máxima de 52 semanas',
                     'vol': 'volatilidade anualizada de 21 pregões', 'volFinMi': 'volume financeiro médio de 20 pregões, milhões na moeda do mercado',
                     'vendido.dias': 'dias de volume para zerar a posição vendida (aluguel B3 ou short interest FINRA)',
-                    'ref13': '1/3 BOVA11 + 1/3 IVVB11 + 1/3 CDI', 'macro.focus': 'boletim Focus do Banco Central: mediana das expectativas em % (selic no fim do ano, ipca e pib do ano, cambio em R$/US$ no fim do ano); antes = 4 semanas atrás', 'testeParaFrente': 'placar da estratégia congelada (regras de 04/11/2026)'},
+                    'ref13': '1/3 BOVA11 + 1/3 IVVB11 + 1/3 CDI', 'macro.focus': 'boletim Focus do Banco Central: mediana das expectativas em % (selic no fim do ano, ipca e pib do ano, cambio em R$/US$ no fim do ano); antes = 4 semanas atrás', 'testeParaFrente': 'placar da estratégia congelada (regras de 04/11/2026)',
+                    'situacoes': 'papéis hoje ≥30% abaixo da máxima de 60 pregões; historico = vezes anteriores do MESMO papel: [data, ret20, excesso20 sobre o índice, ret60, excesso60]; saltoSuspeito = queda ≥45% num pregão (confirmar se é evento real ou erro de ajuste); contexto, não sinal'},
     }
 
 

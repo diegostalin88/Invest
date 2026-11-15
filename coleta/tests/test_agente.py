@@ -51,3 +51,39 @@ def test_dados_velhos_e_mercado_ausente(tmp_path):
     assert o['saude']['diasUteisDesdeUltimoPregao'] == 8 and o['saude']['dadosVelhos']
     assert o['saude']['mercadosAusentes'] == ['br']
     assert agente.montar(str(tmp_path / 'vazio'), hoje=date(2026, 11, 12))['saude']['dadosVelhos']
+
+
+def test_situacoes_parecidas_usa_historico_do_proprio_papel():
+    import random
+    rng = random.Random(3)
+    n = 400
+    datas = [f'2025-{1 + k // 28:02d}-{1 + k % 28:02d}' for k in range(n)]
+    c = [10.0]
+    for k in range(1, n):
+        x = c[-1] * (1 + rng.gauss(0, 0.005))
+        if k == 100:
+            x = c[-1] * 0.6          # episódio antigo: -40% num dia
+        if k == 150:
+            x = c[-1] * 1.5
+        if k == n - 10:
+            x = c[-1] * 0.4          # hoje: -60% num dia (salto suspeito)
+        c.append(x)
+    precos = {'ABCD3': {'dates': datas, 'close': c, 'volume': [1000] * (n - 5) + [5000] * 5},
+              'CALM3': {'dates': datas, 'close': [10 + 0.001 * k for k in range(n)], 'volume': [1000] * n}}
+    indice = {'principal': 'IBOV', 'series': {'IBOV': {'dates': datas, 'close': [100 + 0.01 * k for k in range(n)]}}}
+    s = agente.situacoes(precos, {'ABCD3': {'dias': 7.5}}, indice)
+    assert [o['p'] for o in s] == ['ABCD3']
+    o = s[0]
+    assert o['queda60'] > 0.5 and o['diasVendido'] == 7.5 and o['volumeRel'] == 5.0
+    assert o['desde'] == datas[n - 10] and o['saltoSuspeito'][0][0] == datas[n - 10]
+    assert o['historico']['casos'] == 1 and o['historico']['ultimos'][0][0] == datas[100]
+    caso = o['historico']['ultimos'][0]
+    assert caso[1] == round(c[120] / c[100] - 1, 4)                      # retorno em 20 pregões
+    ri = indice['series']['IBOV']['close'][120] / indice['series']['IBOV']['close'][100] - 1
+    assert abs(caso[2] - (c[120] / c[100] - 1 - ri)) < 1e-4
+
+
+def test_episodios_respeitam_espaco():
+    c = [10] * 60 + [6] * 30 + [10] * 10 + [5] * 100
+    eps = agente.episodios_queda(c)
+    assert eps[0] == 60 and all(b - a >= agente.ESPACO_EPISODIOS for a, b in zip(eps, eps[1:]))
