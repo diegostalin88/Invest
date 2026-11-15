@@ -38,6 +38,8 @@ def test_agente_json_completo_e_pequeno(tmp_path):
     assert 'indiceMesmasDatas' in p
     assert o['referencias']['ref13']['ret12m'] is not None
     assert br['vendidos'] and br['vendidos'][0][1] == 10.0
+    assert o['macro']['focus']['selic']['2026'] == 15.0 and o['macro']['focus']['antes']['ipca']['2026'] == 4.7
+    assert 'fonte' not in o['macro']['focus']
     assert 'compra' in o['aviso'] or 'recomendação' in o['aviso']
 
 

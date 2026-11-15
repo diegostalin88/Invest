@@ -355,6 +355,37 @@
             ref: referencia(dados, ativos, da, db, 0), refBtc: referencia(dados, ativos, da, db, 0.05), quedaMax: dd,
             patrimonioIni: s.patrimonio[a], patrimonioFim: s.patrimonio[b], aportes, ganho: s.patrimonio[b] - s.patrimonio[a] - aportes };
     };
+    // Risco no período (15/11/2026, no lugar do quantstats, porque a carteira só existe no aparelho): retornos MENSAIS
+    // da cota (fim de cada mês) e da referência 1/3 nas mesmas datas. Volatilidade anualizada = desvio mensal × √12;
+    // Sharpe = média do excesso mensal sobre o CDI ÷ desvio desse excesso × √12; meses negativos; maior queda.
+    // Só com 12 meses ou mais (antes disso o número é ruído). Descreve o passado; não é previsão.
+    M.MESES_MIN_RISCO = 12;
+    M.estatMensal = function (rets, rf) {
+        const n = rets.length; if (n < 2) return null;
+        const ex = rets.map((r, k) => r - (rf ? rf[k] : 0));
+        const med = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+        const dp = (v) => { const m = med(v); return Math.sqrt(v.reduce((a, b) => a + (b - m) * (b - m), 0) / (v.length - 1)); };
+        let v = 1, pico = 1, dd = 0; for (const r of rets) { v *= 1 + r; pico = Math.max(pico, v); dd = Math.max(dd, 1 - v / pico); }
+        const sdEx = dp(ex);
+        return { meses: n, vol: dp(rets) * Math.sqrt(12), sharpe: sdEx > 1e-12 ? med(ex) / sdEx * Math.sqrt(12) : null,
+            mesesNegativos: rets.filter(r => r < 0).length / n, quedaMaxMensal: dd, melhorMes: Math.max(...rets), piorMes: Math.min(...rets) };
+    };
+    M.risco = function (R, base, ate) {
+        if (!R || R.vazio) return null;
+        const s = R.serie; let i0 = s.patrimonio.findIndex(p => p > EPS); if (i0 < 0) return null;
+        const b = ateData(s.datas, ate || R.fim); let a = Math.max(ateData(s.datas, base), i0);
+        if (b <= a) return null;
+        const idx = [a];   // fechamento de partida + último dia de cada mês + o último dia do período
+        for (let k = a + 1; k <= b; k++) if (k === b || s.datas[k].slice(0, 7) !== s.datas[k + 1].slice(0, 7)) idx.push(k);
+        const meses = idx.length - 1;
+        if (meses < M.MESES_MIN_RISCO) return { meses, insuficiente: true };
+        const cart = [], cdi = [], refV = [1];
+        for (let j = 1; j < idx.length; j++) { cart.push(s.cota[idx[j]] / s.cota[idx[j - 1]] - 1); cdi.push(s.cdi[idx[j]] / s.cdi[idx[j - 1]] - 1); }
+        for (let j = 1; j < idx.length; j++) { const r = referencia(R.dados, R.ativos, s.datas[a], s.datas[idx[j]], 0); refV.push(r === null ? null : 1 + r); }
+        const temRef = refV.every(x => x !== null);
+        const ref = temRef ? refV.slice(1).map((x, j) => x / refV[j] - 1) : null;
+        return { meses, de: s.datas[a], ate: s.datas[b], carteira: M.estatMensal(cart, cdi), referencia: ref ? M.estatMensal(ref, cdi) : null };
+    };
     // Papel × setor no mesmo período, pelo preço de mercado (não depende dos seus lançamentos). EUA: contra o ETF
     // setorial, em dólar. B3: contra a média da cesta de empresas do setor (peso igual, comprada no início).
     M.setorPeriodo = function (ativos, cod, de, ate) {

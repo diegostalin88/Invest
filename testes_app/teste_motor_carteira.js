@@ -210,4 +210,24 @@ t('preço de tela: desfaz o ajuste de desdobramentos posteriores', () => {
     perto(C.precoTela(D, 'BOVA11', '2024-02-15'), 400); perto(C.precoTela(D, 'BOVA11', '2024-03-05'), 100);
     assert.strictEqual(C.precoTela(D, 'XXXX3', '2024-03-05'), null); assert.strictEqual(C.precoTela(D, 'BOVA11', '2010-01-01'), null);
 });
+t('estatística mensal: volatilidade, Sharpe e queda conferem com a conta à mão', () => {
+    const r = [0.02, -0.01, 0.03, -0.02], rf = [0.01, 0.01, 0.01, 0.01];
+    const e = C.estatMensal(r, rf);
+    // excesso = [0.01, -0.02, 0.02, -0.03]; média = -0.005; desvio amostral = sqrt(0.00143333/1)…
+    const ex = [0.01, -0.02, 0.02, -0.03], m = -0.005, sd = Math.sqrt(ex.reduce((a, x) => a + (x - m) ** 2, 0) / 3);
+    perto(e.sharpe, m / sd * Math.sqrt(12), 1e-12); perto(e.mesesNegativos, 0.5);
+    const mr = 0.005, sdr = Math.sqrt(r.reduce((a, x) => a + (x - mr) ** 2, 0) / 3); perto(e.vol, sdr * Math.sqrt(12), 1e-12);
+    perto(e.quedaMaxMensal, 1 - (1.02 * 0.99 * 1.03 * 0.98) / (1.02 * 0.99 * 1.03), 1e-12);
+});
+t('risco do período: precisa de 12 meses e compara com a referência nas mesmas datas', () => {
+    const D = dados({ bova: i => 100 * (1 + 0.1 * Math.sin(i / 20)), ivvb: i => 200 * (1 + 0.0005 * i), cdiDia: 0.0003 });
+    const L = [{ data: '2024-01-01', tipo: 'compra', ativo: 'BOVA11', qtd: 10, preco: 100 }];
+    const R = C.calcular(D, L, { hoje: '2024-12-31' });
+    const curto = C.risco(R, '2024-06-30', '2024-12-31'); assert(curto.insuficiente && curto.meses === 6, JSON.stringify(curto));
+    const x = C.risco(R, '2024-01-01', '2024-12-31');
+    assert.strictEqual(x.meses, 12); assert(x.carteira && x.referencia, 'tem carteira e referência');
+    assert(x.carteira.vol > x.referencia.vol, 'só BOVA11 oscila mais que a referência 1/3');
+    perto(x.carteira.quedaMaxMensal <= R.metricas.quedaMax + 1e-12 ? 1 : 0, 1);   // mensal nunca passa da diária
+    const s0 = x.carteira.sharpe; assert(Number.isFinite(s0));
+});
 console.log(falhas ? `\n${falhas} teste(s) falharam` : '\nTodos os testes passaram'); process.exit(falhas ? 1 : 0);

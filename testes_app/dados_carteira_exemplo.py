@@ -23,4 +23,9 @@ out = {'geradoEm': '2026-11-07T22:40:00Z', 'ativos': ativos, 'falhas': [], 'cdi'
        'ipca': {'meses': meses, 'var': [round(random.uniform(0.1, 0.6), 2) for _ in meses]}, 'ptax': {'data': du[-1], 'valor': 5.4}}
 os.makedirs(sys.argv[1], exist_ok=True)
 json.dump(out, open(os.path.join(sys.argv[1], 'carteira.json'), 'w'), separators=(',', ':'))
+# Focus fictício (formato de coleta/focus.py), para o app e o agente terem o que mostrar nos testes
+json.dump({'data': '2026-11-06', 'anos': ['2026', '2027'], 'selic': {'2026': 15.0, '2027': 12.25}, 'ipca': {'2026': 4.55, '2027': 4.2},
+           'pib': {'2026': 2.1, '2027': 1.8}, 'cambio': {'2026': 5.4, '2027': 5.5},
+           'antes': {'data': '2026-10-09', 'selic': {'2026': 15.0, '2027': 12.5}, 'ipca': {'2026': 4.7, '2027': 4.25}},
+           'fonte': 'exemplo'}, open(os.path.join(sys.argv[1], 'focus.json'), 'w'), separators=(',', ':'))
 print('ok', len(du), 'pregões')

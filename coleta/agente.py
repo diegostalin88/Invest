@@ -270,6 +270,10 @@ def montar(site, hoje=None):
     hoje = hoje or datetime.now(timezone.utc).date()
     cart = ler_json(os.path.join(site, 'data', 'carteira.json'))
     macro, ref, watch = carteira_resumo(cart)
+    foc = ler_json(os.path.join(site, 'data', 'focus.json'))
+    if foc:
+        macro = dict(macro or {})
+        macro['focus'] = {k: v for k, v in foc.items() if k != 'fonte'}
     base = os.path.join(site, 'antigo', 'data')
     us = mercado(base, 'us', hoje, n_papeis=N_PAPEIS_EUA, extras=watch or ()) if os.path.isdir(base) else None
     br = mercado(os.path.join(base, 'br'), 'br', hoje, extras=watch or ()) if os.path.isdir(os.path.join(base, 'br')) else None
@@ -288,7 +292,7 @@ def montar(site, hoje=None):
                     'mm200': 'distância do preço para a média de 200 pregões', 'topo52': 'queda desde a máxima de 52 semanas',
                     'vol': 'volatilidade anualizada de 21 pregões', 'volFinMi': 'volume financeiro médio de 20 pregões, milhões na moeda do mercado',
                     'vendido.dias': 'dias de volume para zerar a posição vendida (aluguel B3 ou short interest FINRA)',
-                    'ref13': '1/3 BOVA11 + 1/3 IVVB11 + 1/3 CDI', 'testeParaFrente': 'placar da estratégia congelada (regras de 04/11/2026)'},
+                    'ref13': '1/3 BOVA11 + 1/3 IVVB11 + 1/3 CDI', 'macro.focus': 'boletim Focus do Banco Central: mediana das expectativas em % (selic no fim do ano, ipca e pib do ano, cambio em R$/US$ no fim do ano); antes = 4 semanas atrás', 'testeParaFrente': 'placar da estratégia congelada (regras de 04/11/2026)'},
     }
 
 

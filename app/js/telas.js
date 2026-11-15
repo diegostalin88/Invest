@@ -55,6 +55,18 @@ function cartaoTermometro(m, detalhes) {
             <p class="mini mudo" style="margin:8px 0 0">Descreve o mercado; não prevê. A regra da média de 10 meses foi testada como sinal e reprovada (veja Laboratório).</p>
         </details></div>`;
 }
+function cartaoFocus() {
+    const F = AG && AG.macro && AG.macro.focus;
+    if (!F || !F.anos) return '';
+    const A = F.antes || {}, [a0, a1] = F.anos;
+    const v = (k, ano, fmt) => { const x = (F[k] || {})[ano]; if (x === undefined) return '—'; const y = (A[k] || {})[ano]; const d = y === undefined ? '' : x > y ? ' ↑' : x < y ? ' ↓' : ''; return fmt(x) + `<span class="mudo">${d}</span>`; };
+    const p = (x) => nf(x, 2) + '%', c = (x) => 'R$ ' + nf(x, 2);
+    const lin = (r, k, fmt) => `<div class="linha"><span>${r}</span><span class="v">${v(k, a0, fmt)} · ${v(k, a1, fmt)}</span></div>`;
+    return `<div class="cartao"><h2>O que o mercado espera (Focus)</h2>
+        <div class="linha"><span class="mudo peq">Mediana dos economistas, ${dBR(F.data)}</span><span class="v mudo peq">${a0} · ${a1}</span></div>
+        ${lin('Selic no fim do ano', 'selic', p)}${lin('IPCA do ano', 'ipca', p)}${lin('PIB do ano', 'pib', p)}${lin('Dólar no fim do ano', 'cambio', c)}
+        <p class="mini mudo" style="margin:8px 0 0">Setas: mudança desde ${A.data ? dBR(A.data) : '4 semanas antes'}. Expectativa não é previsão certa; aqui é contexto, nenhuma regra do app usa estes números.</p></div>`;
+}
 function alertasCarteira() {
     const al = [];
     if (R && !R.vazio) {
@@ -94,6 +106,7 @@ function telaInicio() {
     const al = alertasCarteira();
     el.innerHTML = `${pat}
         ${cartaoTermometro(m)}
+        ${cartaoFocus()}
         <div class="cartao"><h2>Amplitude do mercado</h2>${amp ? `<div class="grande" style="font-size:28px">${nf(amp.acimaMM200 * 100, 0)}%</div><div class="peq mudo">dos ${amp.papeis} papéis acompanhados estão acima da média de 200 dias</div>` : '<p class="mudo">Sem dados.</p>'}</div>
         <div class="cartao"><h2>Alertas</h2>${al.length ? al.map(([c, t, alvo]) => `<button class="item-alerta" ${alvo ? `data-alvo="${esc(alvo)}"` : ''}><span class="chip ${c}" style="margin-right:6px">•</span>${esc(t)}</button>`).join('') : '<p class="mudo peq">Nada pedindo atenção hoje.</p>'}</div>
         <div class="cartao"><h2>Analista (agente)</h2><p class="peq">Peça no Claude: <b>"analisa o mercado hoje"</b>, <b>"analisa PETR4"</b> ou <b>"revisa minha carteira"</b>. Ele lê o resumo do dia que este app publica.</p><p class="mini mudo" style="margin:0">Parecer não validado: o placar do agente começa a contar agora (Laboratório → Ideias testadas).</p></div>`;
@@ -204,11 +217,12 @@ const IDEIAS = [
     ['K · Regras de trade em cripto', 'reprovada', 'Não vencem o acaso.', 'hipotese-cripto.md'],
     ['5% de BTC na carteira 1/3', 'acompanhar', 'Passou nos critérios, mas o ganho se concentra em 2018–21. Só para frente, sem dinheiro real.', 'hipotese-cripto.md'],
     ['Queda ≥ 30% + estratégia Otimista', 'reprovada', 'Cenário sem vantagem no Brasil e nos EUA.', 'cenario-queda-reversao.md'],
+    ['P · Dividir o aporte por HRP em vez de 1/3 fixo', 'registrada', 'Regras escritas em 15/11/2026, ainda não rodado. Até passar, o aporte segue pela meta.', 'hipotese-hrp.md'],
     ['Agente analista (parecer a favor / contra a tese)', 'em teste', 'Placar com critérios escritos antes: 60 pareceres com 120 pregões.', 'protocolo-agente.md'],
 ];
 function telaLab() {
     const el = document.getElementById('tela-lab'); if (!el) return;
-    const chip = { reprovada: 'vermelho', congelada: 'amarelo', 'só informação': '', acompanhar: 'verde', 'em teste': 'amarelo' };
+    const chip = { reprovada: 'vermelho', congelada: 'amarelo', 'só informação': '', acompanhar: 'verde', 'em teste': 'amarelo', registrada: '' };
     const placar = (mk) => { const m = mercadoAg(mk), P = m && m.testeParaFrente; if (!P) return `<div class="linha"><span>${mk === 'us' ? 'EUA' : 'Brasil'}</span><span class="v mudo">sem diário</span></div>`;
         return `<div class="linha"><span>${mk === 'us' ? 'EUA' : 'Brasil'}<br><span class="mini mudo">desde ${dBR(P.inicio)} · ${P.abertos} abertos${P.regrasDesligadas.length ? ` · ${P.regrasDesligadas.length} regras desligadas` : ''}</span></span><span class="v">${P.fechados} / ${P.metaFechados} fechados<br><span class="mini">${P.retMedio !== undefined ? `média ${pct(P.retMedio)} × índice ${pctN(P.indiceMesmasDatas)}` : 'sem fechados'}</span></span></div>`; };
     el.innerHTML = `<div class="cartao"><h2>Teste para frente</h2>
@@ -219,7 +233,7 @@ function telaLab() {
             <p class="peq"><b>Perdeu para o índice em 04/11/2026.</b> Ranking, simulação, backtest, walk-forward, screener, correlação e relatório continuam abertos só para o teste para frente. Não é recomendação.</p>
             <a class="botao sec cheio" href="antigo/?mercado=${MERC}">Abrir as ferramentas congeladas</a></div>
         <div class="cartao"><h2>Ideias testadas</h2>
-            <p class="peq mudo" style="margin-top:0">Cada ideia teve as regras escritas antes do teste. Reprovada não se reabre com outros parâmetros.</p>
+            <p class="peq mudo" style="margin-top:0">Cada ideia teve as regras escritas antes do teste. Reprovada não se reabre com outros parâmetros. Desde 15/11/2026 toda ideia nova também precisa do Sharpe deflacionado (desconta as 62 tentativas já feitas no projeto): <a href="docs/protocolo-laboratorio.md" style="color:var(--acento)">protocolo</a>.</p>
             ${IDEIAS.map(([n, v, r, doc]) => `<div class="linha"><span>${esc(n)}<br><span class="mini mudo">${esc(r)}</span>${doc ? ` <a class="mini" href="docs/${doc}" style="color:var(--acento)">registro</a>` : ''}</span><span class="v"><span class="chip ${chip[v] || ''}">${v}</span></span></div>`).join('')}</div>
         <div class="cartao"><h2>Estudos</h2><p class="peq" style="margin:0">Opções (O1 a O7), cripto e a volatilidade dos papéis quânticos: registros em <a href="docs/opcoes/relatorio-testes.md" style="color:var(--acento)">opções</a> e <a href="docs/hipotese-cripto.md" style="color:var(--acento)">cripto</a>.</p></div>`;
 }

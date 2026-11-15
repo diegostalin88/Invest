@@ -237,8 +237,26 @@ function cartaoComparacao() {
         ${aa !== null ? `<div class="linha"><span>Sua carteira, ao ano</span><span class="v ${cor(aa)}">${pct(aa)}</span></div>` : ''}
         <div class="linha"><span>Maior queda da carteira no período</span><span class="v baixa">${P.quedaMax > 0 ? '−' + nf(P.quedaMax * 100, 1) + '%' : '0%'}</span></div>
         <div class="linha"><span>Ganho em reais no período<br><span class="mini mudo">sem contar aportes e retiradas</span></span><span class="v ${cor(P.ganho)}">${R$(P.ganho)}</span></div>
+        ${blocoRisco(base, ate)}
         <p class="mini mudo" style="margin:8px 0 0">Referência = a carteira passiva dos estudos, rebalanceada a cada trimestre. "—" quando não há preço desde a data inicial. Num período curto (semana, mês), o resultado é quase só ruído do mercado: serve para acompanhar, não para decidir.</p>
         ${blocoSetor(P)}`;
+}
+function blocoRisco(base, ate) {
+    const X = C.risco(R, base, ate);
+    if (!X) return '';
+    if (X.insuficiente) return `<p class="mini mudo" style="margin:8px 0 0">Risco (volatilidade, Sharpe, meses negativos): aparece em períodos de ${C.MESES_MIN_RISCO} meses ou mais. Este tem ${X.meses}.</p>`;
+    const c = X.carteira, r = X.referencia || {};
+    const f = (v, fmt) => v === null || v === undefined ? '—' : fmt(v);
+    const p0 = (v) => nf(v * 100, 1) + '%', sh = (v) => nf(v, 2);
+    const lin = (n, k, fmt, dica) => `<div class="linha"><span>${n}${dica ? `<br><span class="mini mudo">${dica}</span>` : ''}</span><span class="v">${f(c[k], fmt)} · <span class="mudo">${f(r[k], fmt)}</span></span></div>`;
+    return `<h3 style="margin:14px 0 4px;font-size:16px">Risco no período (${X.meses} meses)</h3>
+        <div class="linha"><span class="mini mudo">mês a mês</span><span class="v mini mudo">carteira · referência 1/3</span></div>
+        ${lin('Volatilidade ao ano', 'vol', p0, 'quanto oscila; menor é mais estável')}
+        ${lin('Índice de Sharpe', 'sharpe', sh, 'ganho acima do CDI por unidade de oscilação; maior é melhor')}
+        ${lin('Meses no vermelho', 'mesesNegativos', p0)}
+        ${lin('Pior mês', 'piorMes', p0)}
+        ${lin('Maior queda (fim de mês)', 'quedaMaxMensal', (v) => v > 0 ? '−' + p0(v) : '0%')}
+        <p class="mini mudo" style="margin:6px 0 0">Mede o passado, não o futuro. Sharpe de poucos anos varia muito: compare com a referência, não com um número fixo.</p>`;
 }
 function linhaSetor(S) {
     const ref = S.ref ? S.ref : `média de ${S.pares.join(', ')}`;
@@ -769,7 +787,8 @@ async function exportarAnalise(formato) {
     if (formato === 'json') {
         const texto = X.resumo.map(x => `${x.campo}: ${x.valor ?? '-'}`).join('\n');
         const obj = { leiaMe: X.leiaMe, resumoTexto: texto, geradoEm: new Date().toISOString(), resumo: X.resumo, rentabilidade: X.rentabilidade, serieMensal: X.mensal, aportesMensais: X.aportes,
-            lancamentos: X.lancamentos, posicoes: X.posicoes, vendas: X.vendas, proventos: X.proventos, impostoMensal: X.imposto, impostoExterior: X.exterior, metas: X.metas, avisos: X.avisos.map(a => a.aviso) };
+            lancamentos: X.lancamentos, posicoes: X.posicoes, vendas: X.vendas, proventos: X.proventos, impostoMensal: X.imposto, impostoExterior: X.exterior, metas: X.metas, avisos: X.avisos.map(a => a.aviso),
+            riscoDesdeInicio: (() => { const k = C.risco(R, '1900-01-01', R.fim); return k && !k.insuficiente ? { ...k, nota: 'mensal; vol e Sharpe anualizados (Sharpe sobre o CDI); referencia = 1/3 BOVA11 + 1/3 IVVB11 + 1/3 CDI' } : null; })() };
         baixarArquivo(JSON.stringify(obj, null, 1), `carteira-analise-${hojeISO()}.json`, 'application/json');
         return toast('Arquivo para IA baixado.');
     }

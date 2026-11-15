@@ -2,6 +2,7 @@
 # Coleta única do Invest na VM (desde 12/11/2026, fase 1 da remodelação). Roda em sequência, nunca em paralelo
 # (a VM tem ~1 GB de memória):
 #   1. carteira: BOVA11, IVVB11, BTC, extras, CDI, IPCA e PTAX (segundos)          -> /data/carteira.json
+#      e o boletim Focus do Banco Central                                          -> /data/focus.json
 #   2. mercado: os EUA mais negociados (lista em cache/universo-eua.txt) + Ibovespa,  -> /antigo/data/
 #      fundamentos, índices, balanços (semanal), vendidos, diário e relatório da estratégia congelada
 #   3. agente.json: resumo de menos de 100 KB para o agente analista                  -> /data/agente.json
@@ -72,7 +73,10 @@ if [ "$MODO" != "so-app" ]; then
   CARTEIRA_EXTRAS_ARQUIVO="$BASE/codigos-br.txt" CARTEIRA_EUA_ARQUIVO="$BASE/codigos-eua.txt" timeout 15m "$PY" coleta/carteira_dados.py "$NOVO/data"
   rc=$?
   [ $rc -eq 2 ] && echo "   (algum ativo extra falhou; os outros foram gravados)"
+  passo "Boletim Focus (Banco Central)"
+  timeout 5m "$PY" coleta/focus.py "$NOVO/data" || echo "   (Focus indisponível; mantém o anterior se houver)"
 fi
+[ -s "$NOVO/data/focus.json" ] || cp "$BASE/www/data/focus.json" "$NOVO/data/" 2>/dev/null || true
 if [ ! -s "$NOVO/data/carteira.json" ]; then
   if [ -s "$ANTES" ]; then echo "   Usando os dados da carteira da versão anterior."; cp "$ANTES" "$NOVO/data/"; else echo "Sem dados da carteira para publicar."; rm -rf "$NOVO"; exit 1; fi
 fi
