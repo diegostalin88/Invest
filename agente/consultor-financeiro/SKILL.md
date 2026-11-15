@@ -110,8 +110,8 @@ Diego contrariar um princípio, **avise qual e proponha a versão alinhada** ant
    Nível 4 → *"Parecer não validado (placar em andamento). Não é recomendação de investimento."*
 
 ## 6. Registrar o parecer (só nível 4; protocolo em `docs/protocolo-agente.md`)
-Na planilha **"Consultor — pareceres"** (pasta Invest; crie com o conector do Google Sheets se não existir), **primeira** aba,
-chamada `pareceres` (a VM lê a primeira aba), colunas: `data | papel | mercado | tese | confianca | preco_ref | indice | indice_ref |
+Na planilha **"Consultor — pareceres"** (pasta Invest, já criada pela VM com o cabeçalho; **não crie outra**), acrescente
+linhas na **primeira** aba, seja qual for o nome dela (a VM lê a primeira aba), colunas: `data | papel | mercado | tese | confianca | preco_ref | indice | indice_ref |
 mudaria_opiniao | data_agente_json`. Uma linha por papel com tese; `preco_ref` = `papeis[TICKER].p`; `indice_ref` =
 `termometro.ult` do mercado. Sem conector, mostre a tabela para o Diego colar. **Nunca altere linhas antigas**;
 mudar o método recomeça o placar.
