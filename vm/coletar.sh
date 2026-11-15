@@ -6,7 +6,8 @@
 #   2. mercado: os EUA mais negociados (lista em cache/universo-eua.txt) + Ibovespa,  -> /antigo/data/
 #      fundamentos, índices, balanços (semanal), vendidos, diário e relatório da estratégia congelada
 #   3. agente.json: resumo de menos de 100 KB para o agente analista                  -> /data/agente.json
-#   4. (opcional) cópia do agente.json para o Google Drive, se RCLONE_DESTINO estiver no config.env
+#   4. (opcional, com RCLONE_DESTINO no config.env) pareceres do Consultor (planilha do Drive -> /data/pareceres.json)
+#      e cópia do agente.json para a pasta do Drive
 # Se o mercado falhar, a carteira publica do mesmo jeito e /antigo/ continua com os dados anteriores.
 #
 # Uso:
@@ -158,6 +159,15 @@ fi
 # ---------------------------------------------------------------- 3. agente
 passo "agente.json (resumo para o agente analista)"
 opcional "$PY" coleta/agente.py "$NOVO"
+
+# Pareceres do Consultor financeiro: planilha "Consultor — pareceres" do Drive (primeira aba, como CSV) -> data/pareceres.json
+if [ -n "${RCLONE_DESTINO:-}" ] && command -v rclone >/dev/null; then
+  passo "Pareceres do Consultor (planilha no Drive)"
+  timeout 3m rclone copyto "$RCLONE_DESTINO/Consultor — pareceres.csv" "$BASE/cache/pareceres.csv" --drive-export-formats csv \
+    && opcional "$PY" coleta/pareceres.py "$BASE/cache/pareceres.csv" "$NOVO/data" \
+    || echo "   (sem planilha de pareceres ainda; segue sem)"
+fi
+[ -s "$NOVO/data/pareceres.json" ] || cp "$BASE/www/data/pareceres.json" "$NOVO/data/" 2>/dev/null || true
 
 # ---------------------------------------------------------------- publicar
 passo "Publicando"

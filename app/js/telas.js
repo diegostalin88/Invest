@@ -3,6 +3,7 @@
 // motor-carteira.js no index.html). Só descrevem: nada aqui é sinal de compra ou venda.
 'use strict';
 let AG = null;               // agente.json
+let PAR = null;              // pareceres.json (Consultor financeiro)
 let MERC = 'br';             // mercado escolhido no topo (br | us)
 let ATIVO = null, abaAtivo = 'resumo', voltarPara = 'mercado';
 try { MERC = localStorage.getItem('invest-mercado') === 'us' ? 'us' : 'br'; } catch (e) { }
@@ -10,6 +11,15 @@ try { MERC = localStorage.getItem('invest-mercado') === 'us' ? 'us' : 'br'; } ca
 async function carregarAgente() {
     try { const r = await fetch('data/agente.json', { cache: 'no-cache' }); if (!r.ok) throw new Error(r.status); AG = await r.json(); }
     catch (e) { AG = null; }
+    try { const r = await fetch('data/pareceres.json', { cache: 'no-cache' }); if (!r.ok) throw new Error(r.status); PAR = await r.json(); }
+    catch (e) { PAR = null; }
+}
+function cartaoConsultor() {
+    const pedir = `<p class="peq" style="margin-bottom:6px">No Claude, peça ao <b>Consultor financeiro</b>: <b>"para onde vai meu próximo aporte?"</b>, <b>"qual renda fixa rende mais hoje?"</b>, <b>"analisa PETR4"</b>. Para ele ver a sua carteira, use Mais → <b>Enviar ao Consultor</b>.</p>`;
+    const U = PAR && PAR.ultimos && PAR.ultimos.length ? PAR.ultimos : null;
+    const cl = (t) => t === 'a favor' ? 'verde' : t === 'contra' ? 'vermelho' : '';
+    const ult = U ? `<div class="peq mudo" style="margin-top:6px">Último parecer, ${dBR(PAR.ultimaData)}:</div>${U.slice(0, 5).map(p => `<button class="item-alerta" data-ativo="${esc(p.papel)}" data-m="${p.mercado || MERC}"><b>${esc(p.papel)}</b> <span class="chip ${cl(p.tese)}">${esc(p.tese)}</span> <span class="mudo">confiança ${esc(p.confianca || '—')}${p.excesso !== undefined ? ` · desde então ${pctN(p.excesso)} contra o índice` : ''}</span></button>`).join('')}` : '';
+    return `<div class="cartao"><h2>Consultor financeiro</h2>${pedir}${ult}<p class="mini mudo" style="margin:6px 0 0">Aporte, veículo e renda fixa: cálculo com os dados do app. Pareceres sobre ações: não validados até o placar passar (Laboratório).</p></div>`;
 }
 const mercadoAg = (m = MERC) => AG && AG.mercados ? AG.mercados[m] || null : null;
 const nomeIndice = (m = MERC) => m === 'us' ? 'S&P 500 (SPY)' : 'Ibovespa (BOVA11)';
@@ -109,7 +119,7 @@ function telaInicio() {
         ${cartaoFocus()}
         <div class="cartao"><h2>Amplitude do mercado</h2>${amp ? `<div class="grande" style="font-size:28px">${nf(amp.acimaMM200 * 100, 0)}%</div><div class="peq mudo">dos ${amp.papeis} papéis acompanhados estão acima da média de 200 dias</div>` : '<p class="mudo">Sem dados.</p>'}</div>
         <div class="cartao"><h2>Alertas</h2>${al.length ? al.map(([c, t, alvo]) => `<button class="item-alerta" ${alvo ? `data-alvo="${esc(alvo)}"` : ''}><span class="chip ${c}" style="margin-right:6px">•</span>${esc(t)}</button>`).join('') : '<p class="mudo peq">Nada pedindo atenção hoje.</p>'}</div>
-        <div class="cartao"><h2>Analista (agente)</h2><p class="peq">Peça no Claude: <b>"analisa o mercado hoje"</b>, <b>"analisa PETR4"</b> ou <b>"revisa minha carteira"</b>. Ele lê o resumo do dia que este app publica.</p><p class="mini mudo" style="margin:0">Parecer não validado: o placar do agente começa a contar agora (Laboratório → Ideias testadas).</p></div>`;
+        ${cartaoConsultor()}`;
 }
 
 // ---------- MERCADO: o que está acontecendo? ----------
@@ -218,7 +228,7 @@ const IDEIAS = [
     ['5% de BTC na carteira 1/3', 'acompanhar', 'Passou nos critérios, mas o ganho se concentra em 2018–21. Só para frente, sem dinheiro real.', 'hipotese-cripto.md'],
     ['Queda ≥ 30% + estratégia Otimista', 'reprovada', 'Cenário sem vantagem no Brasil e nos EUA.', 'cenario-queda-reversao.md'],
     ['P · Dividir o aporte por HRP em vez de 1/3 fixo', 'registrada', 'Regras escritas em 15/11/2026, ainda não rodado. Até passar, o aporte segue pela meta.', 'hipotese-hrp.md'],
-    ['Agente analista (parecer a favor / contra a tese)', 'em teste', 'Placar com critérios escritos antes: 60 pareceres com 120 pregões.', 'protocolo-agente.md'],
+    ['Consultor financeiro: pareceres sobre ações (a favor / contra a tese)', 'em teste', 'Placar com critérios escritos antes: 60 pareceres com 120 pregões.', 'protocolo-agente.md'],
 ];
 function telaLab() {
     const el = document.getElementById('tela-lab'); if (!el) return;
@@ -232,6 +242,13 @@ function telaLab() {
         <div class="cartao congelado"><h2>Estratégia técnica (congelada)</h2>
             <p class="peq"><b>Perdeu para o índice em 04/11/2026.</b> Ranking, simulação, backtest, walk-forward, screener, correlação e relatório continuam abertos só para o teste para frente. Não é recomendação.</p>
             <a class="botao sec cheio" href="antigo/?mercado=${MERC}">Abrir as ferramentas congeladas</a></div>
+        ${(() => { const P = PAR && PAR.placar; if (!P) return `<div class="cartao"><h2>Placar do Consultor</h2><p class="peq mudo" style="margin:0">Ainda sem pareceres registrados. Cada parecer sobre uma ação vira uma linha na planilha "Consultor — pareceres" e é cobrado aqui.</p></div>`;
+            return `<div class="cartao"><h2>Placar do Consultor</h2>
+            <div class="linha"><span>Pareceres registrados</span><span class="v">${P.pareceres}</span></div>
+            <div class="linha"><span>Com tese (a favor ou contra)</span><span class="v">${P.comTese}</span></div>
+            <div class="linha"><span>Acertos até hoje<br><span class="mini mudo">tese × papel contra o índice desde o parecer</span></span><span class="v">${P.acertoAteHoje === null ? '—' : nf(P.acertoAteHoje * 100, 0) + '%'}</span></div>
+            <div class="linha"><span>Com 120 pregões (meta: 60)</span><span class="v">${P.maduros120}</span></div>
+            <p class="mini mudo" style="margin:8px 0 0">${P.podeConcluir ? 'Já há pareceres suficientes para o teste do protocolo.' : 'Ainda não dá para concluir nada: acerto com poucos pareceres é sorte ou azar.'}</p></div>`; })()}
         <div class="cartao"><h2>Ideias testadas</h2>
             <p class="peq mudo" style="margin-top:0">Cada ideia teve as regras escritas antes do teste. Reprovada não se reabre com outros parâmetros. Desde 15/11/2026 toda ideia nova também precisa do Sharpe deflacionado (desconta as 62 tentativas já feitas no projeto): <a href="docs/protocolo-laboratorio.md" style="color:var(--acento)">protocolo</a>.</p>
             ${IDEIAS.map(([n, v, r, doc]) => `<div class="linha"><span>${esc(n)}<br><span class="mini mudo">${esc(r)}</span>${doc ? ` <a class="mini" href="docs/${doc}" style="color:var(--acento)">registro</a>` : ''}</span><span class="v"><span class="chip ${chip[v] || ''}">${v}</span></span></div>`).join('')}</div>

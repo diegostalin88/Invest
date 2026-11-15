@@ -668,6 +668,11 @@ function telaMais() {
         <input type="file" id="arq-backup" accept=".json,application/json" style="display:none">
     </div>
     <div class="cartao">
+        <h2>Enviar ao Consultor</h2>
+        <p class="peq mudo" style="margin-top:0">Manda a sua carteira, já calculada, para o Consultor financeiro do Claude: abre o compartilhar do celular; escolha <b>Drive</b> e a pasta <b>Invest</b>. Vai sem nome, CPF ou conta, e nenhum servidor do app guarda nada. Depois, no Claude: <b>"revisa minha carteira"</b> ou <b>"para onde vai meu próximo aporte?"</b>.</p>
+        <button class="botao cheio" data-acao="enviar-consultor">Enviar ao Consultor</button>
+    </div>
+    <div class="cartao">
         <h2>Baixar para análise</h2>
         <p class="peq mudo" style="margin-top:0">Gera os dados já calculados (todos os lançamentos e aportes, evolução mês a mês, posições, rentabilidade por ano comparada com CDI, IPCA e índices, imposto e avisos), com um "leia-me" explicando cada campo. Bom para abrir no Excel ou enviar a uma IA analisar. Não vai nome, CPF nem conta, mas são seus números: envie só a serviços em que você confia.</p>
         <div class="duas"><button class="botao" data-acao="exportar-analise">Planilha (Excel)</button><button class="botao sec" data-acao="exportar-analise-json">Arquivo para IA</button></div>
@@ -748,7 +753,8 @@ function montarAnalise() {
     const imposto = C.impostoMensal(R.vendas).map(m => ({ mes: m.mes, vendasAcoesBRL: r2(m.vendAcoes), lucroAcoesBRL: r2(m.lucAcoes), acoesIsentas: m.acoesIsentas, lucroETF_BDR_BRL: r2(m.lucETF), lucroFII_BRL: r2(m.lucFII), prejuizoUsadoBRL: r2(m.prejUsado), prejuizoAcumuladoBRL: r2(m.prejComum), impostoBolsaBRL: r2(m.impBolsa), darfBRL: r2(m.darfBolsa), vencimento: m.vencimento, impostoCriptoBRL: r2(m.impCripto) }));
     const exterior = C.impostoExterior(R.vendas, R.proventos).map(a => ({ ano: a.ano, vendidoBRL: r2(a.vendido), ganhosBRL: r2(a.ganhos), rendimentosBRL: r2(a.rendimentos), retidoBRL: r2(a.retido), prejuizoUsadoBRL: r2(a.prejUsado), prejuizoFinalBRL: r2(a.prejFinal), impostoBRL: r2(a.imposto), creditoBRL: r2(a.credito), pagarBRL: r2(a.pagar), vencimento: a.vencimento }));
     const B = C.rebalancear(R, ESTADO.metas, +ESTADO.proximoAporte || 0);
-    const metas = B ? B.classes.map(c => ({ classe: c.nome, valorBRL: r2(c.valor), pesoPct: pc(c.peso), metaPct: pc(c.meta), diferencaPct: pc(c.dif), foraDaFaixa: c.fora })) : [];
+    const metas = B ? B.classes.map(c => ({ classe: c.nome, valorBRL: r2(c.valor), pesoPct: pc(c.peso), metaPct: pc(c.meta), diferencaPct: pc(c.dif), faixaPct: pc(c.faixa), foraDaFaixa: c.fora, proximoAporteBRL: r2(B.divisao[c.k] || 0) })) : [];
+    const rebal = B ? { proximoAporteBRL: r2(B.aporte), precisaRebalancear: B.precisa, proximaRevisao: B.proximaRevisao, regra: 'classe fora da faixa quando |peso - meta| > min(5 pontos, 25% da meta); o aporte vai primeiro para as classes abaixo da meta' } : null;
     const T = Mt.total || {};
     const resumo = [
         ['Gerado em', new Date().toLocaleString('pt-BR')], ['Período da carteira', `${dBR(s.datas[i0])} a ${dBR(R.fim)}`],
@@ -776,20 +782,37 @@ function montarAnalise() {
         'Abas/campos: Resumo, Rentabilidade (períodos e por ano), Mensal (fim de cada mês), Aportes (por mês), Lançamentos (todos), Posições (hoje), Vendas, Proventos, Imposto mensal, Imposto exterior, Metas (rebalanceamento), Avisos.',
     ];
     const avisos = (R.avisos || []).map(a => ({ aviso: a }));
-    return { leiaMe, resumo, rentabilidade, mensal, aportes, lancamentos, posicoes, vendas, proventos, imposto, exterior, metas, avisos };
+    return { leiaMe, resumo, rentabilidade, mensal, aportes, lancamentos, posicoes, vendas, proventos, imposto, exterior, metas, rebal, avisos };
 }
 function baixarArquivo(conteudo, nome, tipo) {
     const blob = conteudo instanceof Blob ? conteudo : new Blob([conteudo], { type: tipo });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
+function objetoIA(X) {
+    const texto = X.resumo.map(x => `${x.campo}: ${x.valor ?? '-'}`).join('\n');
+    return { leiaMe: X.leiaMe, resumoTexto: texto, geradoEm: new Date().toISOString(), resumo: X.resumo, rentabilidade: X.rentabilidade, serieMensal: X.mensal, aportesMensais: X.aportes,
+            lancamentos: X.lancamentos, posicoes: X.posicoes, vendas: X.vendas, proventos: X.proventos, impostoMensal: X.imposto, impostoExterior: X.exterior, metas: X.metas, rebalanceamento: X.rebal, avisos: X.avisos.map(a => a.aviso),
+            riscoDesdeInicio: (() => { const k = C.risco(R, '1900-01-01', R.fim); return k && !k.insuficiente ? { ...k, nota: 'mensal; vol e Sharpe anualizados (Sharpe sobre o CDI); referencia = 1/3 BOVA11 + 1/3 IVVB11 + 1/3 CDI' } : null; })() };
+}
+// "Enviar ao Consultor" (fase 4, 15/11/2026): o mesmo Arquivo para IA, pelo compartilhar do aparelho (escolha o
+// Google Drive, pasta Invest). Nenhum servidor do app recebe a carteira. Sem compartilhar de arquivos, baixa o arquivo.
+async function enviarConsultor() {
+    const X = montarAnalise(); if (!X) return toast('Sem lançamentos para enviar.');
+    const nome = `carteira-analise-${hojeISO()}.json`, txt = JSON.stringify(objetoIA(X), null, 1);
+    try {
+        const arq = new File([txt], nome, { type: 'application/json' });
+        if (navigator.canShare && navigator.canShare({ files: [arq] })) {
+            await navigator.share({ files: [arq], title: nome, text: 'Carteira para o Consultor financeiro (salvar na pasta Invest do Drive)' });
+            return toast('Enviado. No Claude, peça: "revisa minha carteira".');
+        }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+    baixarArquivo(txt, nome, 'application/json');
+    toast('Arquivo baixado: salve-o na pasta Invest do Google Drive.');
+}
 async function exportarAnalise(formato) {
     const X = montarAnalise(); if (!X) return toast('Sem lançamentos para exportar.');
     if (formato === 'json') {
-        const texto = X.resumo.map(x => `${x.campo}: ${x.valor ?? '-'}`).join('\n');
-        const obj = { leiaMe: X.leiaMe, resumoTexto: texto, geradoEm: new Date().toISOString(), resumo: X.resumo, rentabilidade: X.rentabilidade, serieMensal: X.mensal, aportesMensais: X.aportes,
-            lancamentos: X.lancamentos, posicoes: X.posicoes, vendas: X.vendas, proventos: X.proventos, impostoMensal: X.imposto, impostoExterior: X.exterior, metas: X.metas, avisos: X.avisos.map(a => a.aviso),
-            riscoDesdeInicio: (() => { const k = C.risco(R, '1900-01-01', R.fim); return k && !k.insuficiente ? { ...k, nota: 'mensal; vol e Sharpe anualizados (Sharpe sobre o CDI); referencia = 1/3 BOVA11 + 1/3 IVVB11 + 1/3 CDI' } : null; })() };
-        baixarArquivo(JSON.stringify(obj, null, 1), `carteira-analise-${hojeISO()}.json`, 'application/json');
+        baixarArquivo(JSON.stringify(objetoIA(X), null, 1), `carteira-analise-${hojeISO()}.json`, 'application/json');
         return toast('Arquivo para IA baixado.');
     }
     try { await carregarXLSX(); } catch (e) { return toast('Não consegui carregar o gerador de planilha. Confira a internet.'); }
@@ -1148,6 +1171,7 @@ document.addEventListener('click', (ev) => {
     if (a === 'exportar') return exportar();
     if (a === 'exportar-analise') return exportarAnalise('xlsx');
     if (a === 'exportar-analise-json') return exportarAnalise('json');
+    if (a === 'enviar-consultor') return enviarConsultor();
     if (a === 'abrir-importar') return document.getElementById('arq-backup').click();
     if (a === 'abrir-b3') return document.getElementById('arq-b3').click();
     if (a === 'importar-antiga') return importarAntiga();

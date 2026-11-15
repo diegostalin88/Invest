@@ -6,7 +6,7 @@ vira sinal), o parecer é **contexto** até este placar mostrar o contrário. Es
 
 ## O que é registrado em cada parecer
 
-Uma linha por papel citado, no registro "Agente" (planilha no Google Drive do Diego, aba `pareceres`):
+Uma linha por papel citado, na planilha "Consultor — pareceres" (pasta Invest do Google Drive do Diego, primeira aba, `pareceres`; a VM lê essa aba todo dia útil e grava `data/pareceres.json`. Desde 15/11/2026 quem registra é a skill `consultor-financeiro`, com o mesmo método do nível 4):
 
 | campo | exemplo |
 |---|---|
