@@ -1,0 +1,39 @@
+name: "Qualidade Brasil - hipótese Q-BR"
+
+# Só leitura: teste da carteira por qualidade (ROE e passivo/ativo) no Brasil (docs/hipotese-qualidade-brasil.md).
+# Não publica nada.
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/project-thread-10wjcu]
+    paths: ["coleta/testar_qualidade_br.py", ".github/workflows/qualidade-br.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  q-br:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Dependências
+        run: pip install -r coleta/requirements.txt
+
+      - name: Teste Q-BR
+        run: python coleta/testar_qualidade_br.py --saida qualidade_br.json
+
+      - name: Guardar o resultado
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qualidade-br
+          path: qualidade_br.json
+          if-no-files-found: ignore

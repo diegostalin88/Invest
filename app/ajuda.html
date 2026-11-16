@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Invest · Como usar</title>
+<meta name="theme-color" content="#0b1220">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<style>
+:root{--fundo:#0b1220;--cartao:#131c2e;--cartao2:#1a2540;--borda:rgba(148,163,184,.18);--txt:#e5e9f2;--mudo:#93a1b8;--acento:#4f8cff;--alta:#22c55e;--baixa:#f05252;--amarelo:#f5b301}
+:root[data-tema="claro"]{--fundo:#f3f5f9;--cartao:#fff;--cartao2:#eef2f8;--borda:rgba(15,23,42,.12);--txt:#0f172a;--mudo:#5b6b82;--acento:#2563eb;--alta:#15803d;--baixa:#dc2626;--amarelo:#b45309}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--fundo);color:var(--txt);font:17px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+header{position:sticky;top:0;z-index:5;background:var(--fundo);padding:12px 16px 8px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--borda)}
+header h1{font-size:20px;margin:0}
+main{max-width:760px;margin:0 auto;padding:12px 16px 40px}
+a{color:var(--acento)}
+.botao{display:inline-block;background:var(--cartao2);color:var(--txt);border:1px solid var(--borda);border-radius:12px;padding:8px 14px;font-weight:650;text-decoration:none}
+nav.indice{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 14px}
+nav.indice a{background:var(--cartao2);border:1px solid var(--borda);color:var(--txt);border-radius:999px;padding:5px 12px;font-size:14px;text-decoration:none}
+details{background:var(--cartao);border:1px solid var(--borda);border-radius:16px;padding:14px 16px;margin:0 0 12px}
+details[open] summary{margin-bottom:8px}
+summary{cursor:pointer;font-weight:700;font-size:18px}
+h3{font-size:16px;margin:16px 0 4px}
+ol,ul{padding-left:22px;margin:6px 0}
+li{margin:4px 0}
+.mudo{color:var(--mudo)}.peq{font-size:14px}
+.nota{background:var(--cartao2);border-radius:12px;padding:10px 12px;margin:10px 0;font-size:15px}
+.nota.aviso{border-left:4px solid var(--amarelo)}
+table{width:100%;border-collapse:collapse;font-size:15px;margin:8px 0}
+th,td{padding:7px 6px;text-align:left;border-top:1px solid var(--borda);vertical-align:top}
+th{font-size:13px;color:var(--mudo)}
+code{background:var(--cartao2);padding:1px 6px;border-radius:6px;font-size:15px}
+</style>
+</head>
+<body>
+<header><h1>Como usar</h1><a class="botao" href="./">Voltar ao app</a></header>
+<main>
+<p class="mudo peq">Toque em cada tema para abrir. As regras de imposto são as de pessoa física em 2026, sem day trade. Para valores grandes, confirme com um contador.</p>
+<nav class="indice">
+  <a href="#comecar">Começar</a><a href="#lancar">Lançar</a><a href="#resumo">Ler o resumo</a><a href="#rebalancear">Rebalancear</a><a href="#darf">DARF mensal</a><a href="#declaracao">Declaração anual</a><a href="#copia">Cópia</a><a href="#analise">Análise</a>
+</nav>
+
+<details id="comecar" open>
+<summary>1. Começar: colocar a carteira no app</summary>
+<p>Escolha um dos três caminhos:</p>
+<ol>
+  <li><b>Importar da B3</b> (o mais rápido). No site da B3, entre na Área do Investidor, depois em Extratos e depois em <b>Negociação</b>. Escolha o período desde a sua primeira compra e baixe em Excel. No app, vá em <b>Mais</b>, depois em <b>Escolher arquivo da B3</b>. Compras e vendas entram sozinhas; operações repetidas são ignoradas. Dá para escolher vários arquivos de uma vez.</li>
+  <li><b>Sem o extrato de Negociação de algum período</b> (a B3 às vezes não libera os anos antigos): baixe o de <b>Movimentação</b> desses anos e importe junto. O app lê dele os proventos e também as compras e vendas (as linhas "Transferência - Liquidação"), na data do negócio (dois pregões antes da liquidação). Onde houver os dois extratos, vale o de Negociação, que tem data e preço exatos. Linhas sem preço (comuns quando a ação estava alugada) ficam com um preço estimado; ações recebidas em subscrição, fusão ou desdobramento entram só quando faltam para fechar as vendas seguintes, como "Ações recebidas". Empréstimo de ações e transferência entre corretoras não mudam a carteira; Tesouro Direto não é importado. O resumo da importação fica em Mais.</li>
+  <li><b>Trazer do app antigo.</b> Se você usava a carteira do app antigo neste mesmo celular, o botão aparece em <b>Mais</b>. Cada posição entra como uma compra pelo preço médio. Confira as datas depois.</li>
+  <li><b>Lançar à mão</b>, na aba <b>Lançar</b>, uma operação de cada vez.</li>
+</ol>
+<p>Depois, complete o que o extrato de negociação não traz: renda fixa (Tesouro, CDB), Bitcoin, proventos e o dinheiro parado na corretora.</p>
+<div class="nota aviso">A data de cada operação é o que permite calcular a rentabilidade certa e descontar a inflação. Sem a data certa, o resultado fica errado.</div>
+</details>
+
+<details id="lancar">
+<summary>2. Lançar: o que é cada tipo</summary>
+<table>
+<tr><th>Tipo</th><th>Quando usar</th></tr>
+<tr><td><b>Aporte</b></td><td>Dinheiro novo que entrou na carteira (transferência do banco para a corretora).</td></tr>
+<tr><td><b>Compra</b></td><td>Comprou ETF, ação ou cripto. Informe quantidade, preço e custos (corretagem e taxas da nota).</td></tr>
+<tr><td><b>Venda</b></td><td>Vendeu. O dinheiro fica no <b>caixa</b> da carteira; não é retirada.</td></tr>
+<tr><td><b>Retirada</b></td><td>Tirou dinheiro da carteira para usar fora dela (voltou para o banco).</td></tr>
+<tr><td><b>Provento</b></td><td>Dividendo, JCP ou rendimento que caiu na conta da corretora. Lance o valor líquido que caiu.</td></tr>
+<tr><td><b>Taxa/custódia</b></td><td>Taxas cobradas fora das notas de compra e venda.</td></tr>
+<tr><td><b>Aplicação em renda fixa</b></td><td>Tesouro Selic, CDB, fundo DI. Informe o valor e quanto rende do CDI (ex.: 100%).</td></tr>
+<tr><td><b>Resgate de renda fixa</b></td><td>O dinheiro voltou da renda fixa para o caixa.</td></tr>
+<tr><td><b>Saldo informado da renda fixa</b></td><td>De vez em quando, digite o saldo do extrato do banco. O app corrige a diferença.</td></tr>
+<tr><td><b>Preço atual (manual)</b></td><td>Para um papel que o app não cota sozinho.</td></tr>
+</table>
+<h3>Exemplo de um mês normal</h3>
+<ol>
+  <li>Transferiu R$ 3.000 para a corretora: lance um <b>Aporte</b> de R$ 3.000.</li>
+  <li>Comprou 10 BOVA11 a R$ 130: lance uma <b>Compra</b> de 10 a R$ 130.</li>
+  <li>Aplicou R$ 1.000 no Tesouro Selic: lance uma <b>Aplicação em renda fixa</b> de R$ 1.000 a 100% do CDI.</li>
+  <li>Sobraram R$ 700 parados: não precisa lançar nada, o app já conta esse caixa.</li>
+</ol>
+<div class="nota">Se você não costuma lançar as transferências, deixe ligada a opção "Compra sem aporte lançado conta como aporte" (em Mais). O app trata o valor de cada compra como dinheiro novo na data dela.</div>
+</details>
+
+<details id="resumo">
+<summary>3. Ler o resumo: quanto a carteira rendeu de verdade</summary>
+<ul>
+  <li><b>Patrimônio hoje</b>: quanto vale tudo agora (ativos, renda fixa e caixa).</li>
+  <li><b>Dinheiro que você colocou</b>: aportes menos retiradas. Não é lucro.</li>
+  <li><b>Ganho em reais</b>: patrimônio menos o dinheiro colocado.</li>
+  <li><b>Ganho real em reais</b>: o mesmo cálculo, com cada aporte corrigido pela inflação (IPCA) até hoje. É o quanto o seu poder de compra aumentou.</li>
+  <li><b>Rentabilidade</b> (desde o início, no ano, em 12 meses, no mês): calculada pelo <b>método de cotas</b>, o mesmo dos fundos. Cada aporte compra "cotas" da carteira pelo valor do dia, e cada retirada vende cotas. Assim, aportes, vendas e recompras não inflam o resultado; só a valorização dos investimentos conta.</li>
+  <li><b>Real</b>: a rentabilidade descontada a inflação. Se der negativa, a carteira perdeu poder de compra no período.</li>
+  <li><b>Comparação</b>: o que teria rendido no CDI, na inflação, na carteira de referência (1/3 BOVA11, 1/3 IVVB11 e 1/3 CDI) e em cada ativo sozinho, no mesmo período. Escolha o período nos botões do quadro: semana, mês, 3 meses, semestre, 12 meses, no ano, 2 ou 5 anos, desde o início, ou "Escolher datas" (de uma data até outra). A escolha fica lembrada no aparelho.</li>
+  <li><b>Bazin e Graham</b>: para cada ação que você tem ou acompanha, o <b>preço teto de Bazin</b> (dividendo médio por ação dos últimos 5 anos ÷ 6%) e o <b>número de Graham</b> (√(22,5 × lucro por ação × patrimônio por ação)), com os filtros de cada método (dividendos todos os anos, dívida baixa, lucro em todos os anos, P/L até 15, P/VP até 1,5). É só informação: os estudos de escolha de ações por fundamentos não venceram o índice. ETFs e fundos não têm ficha; bancos aparecem com aviso, porque os métodos não se aplicam bem a eles.</li>
+  <li><b>Cada papel × o setor dele</b>: no mesmo período, quanto o preço de cada papel que você tem (e dos que acompanha) variou contra o setor. Papéis dos EUA comparam com o fundo do setor, em dólar (ex.: PLTR × XLK, de tecnologia; os quânticos × QTUM). Papéis da B3 comparam com a média de empresas grandes do mesmo setor (ex.: MGLU3 × Renner, Casas Bahia, C&amp;A e outras do varejo). "+5 pontos" quer dizer que o papel subiu 5 pontos percentuais a mais que o setor. Fundos de prata, de moeda e parecidos não têm setor.</li>
+</ul>
+<div class="nota">Venda sem compra lançada antes (por exemplo, papel comprado antes do primeiro lançamento): o app conta o dinheiro dessa venda como aporte, para não inflar a rentabilidade, e mostra um aviso no topo. Para corrigir, use o lançamento <b>Posição inicial</b>: informe a quantidade que você já tinha e o preço médio da declaração de IR (Bens e Direitos: valor em 31/12 ÷ quantidade), com data antes da primeira venda. O preço médio vale para o imposto; para a rentabilidade, o papel entra pelo preço de mercado daquele dia, sem criar lucro falso.</div>
+<div class="nota">Por que aqui não aparece um "+200%" falso: o cálculo antigo comparava o lucro com o preço médio de cada papel, misturando o dinheiro que entrou com o que rendeu. Pelas cotas, colocar mais dinheiro não muda a rentabilidade.</div>
+</details>
+
+<details id="rebalancear">
+<summary>4. Rebalancear: quando e como</summary>
+<p>O app não dá ordens; ele mostra a situação. Há três gatilhos:</p>
+<ol>
+  <li><b>Todo aporte.</b> Na aba <b>Rebalancear</b>, digite o valor do próximo aporte. O app divide esse valor entre as classes que estão abaixo da meta e mostra quantas cotas comprar. Assim o aporte já rebalanceia, sem vender e sem imposto.</li>
+  <li><b>"Fora da faixa" (vale a qualquer momento).</b> Uma classe está fora quando se afasta 5 pontos da meta. Para metas pequenas, vale 25% da própria meta: com 5% de Bitcoin, a faixa vai de 3,75% a 6,25%. Dentro da faixa, não precisa mexer.</li>
+  <li><b>Revisão no fim de cada trimestre</b> (31/03, 30/06, 30/09 e 31/12). Se alguma classe estiver fora da faixa e os aportes não bastarem para corrigir, abra "E se eu quiser rebalancear vendendo?". O app mostra quanto vender e quanto comprar. Lance as operações e confira o imposto na aba Imposto.</li>
+</ol>
+<div class="nota aviso">Antes de vender ETF para rebalancear, lembre: ETF paga 15% sobre o lucro mesmo em vendas pequenas. Bitcoin é isento se o total vendido no mês ficar até R$ 35 mil. Quase sempre, corrigir pelos aportes sai mais barato.</div>
+<p>A informação "Bitcoin e a média de 200 dias" está em teste para frente: serve de contexto, não de ordem.</p>
+</details>
+
+<details id="darf">
+<summary>5. DARF mensal: como gerar e pagar</summary>
+<p>Quando a aba <b>Imposto</b> mostrar "Pagar R$ …" em um mês, faça assim:</p>
+<h3>Bolsa: ações, ETFs, BDRs e FIIs (código 6015)</h3>
+<p class="nota">BDR (código terminado em 32, 33, 34, 35 ou 39, como P2LT34) <b>não</b> tem a isenção de R$ 20 mil das ações: paga 15% sobre o lucro em qualquer mês, como os ETFs. O app reconhece o BDR pelo código; confira o tipo na aba Imposto. DARF atrasado se paga pelo mesmo Sicalc, que já calcula multa e juros.</p>
+<ol>
+  <li>Anote, na aba Imposto, o valor e o vencimento (último dia útil do mês seguinte ao da venda).</li>
+  <li>Abra o <b>Sicalc Web</b> da Receita: <a href="https://sicalc.receita.economia.gov.br/sicalc/principal" target="_blank" rel="noopener">sicalc.receita.economia.gov.br</a>. Também dá para gerar pelo e-CAC, com login gov.br.</li>
+  <li>Escolha <b>Pessoa Física</b>, informe o CPF e, em código da receita, digite <code>6015</code>.</li>
+  <li><b>Período de apuração</b>: o último dia do mês em que você vendeu (ex.: vendeu em março de 2026, informe 31/03/2026).</li>
+  <li><b>Valor principal</b>: o valor da aba Imposto, menos o imposto que a corretora já reteve (o "dedo-duro", 0,005% das vendas). Ele aparece na nota de corretagem como IRRF.</li>
+  <li>Toque em <b>Calcular</b> e depois em <b>Emitir DARF</b>. Pague pelo app do banco, com o código de barras ou o QR Code Pix do DARF.</li>
+  <li>Lance o pagamento como <b>Taxa/custódia</b> só se o dinheiro saiu do caixa da corretora. Se saiu da sua conta do banco, não lance nada.</li>
+</ol>
+<h3>Atrasou?</h3>
+<p>Gere o DARF do mesmo jeito, informando a data em que vai pagar. O Sicalc soma sozinho a multa (0,33% por dia, até 20%) e os juros (Selic).</p>
+<h3>Imposto abaixo de R$ 10</h3>
+<p>Não emita DARF. O valor fica para o mês seguinte e o app já soma no próximo mês com imposto.</p>
+<h3>Bitcoin e outras criptos (código 4600)</h3>
+<p>Só existe imposto se o total vendido no mês passar de R$ 35 mil. Nesse caso, o DARF é feito pelo programa <b>GCAP</b> da Receita (Ganhos de Capital), com o mesmo vencimento. Prejuízo com cripto não abate o lucro.</p>
+<h3>Prejuízo</h3>
+<p>Num mês com prejuízo não se paga nada, e o app guarda esse valor para abater o lucro dos meses seguintes (ações e ETFs juntos; FIIs à parte).</p>
+</details>
+
+<details id="declaracao">
+<summary>6. Declaração anual do Imposto de Renda</summary>
+<p>Na aba <b>Imposto</b>, escolha o ano. O app mostra:</p>
+<ol>
+  <li><b>Bens e Direitos</b>: cada ativo com o grupo e o código, o texto de discriminação (quantidade e preço médio) e o valor em 31/12 do ano anterior e do ano atual, <b>pelo custo</b>, não pelo valor de mercado.</li>
+  <li><b>Renda variável</b>: no programa da Receita, ficha "Renda Variável", em "Operações comuns", lance mês a mês o resultado de ações e ETFs e o imposto pago (veja o mês a mês da aba Imposto).</li>
+  <li><b>Rendimentos isentos</b>: dividendos (código 09), lucro com ações em meses de vendas até R$ 20 mil (código 20) e ganho com cripto em meses de vendas até R$ 35 mil (código 05).</li>
+  <li><b>Tributação exclusiva</b>: JCP (código 10) e rendimentos de renda fixa (código 06, pelo informe do banco).</li>
+</ol>
+<div class="nota">Desde 2026, o JCP tem 17,5% retido na fonte (eram 15%). Dividendos continuam isentos, mas, se uma mesma empresa pagar mais de R$ 50 mil no mês para você, 10% são retidos. Quem tem renda acima de R$ 600 mil no ano entra no imposto mínimo.</div>
+<p class="mudo peq">Use sempre os informes de rendimentos da corretora e do banco para conferir os números do app.</p>
+</details>
+
+<details id="eua">
+<summary>7. Conta EUA (papéis em dólar)</summary>
+<p>A carteira é uma só, com duas contas: <b>Brasil (R$)</b> e <b>EUA (US$)</b>. O patrimônio, a rentabilidade e o rebalanceamento somam as duas em reais, pelo dólar PTAX do Banco Central. Você não precisa repetir nada em duas carteiras.</p>
+<ol>
+  <li>Em <b>Lançar</b>, escolha <b>Conta: EUA (US$)</b>. Todos os valores desse lançamento são em dólar.</li>
+  <li>Quando mandar dinheiro para a corretora dos EUA, lance um <b>Aporte</b> na conta EUA com os dólares que chegaram lá. Exemplo: chegaram US$ 1.000 em 02/02 → Aporte, conta EUA, US$ 1.000.</li>
+  <li>Compras e vendas: o código como aparece na corretora (VOO, IONX, PLTR, SLV...) e o preço em dólar. Qualquer papel negociado nos EUA (Nasdaq, NYSE, NYSE Arca, Cboe) serve.</li>
+  <li><b>Extratos mensais em PDF</b> (Monthly Statement da XP Internacional, da Nomad e de outras que usam a Apex): o jeito mais rápido, um arquivo por mês. Escolha todos os meses de uma vez em <b>Mais</b>, Importar. Entram as compras e vendas (com a corretagem nos custos) e as remessas ("Journal from" vira aporte; "Journal to", retirada). O app confere a posição do fim de cada mês com a do extrato e avisa se algo não bate. Dividendos ainda não são lidos: lance como Provento.</li>
+  <li><b>Notas de corretagem em PDF</b> (Nomad e outras corretoras que usam a Apex Clearing): em <b>Mais</b>, Importar, escolha as notas, várias de uma vez. Compras e vendas entram na conta EUA com o preço em dólar e a comissão e as taxas nos custos; a mesma nota escolhida de novo não duplica. Se uma nota não for reconhecida, mande-a no chat.</li>
+  <li>Dividendos: lance como <b>Provento</b> na conta EUA o valor líquido que caiu e, se quiser, o imposto que os EUA retiveram (em geral 30%). O app usa o retido para abater o imposto brasileiro.</li>
+  <li>O dinheiro de uma venda fica em dólar, no caixa da conta EUA, até você comprar outro papel ou trazer de volta (<b>Retirada</b> na conta EUA).</li>
+</ol>
+<div class="nota">Papel novo: a cotação dele entra na coleta da noite depois de incluído na lista do servidor. Peça no chat. Até lá, use "Preço atual (manual)" em dólar.</div>
+<p><b>Imposto da conta EUA (Lei 14.754/2023)</b></p>
+<ol>
+  <li>Não há DARF mensal nem a isenção de R$ 20 mil. O imposto é <b>15% por ano</b> sobre o ganho das vendas mais os dividendos, pago junto com a declaração (quota única até o fim de maio, ou parcelado).</li>
+  <li>O ganho é calculado em reais: valor da venda pela PTAX do dia da venda menos o custo pela PTAX de cada compra. Por isso a alta do dólar também entra no ganho.</li>
+  <li>Prejuízo nas vendas abate ganhos e dividendos do mesmo ano e dos anos seguintes, desde que declarado.</li>
+  <li>Na aba <b>Imposto</b>, o cartão "Conta EUA" mostra o ganho, os dividendos, o imposto, o abatimento do retido e o valor a pagar. Na declaração, use a ficha de <b>Bens e Direitos</b> marcando que é aplicação financeira no exterior; o programa calcula o imposto a partir do ganho informado em cada bem.</li>
+  <li>O dólar parado na corretora também é declarado (grupo 06, depósito em conta no exterior).</li>
+</ol>
+<div class="nota">ETFs alavancados (IONX, QBTX, QPUX) rebalanceiam todo dia. Em períodos de sobe e desce, eles costumam perder valor mesmo quando a ação de base volta ao mesmo preço. Na lista "Acompanhando", o app mostra a ação de base ao lado para comparar. É informação, não recomendação.</div>
+<p class="mudo peq">Regras para pessoa física residente no Brasil. Confira com o informe da corretora ou um contador.</p>
+</details>
+
+<details id="copia">
+<summary>8. Cópia de segurança</summary>
+<p>Os lançamentos ficam só neste celular e neste navegador. Se você limpar os dados do navegador ou trocar de aparelho, eles somem.</p>
+<ol>
+  <li>Em <b>Mais</b>, toque em <b>Baixar cópia</b> uma vez por mês (e sempre antes de trocar de celular). Guarde o arquivo no Drive ou no e-mail.</li>
+  <li>Para voltar, toque em <b>Restaurar cópia</b> e escolha o arquivo.</li>
+</ol>
+</details>
+
+<details id="analise">
+<summary>9. Baixar para análise (Excel ou IA)</summary>
+<p>Em <b>Mais → Baixar para análise</b> o app gera os seus dados já calculados, para você abrir no Excel ou mandar para uma IA (ChatGPT, Claude etc.) analisar o desempenho.</p>
+<ul>
+  <li><b>Planilha (Excel)</b>: um arquivo .xlsx com abas: Leia-me, Resumo, Rentabilidade (total, 12 meses, por ano, contra CDI, IPCA, BOVA11, IVVB11 e a carteira de referência), Mensal (patrimônio, aportes e rentabilidade de cada mês), Aportes, Lançamentos, Posições, Vendas, Proventos, Imposto e Avisos.</li>
+  <li><b>Arquivo para IA</b>: os mesmos dados num único arquivo .json, que as IAs leem bem. Anexe no chat e peça, por exemplo: "Analise o desempenho desta carteira, leia o leiaMe primeiro".</li>
+</ul>
+<p>O arquivo explica como a rentabilidade é calculada (método de cotas), para a IA não refazer a conta de outro jeito. A aba <b>Avisos</b> mostra dados incompletos; peça para a IA levá-los em conta.</p>
+<p class="mudo peq">Não vão nome, CPF nem número de conta, mas são os seus números: envie só para serviços em que você confia. Esse arquivo não serve para restaurar a carteira; para isso use a Cópia de segurança.</p>
+</details>
+</main>
+<script>try { if (localStorage.getItem('invest-tema') === 'claro') document.documentElement.dataset.tema = 'claro'; } catch (e) { }
+(function () { const h = location.hash.slice(1); if (h) { const d = document.getElementById(h); if (d) d.open = true; } document.querySelectorAll('nav.indice a').forEach(a => a.addEventListener('click', () => { const d = document.getElementById(a.getAttribute('href').slice(1)); if (d) d.open = true; })); })();</script>
+</body>
+</html>

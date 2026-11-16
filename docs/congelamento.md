@@ -63,3 +63,21 @@ Em **04/11/2027**, por mercado, se o diário tiver pelo menos **100 sinais encer
 3. **Carteira:** na carteira com capital limitado (mediana de 30 sorteios da ordem dos sinais), no mesmo período novo, o retorno é maior ou igual ao do índice real, com queda máxima não maior.
 
 **Se qualquer critério falhar, a estratégia é descartada naquele mercado.** Ela não pode ser "salva" com ajuste de parâmetro. Uma ideia nova precisa de um teste novo, separado, em dados que este teste não usou.
+
+## Desvios registrados (escritos antes de ver os resultados do período)
+
+### 12/11/2026: universo menor e coleta parada de 07/11 a 12/11
+
+- **O que mudou:** a VM Oracle deixou de baixar os ~3.400 papéis dos EUA. Desde 12/11/2026 a coleta usa os **500 papéis
+  de maior volume financeiro** (média de 60 pregões, lista refeita a cada coleta e renovada uma vez por mês com a tela de
+  ações da Nasdaq; `coleta/universo_liquido.py`). O Brasil continua com a carteira do Ibovespa inteira. Motivo: evitar o
+  limite do Yahoo com o IP da Oracle (decisão do Diego, 12/11/2026).
+- **Coleta parada:** de 07/11 a 12/11/2026 a coleta de mercado ficou desligada. Os sinais desses pregões não foram anotados.
+  Os sinais já anotados continuam sendo acompanhados normalmente, porque o motor refaz o resultado a partir dos preços.
+- **O que NÃO mudou:** sinais, pesos, stops, saídas, regra de escolha, travas do veredito e a recalibração. O relatório e o
+  diário continuam rodando **todo pregão**.
+- **Efeito esperado:** menos sinais por dia nos EUA. A meta de 100 sinais encerrados pode só ser alcançada mais tarde
+  (o limite de 04/11/2028 continua valendo). A amostra passa a ser de papéis mais líquidos, o que deve ser lembrado na
+  leitura do critério 2.
+- **Como avaliar:** os três critérios continuam os mesmos. Na reavaliação, o resultado dos EUA será lido como
+  "estratégia congelada aplicada aos 500 mais negociados", e não como o sistema original de ~3.400 papéis.
