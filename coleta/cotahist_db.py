@@ -35,7 +35,7 @@ COLUNAS = ['data', 'codneg', 'codbdi', 'especi', 'nomres', 'isin', 'abertura', '
 ESQUEMA = """CREATE TABLE IF NOT EXISTS pregoes (
     data DATE, codneg VARCHAR, codbdi VARCHAR, especi VARCHAR, nomres VARCHAR, isin VARCHAR,
     abertura DOUBLE, maxima DOUBLE, minima DOUBLE, media DOUBLE, fechamento DOUBLE,
-    negocios INTEGER, quantidade BIGINT, volume DOUBLE);
+    negocios BIGINT, quantidade BIGINT, volume DOUBLE);
 CREATE TABLE IF NOT EXISTS carga (ano INTEGER PRIMARY KEY, linhas BIGINT, completo BOOLEAN, em TIMESTAMP);
 CREATE OR REPLACE VIEW liquidez_mensal AS
     SELECT strftime(data, '%Y-%m') AS mes, codneg, any_value(isin) AS isin, count(*) AS pregoes,
@@ -113,8 +113,9 @@ def carregar_ano(con, ano, linhas, completo):
         if n:
             tipos = "{'data':'DATE','codneg':'VARCHAR','codbdi':'VARCHAR','especi':'VARCHAR','nomres':'VARCHAR','isin':'VARCHAR'," \
                     "'abertura':'DOUBLE','maxima':'DOUBLE','minima':'DOUBLE','media':'DOUBLE','fechamento':'DOUBLE'," \
-                    "'negocios':'INTEGER','quantidade':'BIGINT','volume':'DOUBLE'}"
-            con.execute(f"INSERT INTO pregoes SELECT * FROM read_csv(?, header=false, columns={tipos})", [tmp.name])
+                    "'negocios':'BIGINT','quantidade':'BIGINT','volume':'DOUBLE'}"
+            opcoes = "header=false, delim=',', quote='\"', escape='\"', auto_detect=false, columns=" + tipos
+            con.execute('INSERT INTO pregoes SELECT * FROM read_csv(?, ' + opcoes + ')', [tmp.name])
         con.execute("INSERT OR REPLACE INTO carga VALUES (?, ?, ?, ?)",
                     [ano, n, completo, datetime.now(timezone.utc).replace(tzinfo=None)])
         con.execute('COMMIT')
