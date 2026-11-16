@@ -265,6 +265,7 @@ function telaLab() {
             <div class="linha"><span>Com tese (a favor ou contra)</span><span class="v">${P.comTese}</span></div>
             <div class="linha"><span>Acertos até hoje<br><span class="mini mudo">tese × papel contra o índice desde o parecer</span></span><span class="v">${P.acertoAteHoje === null ? '—' : nf(P.acertoAteHoje * 100, 0) + '%'}</span></div>
             <div class="linha"><span>Com 120 pregões (meta: 60)</span><span class="v">${P.maduros120}</span></div>
+            ${P.brierAteHoje != null ? `<div class="linha"><span>Nota de Brier até hoje<br><span class="mini mudo">0,25 = chutar 50%; quanto menor, melhor (${P.comProbabilidade} pareceres)</span></span><span class="v">${nf(P.brierAteHoje, 3)}</span></div>` : ''}
             <p class="mini mudo" style="margin:8px 0 0">${P.podeConcluir ? 'Já há pareceres suficientes para o teste do protocolo.' : 'Ainda não dá para concluir nada: acerto com poucos pareceres é sorte ou azar.'}</p></div>`; })()}
         <div class="cartao"><h2>Ideias testadas</h2>
             <p class="peq mudo" style="margin-top:0">Cada ideia teve as regras escritas antes do teste. Reprovada não se reabre com outros parâmetros. Desde 15/11/2026 toda ideia nova também precisa do Sharpe deflacionado (desconta as 62 tentativas já feitas no projeto): <a href="docs/protocolo-laboratorio.md" style="color:var(--acento)">protocolo</a>.</p>

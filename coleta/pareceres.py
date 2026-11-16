@@ -21,7 +21,9 @@ try:
 except ImportError:
     from coleta.calendario import pregoes_entre
 
-COLUNAS = ['data', 'papel', 'mercado', 'tese', 'confianca', 'preco_ref', 'indice', 'indice_ref', 'mudaria_opiniao', 'data_agente_json']
+COLUNAS = ['data', 'papel', 'mercado', 'tese', 'confianca', 'preco_ref', 'indice', 'indice_ref', 'mudaria_opiniao', 'data_agente_json',
+           'probabilidade']   # probabilidade (16/11/2026): 0 a 100, chance de bater o índice em 60 pregões
+JANELA_BRIER = 60
 MINIMO_PARECERES, MINIMO_PREGOES = 60, 120
 
 
@@ -40,6 +42,14 @@ def data_iso(x):
         except ValueError:
             pass
     return None
+
+
+def prob(x):
+    """'65', '65%' ou '0,65' -> 0.65; fora de 0 a 100 -> None."""
+    v = num(str(x or '').replace('%', ''))
+    if v is None or v < 0 or v > 100:
+        return None
+    return round(v / 100 if v > 1 else v, 4)
 
 
 def tese_norm(t):
@@ -63,7 +73,8 @@ def ler_csv(caminho):
             continue
         out.append({'data': d, 'papel': papel, 'mercado': (l.get('mercado') or '').lower() or None, 'tese': tese_norm(l.get('tese')),
                     'confianca': (l.get('confianca') or '').lower() or None, 'precoRef': num(l.get('preco_ref')),
-                    'indice': l.get('indice') or None, 'indiceRef': num(l.get('indice_ref')), 'mudaria': l.get('mudaria_opiniao') or None})
+                    'indice': l.get('indice') or None, 'indiceRef': num(l.get('indice_ref')), 'mudaria': l.get('mudaria_opiniao') or None,
+                    'probabilidade': prob(l.get('probabilidade'))})
     return out
 
 
@@ -80,11 +91,18 @@ def montar(pareceres, agente, hoje=None):
             p['retorno'], p['retornoIndice'], p['excesso'] = round(rp, 4), round(ri, 4), round(rp - ri, 4)
             if p['tese'] in ('a favor', 'contra'):
                 p['acertou'] = (p['excesso'] > 0) if p['tese'] == 'a favor' else (p['excesso'] < 0)
+    # Brier até hoje (acompanhamento): (p − y)², y = 1 se o papel está à frente do índice. O Brier oficial é o de
+    # 60 pregões (protocolo-agente.md, critério 4), medido no placar automático.
+    com_prob = [p for p in pareceres if p.get('probabilidade') is not None and 'excesso' in p]
+    brier = (round(sum((p['probabilidade'] - (1 if p['excesso'] > 0 else 0)) ** 2 for p in com_prob) / len(com_prob), 4)
+             if com_prob else None)
     com_tese = [p for p in pareceres if p['tese'] in ('a favor', 'contra') and 'acertou' in p]
     maduros = [p for p in com_tese if p['pregoes'] >= MINIMO_PREGOES]
     placar = {'pareceres': len(pareceres), 'comTese': len(com_tese), 'maduros120': len(maduros),
               'acertoAteHoje': round(sum(p['acertou'] for p in com_tese) / len(com_tese), 3) if com_tese else None,
               'podeConcluir': len(maduros) >= MINIMO_PARECERES,
+              'comProbabilidade': len(com_prob), 'brierAteHoje': brier,
+              'maduros60ComProbabilidade': sum(1 for p in com_prob if p['pregoes'] >= JANELA_BRIER),
               'nota': f'Validação só com {MINIMO_PARECERES} pareceres de {MINIMO_PREGOES} pregões (protocolo-agente.md). Até lá, o acerto é só acompanhamento.'}
     ult = sorted(pareceres, key=lambda p: p['data'])
     data_ult = ult[-1]['data'] if ult else None
