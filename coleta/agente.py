@@ -18,6 +18,11 @@ import os
 import sys
 from datetime import date, datetime, timezone
 
+try:
+    from calendario import pregoes_entre
+except ImportError:  # rodando de fora da pasta coleta/
+    from coleta.calendario import pregoes_entre
+
 VERSAO = 1
 LIMITE_BYTES = 100 * 1024
 N_LISTA = 10
@@ -325,11 +330,11 @@ def carteira_resumo(cart):
     return macro, ref, watch
 
 
-def dias_uteis(de, ate):
+def dias_uteis(de, ate, mercado='br'):
+    """Pregões (calendário da B3 ou da NYSE, com feriados) depois de `de` até `ate`."""
     if not de:
         return None
-    d0 = date.fromisoformat(de)
-    return sum(1 for k in range(1, (ate - d0).days + 1) if date.fromordinal(d0.toordinal() + k).weekday() < 5)
+    return pregoes_entre(de, ate, mercado)
 
 
 def montar(site, hoje=None):
@@ -343,8 +348,8 @@ def montar(site, hoje=None):
     base = os.path.join(site, 'antigo', 'data')
     us = mercado(base, 'us', hoje, n_papeis=N_PAPEIS_EUA, extras=watch or ()) if os.path.isdir(base) else None
     br = mercado(os.path.join(base, 'br'), 'br', hoje, extras=watch or ()) if os.path.isdir(os.path.join(base, 'br')) else None
-    ultimos = [m['saude']['ultimoPregao'] for m in (us, br) if m and m['saude'].get('ultimoPregao')]
-    atraso = dias_uteis(min(ultimos), hoje) if ultimos else None
+    atrasos = [dias_uteis(m['saude']['ultimoPregao'], hoje, mk) for mk, m in (('us', us), ('br', br)) if m and m['saude'].get('ultimoPregao')]
+    atraso = max(atrasos) if atrasos else None
     return {
         'versao': VERSAO, 'geradoEm': datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace('+00:00', 'Z'),
         'aviso': AVISO,

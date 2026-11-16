@@ -16,6 +16,11 @@ import os
 import sys
 from datetime import date, datetime, timezone
 
+try:
+    from calendario import pregoes_entre
+except ImportError:
+    from coleta.calendario import pregoes_entre
+
 COLUNAS = ['data', 'papel', 'mercado', 'tese', 'confianca', 'preco_ref', 'indice', 'indice_ref', 'mudaria_opiniao', 'data_agente_json']
 MINIMO_PARECERES, MINIMO_PREGOES = 60, 120
 
@@ -42,9 +47,9 @@ def tese_norm(t):
     return 'a favor' if 'favor' in t else 'contra' if 'contra' in t else 'neutro' if 'neutr' in t else t
 
 
-def dias_uteis(de, ate):
-    d0, d1 = date.fromisoformat(de), date.fromisoformat(ate)
-    return sum(1 for k in range(1, (d1 - d0).days + 1) if date.fromordinal(d0.toordinal() + k).weekday() < 5)
+def dias_uteis(de, ate, mercado='br'):
+    """Pregões depois de `de` até `ate`, com os feriados da B3 ou da NYSE."""
+    return pregoes_entre(de, ate, mercado)
 
 
 def ler_csv(caminho):
@@ -69,7 +74,7 @@ def montar(pareceres, agente, hoje=None):
         m = merc.get(p['mercado'] or ('br' if p['papel'][-1:].isdigit() else 'us')) or {}
         atual = ((m.get('papeis') or {}).get(p['papel']) or {}).get('p')
         ind = (m.get('termometro') or {}).get('ult')
-        p['pregoes'] = dias_uteis(p['data'], hoje.isoformat()) if p['data'] <= hoje.isoformat() else 0
+        p['pregoes'] = dias_uteis(p['data'], hoje.isoformat(), p['mercado'] or ('br' if p['papel'][-1:].isdigit() else 'us')) if p['data'] <= hoje.isoformat() else 0
         if atual and p['precoRef'] and ind and p['indiceRef']:
             rp, ri = atual / p['precoRef'] - 1, ind / p['indiceRef'] - 1
             p['retorno'], p['retornoIndice'], p['excesso'] = round(rp, 4), round(ri, 4), round(rp - ri, 4)
