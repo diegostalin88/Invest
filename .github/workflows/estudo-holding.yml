@@ -1,0 +1,30 @@
+name: Estudo holding com dividendos
+
+# Só leitura: teste registrado em docs/hipotese-holding-dividendos.md (ETFs de dividendos contra o índice).
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/project-thread-10wjcu]
+    paths: [coleta/testar_holding.py, .github/workflows/estudo-holding.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  estudo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Estudo
+        run: |
+          pip install -q yfinance pandas numpy
+          python coleta/testar_holding.py
+          cat estudo_holding.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: estudo-holding
+          path: estudo_holding.md

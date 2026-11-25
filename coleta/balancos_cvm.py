@@ -5,8 +5,9 @@ Fontes (https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/):
     empresa não publicar consolidado), e o índice com a data de entrega à CVM (DT_RECEB);
   - FCA (valor mobiliário): o código de negociação (PETR4) de cada CNPJ.
 Trimestre = linha de 3 meses da DRE do ITR. O 4º trimestre é o ano (DFP) menos os 9 meses do ITR de setembro.
-Valores com ESCALA_MOEDA = MIL são multiplicados por 1.000. Os números são os da versão mais recente entregue;
-a data é a da PRIMEIRA entrega (quando o resultado ficou público).
+Valores com ESCALA_MOEDA = MIL são multiplicados por 1.000. Os números são os da versão mais recente entregue, e a
+data é a da entrega DESSA versão (correção de 07/11/2026: antes era a da primeira entrega, o que fazia um número
+retificado parecer conhecido desde a entrega original).
 Uso: python coleta/balancos_cvm.py site/data/br [--anos 4]
 """
 import argparse
@@ -80,11 +81,13 @@ def mapa_tickers(fca_zip_bytes, tickers):
 
 
 class Acumulador:
-    """Junta, por CNPJ, os números de vários ITR/DFP. Fica com a versão mais recente de cada documento."""
+    """Junta, por CNPJ, os números de vários ITR/DFP. Fica com a versão mais recente de cada documento e com a data em
+    que essa versão foi entregue."""
 
     def __init__(self, cnpjs):
         self.cnpjs = set(cnpjs)
-        self.receb = {}    # (cnpj, dt_refer, tipo) -> data da 1ª entrega
+        self.receb = {}    # (cnpj, dt_refer, tipo) -> data de entrega da versão usada (a mais recente)
+        self._versao = {}  # (cnpj, dt_refer, tipo) -> (versão, data de entrega)
         self.dre = {}      # (cnpj, dt_refer, tipo, fonte) -> {(ini, fim, campo): (versao, valor)}
         self.bal = {}      # (cnpj, dt_refer, tipo, fonte) -> {campo: (versao, valor)}
 
@@ -94,8 +97,11 @@ class Acumulador:
         for r in linhas(z, f'{p}_cia_aberta_{ano}.csv', self.cnpjs):
             if r['CNPJ_CIA'] in self.cnpjs:
                 k = (r['CNPJ_CIA'], r['DT_REFER'], tipo)
-                if k not in self.receb or r['DT_RECEB'] < self.receb[k]:
-                    self.receb[k] = r['DT_RECEB']
+                ver, dt = int(r.get('VERSAO') or 0), r['DT_RECEB']
+                atual = self._versao.get(k)
+                if atual is None or ver > atual[0] or (ver == atual[0] and dt < atual[1]):
+                    self._versao[k] = (ver, dt)
+                    self.receb[k] = dt
         com_con = set()
         for fonte in ('con', 'ind'):
             alvo = self.cnpjs if fonte == 'con' else self.cnpjs - com_con   # individual só para quem não tem consolidado
@@ -150,8 +156,9 @@ class Acumulador:
                 d9 = self._fonte(cnpj, set_ref, 'ITR', self.dre)
                 nove = {campo: v for (ini, fim, campo), (_, v) in d9.items() if fim == set_ref and 260 <= _dias(ini, fim) <= 280}
                 q = {campo: ano[campo] - nove[campo] for campo in ano if campo in nove}
-                if q:
-                    tri.setdefault(ref, {'divulgado': div}).update(q)
+                if q:   # o 4º trimestre só é conhecido quando as duas entregas (DFP e ITR de setembro) existem
+                    div4 = max(div, self.receb.get((cnpj, set_ref, 'ITR'), div))
+                    tri.setdefault(ref, {'divulgado': div4}).update(q)
         t = [[fim, x['divulgado'], _int(x.get('rev')), _int(x.get('ni')), None, _int(x.get('gp'))] for fim, x in sorted(tri.items()) if 'ni' in x or 'rev' in x]
         b = []
         for ref, tipo in refs:

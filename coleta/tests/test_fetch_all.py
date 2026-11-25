@@ -360,7 +360,7 @@ def test_main_ponta_a_ponta(monkeypatch, tmp_path, fake_yf):
     assert fa.main(['--saida', str(saida), '--url-publicado', 'https://exemplo.invalid/data/']) == 0
 
     m = json.loads((saida / 'manifest.json').read_text())
-    assert m['versao'] == 2 and m['ultimoPregao'] == hoje.isoformat() and m['anosHistorico'] == 5
+    assert m['versao'] == 2 and m['ultimoPregao'] == pd.bdate_range(end=pd.Timestamp(hoje), periods=1)[0].date().isoformat() and m['anosHistorico'] == 5
     assert m['arquivosPrecos'] == ['precos_000.json']
     # AAA (~US$ 50 mi/dia) e BBB (~US$ 10 mi/dia) passam; CCC e DDD-B são ilíquidos; ETFX é ETF
     assert m['stats']['tickersPrecos'] == 2
@@ -431,3 +431,16 @@ def test_estimar_proximo_balanco():
     # pouco histórico: último + 91 dias
     assert fa.estimar_proximo_balanco(['2026-09-01'], hoje) == '2026-12-01'
     assert fa.estimar_proximo_balanco([], hoje) is None
+
+
+def test_portao_nao_bloqueia_troca_para_universo_menor():
+    # execução anterior com 3481 papéis; hoje a lista fixa pede 500 e vieram 480
+    assert fa.portao_qualidade(_manif(480), _manif(3481), FUND_OK, HOJE, n_universo=500) == []
+    # mas uma queda real dentro da lista fixa continua bloqueando
+    assert fa.portao_qualidade(_manif(300), _manif(3481), FUND_OK, HOJE, n_universo=500)
+
+
+def test_ler_universo_arquivo(tmp_path):
+    p = tmp_path / 'u.txt'
+    p.write_text('aapl\n# comentário\nBRK.B\n\nAAPL\nmsft  # nota\n', encoding='utf-8')
+    assert fa.ler_universo_arquivo(str(p)) == ['AAPL', 'BRK-B', 'MSFT']

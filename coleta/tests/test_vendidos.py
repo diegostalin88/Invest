@@ -111,6 +111,9 @@ def test_main_grava_e_nao_quebra_quando_fonte_falha(tmp_path, monkeypatch):
     assert br['ativos']['MOVI3']['qtd'] == 12346678 and br['geradoEm'].endswith('Z')
     assert json.loads((tmp_path / 'br' / 'manifest.json').read_text())['arquivoVendidos'] == 'vendidos.json'
     assert 'arquivoVendidos' not in json.loads((tmp_path / 'manifest.json').read_text())
+    todos = json.loads((tmp_path / 'br' / 'vendidos-todos.json').read_text())   # relatório inteiro, fora do universo também
+    assert set(todos['ativos']) == {'MOVI3', 'PETR4', 'XXXX3'} and todos['papeis'] == 3
+    assert 'todos' not in br
 
 
 def test_finra_sem_ordenacao_procura_a_data_dia_a_dia():
@@ -182,3 +185,13 @@ def test_token_b3_aceita_formato_novo_redirect():
     assert v._token_b3({'token': 'abc'}) == 'abc'
     assert v._token_b3({'redirectUrl': '~/download?token=R2c+/x=='}) == 'R2c+/x=='
     assert v._token_b3({'redirectUrl': '~/download'}) is None and v._token_b3({}) is None
+
+
+def test_finra_guarda_o_relatorio_inteiro():
+    linhas = [{'symbolCode': 'GME', 'currentShortPositionQuantity': 9000000, 'daysToCoverQuantity': 6.2,
+               'averageDailyVolumeQuantity': 1500000, 'issueName': 'GameStop', 'marketClassCode': 'NYSE', 'changePercent': 40.0},
+              {'symbolCode': 'AAPL', 'currentShortPositionQuantity': 100, 'daysToCoverQuantity': 1}]
+    dados = v.baixar_finra({'AAPL'}, SessaoFalsa(finra_linhas=linhas))
+    assert set(dados['ativos']) == {'AAPL'}
+    assert dados['todos']['GME'] == {'qtd': 9000000, 'variacaoPct': 40.0, 'diasFinra': 6.2, 'volMedio': 1500000,
+                                     'nome': 'GameStop', 'mercado': 'NYSE'}

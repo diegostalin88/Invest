@@ -9,6 +9,8 @@
 Grava <saida>/vendidos.json e <saida>/br/vendidos.json no formato
     {"fonte": ..., "data": "AAAA-MM-DD", "geradoEm": ..., "ativos": {"TICKER": {"qtd": N, ...}}}
 Só entram os tickers que o app tem preço. Qualquer falha só gera aviso: nunca bloqueia a publicação.
+Desde 25/11/2026 grava também <pasta>/vendidos-todos.json com TODOS os papéis do relatório da bolsa (FINRA ou B3),
+mesmo os que o app não acompanha, para o Consultor enxergar squeezes fora do universo de preços.
 O app calcula "dias para zerar" = qtd vendida / volume médio de 20 pregões, com os próprios preços.
 
 Uso: python coleta/vendidos.py --saida site/data [--b3-bruto b3-cache/aluguel_b3.json]
@@ -107,13 +109,18 @@ def _finra_ultima_data(sessao, hoje):
 
 def baixar_finra(universo, sessao=requests, hoje=None):
     data_liq = _finra_ultima_data(sessao, hoje or date.today())
-    ativos, offset, lote = {}, 0, 5000
+    ativos, todos, offset, lote = {}, {}, 0, 5000
     while True:
         linhas = _finra_post({'limit': lote, 'offset': offset,
                               'compareFilters': [{'compareType': 'EQUAL', 'fieldName': 'settlementDate',
                                                   'fieldValue': data_liq}]}, sessao)
         for l in linhas:
             t = (l.get('symbolCode') or '').strip().upper()
+            if t and l.get('currentShortPositionQuantity'):
+                todos[t] = {'qtd': int(l['currentShortPositionQuantity']), 'variacaoPct': l.get('changePercent'),
+                            'diasFinra': l.get('daysToCoverQuantity'), 'volMedio': l.get('averageDailyVolumeQuantity'),
+                            'nome': (l.get('issueName') or '').strip() or None,
+                            'mercado': (l.get('marketClassCode') or '').strip() or None}
             if t in universo and l.get('currentShortPositionQuantity'):
                 ativos[t] = {'qtd': int(l['currentShortPositionQuantity']),
                              'qtdAnterior': int(l.get('previousShortPositionQuantity') or 0),
@@ -122,7 +129,7 @@ def baixar_finra(universo, sessao=requests, hoje=None):
         if len(linhas) < lote or offset > 200000:
             break
         offset += lote
-    return {'fonte': 'FINRA (short interest)', 'data': data_liq, 'ativos': ativos}
+    return {'fonte': 'FINRA (short interest)', 'data': data_liq, 'ativos': ativos, 'todos': todos}
 
 
 # ---------------- Brasil: B3 (aluguel) ----------------
@@ -241,19 +248,19 @@ def baixar_b3(universo, hoje, sessao=requests, dias_atras=5):
             log(f'Vendidos Brasil: {e}')
             ultimo_erro = e
             continue
-        ativos = {}
+        todos = {}
         for l in linhas:
             t = (l.get('TckrSymb') or '').strip().upper()
-            if universo is None or t in universo:
-                qtd = _numero(l.get('BalQty'), inteiro=isinstance(l.get('BalQty'), str))
-                if qtd > 0:
-                    a = ativos.setdefault(t, {'qtd': 0, 'valor': 0.0})
-                    a['qtd'] += int(qtd)
-                    a['valor'] += _numero(l.get('BalVal'))
+            qtd = _numero(l.get('BalQty'), inteiro=isinstance(l.get('BalQty'), str))
+            if t and qtd > 0:
+                a = todos.setdefault(t, {'qtd': 0, 'valor': 0.0})
+                a['qtd'] += int(qtd)
+                a['valor'] += _numero(l.get('BalVal'))
+        for a in todos.values():
+            a['valor'] = round(a['valor'], 2)
+        ativos = {t: a for t, a in todos.items() if universo is None or t in universo}
         if ativos:
-            for a in ativos.values():
-                a['valor'] = round(a['valor'], 2)
-            return {'fonte': 'B3 (aluguel de ações, posições em aberto)', 'data': dia.isoformat(), 'ativos': ativos}
+            return {'fonte': 'B3 (aluguel de ações, posições em aberto)', 'data': dia.isoformat(), 'ativos': ativos, 'todos': todos}
         ultimo_erro = ValueError(f'arquivo de {dia} sem nenhum papel da carteira')
     raise RuntimeError(f'B3 indisponível nos últimos {dias_atras} dias: {ultimo_erro}')
 
@@ -275,10 +282,17 @@ def ler_b3_bruto(caminho, universo, hoje):
     ativos = {t: a for t, a in (bruto.get('ativos') or {}).items() if t in universo}
     if not ativos:
         return None
-    return {'fonte': bruto.get('fonte', 'B3 (aluguel de ações, posições em aberto)') + ' · via coletor no Brasil', 'data': dia.isoformat(), 'ativos': ativos}
+    return {'fonte': bruto.get('fonte', 'B3 (aluguel de ações, posições em aberto)') + ' · via coletor no Brasil', 'data': dia.isoformat(),
+            'ativos': ativos, 'todos': bruto.get('ativos') or {}}
 
 
 def gravar(pasta, dados):
+    dados = dict(dados)
+    todos = dados.pop('todos', None)
+    if todos:
+        with open(os.path.join(pasta, 'vendidos-todos.json'), 'w', encoding='utf-8') as f:
+            json.dump({'fonte': dados.get('fonte'), 'data': dados.get('data'), 'papeis': len(todos), 'ativos': todos},
+                      f, ensure_ascii=False, separators=(',', ':'))
     dados = {**dados, 'geradoEm': datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace('+00:00', 'Z')}
     with open(os.path.join(pasta, 'vendidos.json'), 'w', encoding='utf-8') as f:
         json.dump(dados, f, ensure_ascii=False, separators=(',', ':'))
@@ -304,6 +318,7 @@ def main(argv=None, hoje=None, sessao=requests):
     hoje = hoje or date.today()
     if args.somente_b3_bruto:
         dados = baixar_b3(None, hoje, sessao)
+        dados.pop('todos', None)
         os.makedirs(os.path.dirname(os.path.abspath(args.somente_b3_bruto)), exist_ok=True)
         with open(args.somente_b3_bruto, 'w', encoding='utf-8') as f:
             json.dump(dados, f, ensure_ascii=False, separators=(',', ':'))
@@ -319,13 +334,16 @@ def main(argv=None, hoje=None, sessao=requests):
     for nome, pasta, func in (('EUA', args.saida, lambda u: baixar_finra(u, sessao, hoje)),
                               ('Brasil', os.path.join(args.saida, 'br'), brasil)):
         universo = tickers_com_preco(pasta)
+        if universo and os.path.isdir(os.path.join(pasta, 'extras')):  # 25/11/2026: ações extras da watchlist
+            universo = set(universo) | set(tickers_com_preco(os.path.join(pasta, 'extras')) or ())
         if not universo:
             resumo.append(f'- {nome}: sem preços nesta publicação; pulado.')
             continue
         try:
             dados = func(universo)
             gravar(pasta, dados)
-            resumo.append(f"- {nome}: ✅ {len(dados['ativos'])} papéis com posição vendida ({dados['fonte']}, {dados['data']}).")
+            resumo.append(f"- {nome}: ✅ {len(dados['ativos'])} papéis com posição vendida ({dados['fonte']}, {dados['data']})"
+                          f" · {len(dados.get('todos') or {})} no relatório inteiro.")
         except Exception as e:  # nunca bloqueia a publicação
             log(f'Vendidos {nome}: falhou: {e!r}')
             resumo.append(f'- {nome}: ⚠️ não consegui baixar ({e}). O app só não mostra o alerta.')
