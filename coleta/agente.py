@@ -7,9 +7,10 @@ da estratégia congelada.
 
 Só descreve. Nada aqui é sinal de compra ou venda; o agente também não pode tratar como tal.
 
-Uso: python coleta/agente.py PASTA_DO_SITE
+Uso: python coleta/agente.py PASTA_DO_SITE [BANCO_COTAHIST]
   lê PASTA/data/carteira.json e PASTA/antigo/data/ (EUA) e PASTA/antigo/data/br/ (Brasil), quando existem;
-  grava PASTA/data/agente.json.
+  grava PASTA/data/agente.json. BANCO_COTAHIST (opcional, DuckDB de coleta/cotahist_db.py) dá o volume dos papéis
+  da B3 que o app não acompanha, para o radar amplo de vendidos (radarVendidos).
 """
 import glob
 import json
@@ -28,6 +29,13 @@ LIMITE_BYTES = 100 * 1024
 N_LISTA = 10
 N_PAPEIS_EUA = 60
 DIAS_BALANCO = 14
+# radar amplo de vendidos (25/11/2026): o relatório INTEIRO da FINRA e da B3, não só os papéis com preço no app
+N_RADAR = 40
+RADAR_EUA_MIN_VOL = 100_000        # ações por dia (média da FINRA); abaixo disso "dias para zerar" é ruído
+RADAR_EUA_MIN_QTD = 500_000        # ações vendidas; em papéis minúsculos a variação % explode sem significar nada
+RADAR_EUA_MERCADOS_FORA = ('OTC',)  # marketClassCode da FINRA: balcão fica de fora (NYSE, NNM, SC, ARCA, BZX, AMEX entram)
+RADAR_BR_MIN_VALOR = 5_000_000     # R$ alugados
+RADAR_BR_MIN_VOLFIN = 200_000      # R$ negociados por dia (média de 20 pregões)
 BASE_CARTEIRA = {'BOVA11', 'IVVB11', 'BTC'}
 AVISO = ('Resumo descritivo gerado pelo Invest. Não é recomendação de investimento. Nenhum campo é sinal de '
          'compra ou venda; a estratégia técnica está congelada desde 04/11/2026 e perdeu para o índice.')
@@ -55,6 +63,61 @@ def ler_precos(pasta):
         else:
             saida.update(obj)
     return saida
+
+
+def volume_cotahist(banco, n=20):
+    """{codneg: (quantidade média, volume financeiro médio)} dos últimos n pregões de cada papel no banco COTAHIST.
+    Sem duckdb ou sem banco devolve {} (o radar do Brasil fica só com os papéis que o app acompanha)."""
+    if not banco or not os.path.exists(banco):
+        return {}
+    try:
+        import duckdb
+        con = duckdb.connect(banco, read_only=True)
+        try:
+            linhas = con.execute("""
+                WITH ult AS (SELECT data FROM (SELECT DISTINCT data FROM pregoes) ORDER BY data DESC LIMIT ?)
+                SELECT codneg, avg(quantidade), avg(volume) FROM pregoes WHERE data IN (SELECT data FROM ult)
+                GROUP BY codneg""", [n]).fetchall()
+        finally:
+            con.close()
+        return {c: (q, v) for c, q, v in linhas}
+    except Exception as e:  # noqa: BLE001 - opcional, nunca derruba o agente.json
+        print(f'agente: volume do COTAHIST indisponível ({e})', file=sys.stderr)
+        return {}
+
+
+def radar_vendidos(todos_arq, precos, nome, vol_b3=None):
+    """Os N_RADAR papéis com mais dias para zerar a posição vendida no relatório inteiro da bolsa.
+    Cada item: [ticker, dias, variacaoPct (EUA) ou valor alugado em R$ mi (BR), fora do app (1/0), nome]."""
+    ativos = (todos_arq or {}).get('ativos') or {}
+    if not ativos:
+        return None
+    itens = []
+    for t, a in ativos.items():
+        fora = 0 if t in precos else 1
+        if nome == 'us':
+            if (a.get('mercado') or '').upper() in RADAR_EUA_MERCADOS_FORA or (a.get('volMedio') or 0) < RADAR_EUA_MIN_VOL \
+                    or (a.get('qtd') or 0) < RADAR_EUA_MIN_QTD:
+                continue
+            dias = a.get('diasFinra')
+            if dias is None:
+                continue
+            itens.append([t, r(dias, 1), a.get('variacaoPct'), fora, a.get('nome')])
+        else:
+            if (a.get('valor') or 0) < RADAR_BR_MIN_VALOR:
+                continue
+            s = precos.get(t)
+            if s:
+                qm = media([v for v in s.get('volume', [])[-20:] if v])
+                fin = media([c * v for c, v in zip(s['close'][-20:], s.get('volume', [])[-20:]) if c and v])
+            else:
+                qm, fin = (vol_b3 or {}).get(t, (None, None))
+            if not qm or (fin or 0) < RADAR_BR_MIN_VOLFIN:
+                continue
+            itens.append([t, r(a['qtd'] / qm, 1), r(a['valor'] / 1e6, 1), fora, None])
+    itens.sort(key=lambda x: (-x[1], x[0]))
+    return {'fonte': todos_arq.get('fonte'), 'data': todos_arq.get('data'), 'papeisNoRelatorio': len(ativos),
+            'arquivoCompleto': f'vendidos-todos-{nome}.json', 'itens': itens[:N_RADAR]}
 
 
 # ---------------- contas ----------------
@@ -225,13 +288,14 @@ def placar_diario(diario, indice):
     return o
 
 
-def mercado(pasta, nome, hoje, n_papeis=None, extras=()):
+def mercado(pasta, nome, hoje, n_papeis=None, extras=(), vol_b3=None):
     m = ler_json(os.path.join(pasta, 'manifest.json'))
     if not m:
         return None
     precos = ler_precos(pasta)
     fund = ler_json(os.path.join(pasta, m.get('arquivoFundamentos') or 'fundamentos.json')) or {}
     vend_arq = ler_json(os.path.join(pasta, m.get('arquivoVendidos') or 'vendidos.json')) or {}
+    vend_todos = ler_json(os.path.join(pasta, 'vendidos-todos.json'))
     indice = ler_json(os.path.join(pasta, m.get('arquivoIndice') or 'indice.json'))
     diario = ler_json(os.path.join(pasta, 'diario.json'))
 
@@ -280,7 +344,8 @@ def mercado(pasta, nome, hoje, n_papeis=None, extras=()):
                   'vendidos': {'fonte': vend_arq.get('fonte'), 'data': vend_arq.get('data')} if vend_arq else None},
         'termometro': termometro(indice),
         'amplitude': {'acimaMM200': r(sum(acima) / len(acima), 3), 'papeis': len(acima)} if acima else None,
-        'listas': listas, 'vendidos': vendidos, 'balancosProximos': balancos[:30],
+        'listas': listas, 'vendidos': vendidos, 'radarVendidos': radar_vendidos(vend_todos, precos, nome, vol_b3),
+        'balancosProximos': balancos[:30],
         'testeParaFrente': placar_diario(diario, indice),
         'situacoes': situacoes(precos, vend, indice),
         'papeis': {t: resumos[t] for t in sorted(escolhidos)},
@@ -337,7 +402,7 @@ def dias_uteis(de, ate, mercado='br'):
     return pregoes_entre(de, ate, mercado)
 
 
-def montar(site, hoje=None):
+def montar(site, hoje=None, cotahist=None):
     hoje = hoje or datetime.now(timezone.utc).date()
     cart = ler_json(os.path.join(site, 'data', 'carteira.json'))
     macro, ref, watch = carteira_resumo(cart)
@@ -347,7 +412,7 @@ def montar(site, hoje=None):
         macro['focus'] = {k: v for k, v in foc.items() if k != 'fonte'}
     base = os.path.join(site, 'antigo', 'data')
     us = mercado(base, 'us', hoje, n_papeis=N_PAPEIS_EUA, extras=watch or ()) if os.path.isdir(base) else None
-    br = mercado(os.path.join(base, 'br'), 'br', hoje, extras=watch or ()) if os.path.isdir(os.path.join(base, 'br')) else None
+    br = mercado(os.path.join(base, 'br'), 'br', hoje, extras=watch or (), vol_b3=volume_cotahist(cotahist)) if os.path.isdir(os.path.join(base, 'br')) else None
     atrasos = [dias_uteis(m['saude']['ultimoPregao'], hoje, mk) for mk, m in (('us', us), ('br', br)) if m and m['saude'].get('ultimoPregao')]
     atraso = max(atrasos) if atrasos else None
     return {
@@ -362,6 +427,7 @@ def montar(site, hoje=None):
         'legenda': {'d1/m1/a1': 'retorno de 1 pregão, 21 pregões e 252 pregões (fração: 0.05 = 5%)',
                     'mm200': 'distância do preço para a média de 200 pregões', 'topo52': 'queda desde a máxima de 52 semanas',
                     'vol': 'volatilidade anualizada de 21 pregões', 'volFinMi': 'volume financeiro médio de 20 pregões, milhões na moeda do mercado',
+                    'radarVendidos': 'os 40 papéis com mais dias para zerar a posição vendida no relatório INTEIRO da bolsa (FINRA ou B3), inclusive papéis que o app não acompanha; itens = [ticker, dias, variação % da posição vendida (EUA) ou R$ mi alugados (BR), fora (1 = sem preço nem fundamentos no app), nome]; o relatório completo fica no arquivo arquivoCompleto, na mesma pasta do Drive; contexto, não sinal',
                     'vendido.dias': 'dias de volume para zerar a posição vendida (aluguel B3 ou short interest FINRA)',
                     'ref13': '1/3 BOVA11 + 1/3 IVVB11 + 1/3 CDI', 'macro.focus': 'boletim Focus do Banco Central: mediana das expectativas em % (selic no fim do ano, ipca e pib do ano, cambio em R$/US$ no fim do ano); antes = 4 semanas atrás', 'testeParaFrente': 'placar da estratégia congelada (regras de 04/11/2026)',
                     'situacoes': 'papéis hoje ≥30% abaixo da máxima de 60 pregões; historico = vezes anteriores do MESMO papel: [data, ret20, excesso20 sobre o índice, ret60, excesso60]; saltoSuspeito = queda ≥45% num pregão além da queda do índice no dia (confirmar se é evento real ou erro de ajuste); contexto, não sinal'},
@@ -378,7 +444,7 @@ def main(argv=None):
         print(__doc__)
         return 2
     site = argv[1]
-    obj = montar(site)
+    obj = montar(site, cotahist=argv[2] if len(argv) > 2 else None)
     txt = compactar(obj)
     # se passar do limite, corta a lista de papéis dos EUA (o Ibovespa fica inteiro)
     us = obj['mercados'].get('us')

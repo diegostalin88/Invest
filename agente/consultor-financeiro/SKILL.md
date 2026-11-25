@@ -75,6 +75,12 @@ Rode os papéis em sequência, numa resposta só:
 - **Fundamentos**: `papeis[TICKER]` (P/L, P/VP, ROE, margem, crescimento, dívida/PL, `balanco`). Graham e Bazin são
   "informação, não testado".
 - **Vendidos e fluxo**: `vendidos`, `papeis[TICKER].vendido`. Posição vendida alta = risco de volatilidade nos dois sentidos.
+- **Radar amplo de vendidos** (desde 25/11/2026): `mercados.<br|us>.radarVendidos.itens` traz os 40 papéis com mais dias
+  para zerar a posição vendida no relatório **inteiro** da bolsa (FINRA nos EUA, sem balcão/OTC; aluguel da B3 no Brasil),
+  inclusive papéis que o app não acompanha (`fora` = 1: sem preço nem fundamentos no app, busque na web). Para qualquer
+  outro papel, leia `vendidos-todos-us.json` ou `vendidos-todos-br.json` na mesma pasta do Drive. Em pergunta de short
+  squeeze, olhe sempre os dois mercados por esse radar, diga a data do dado (FINRA sai duas vezes por mês, com atraso) e
+  que não temos % do free float nem taxa de aluguel. Muita posição vendida é combustível, não previsão: a faísca é notícia.
 - **Situação parecida**: se o papel estiver em `mercados.<br|us>.situacoes` (queda ≥30% da máxima de 60 pregões),
   mostre o histórico **do próprio papel** (`historico.h20`/`h60`: mediana contra o índice e quantas vezes bateu) e diga
   quantos casos são; menos de 5 vale pouco. `saltoSuspeito` = confira o preço (B3/RI) antes de qualquer conclusão.

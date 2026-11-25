@@ -133,6 +133,12 @@ if [ "$MODO" = "completo" ] || [[ "$MODO" =~ ^[0-9]+$ ]]; then
     passo "Vendidos (aluguel B3 direto daqui do Brasil e short interest FINRA)"
     opcional "$PY" coleta/vendidos.py --saida "$M"
 
+    # Ano corrente do histórico da B3 (COTAHIST): dá o volume de TODOS os papéis para o radar amplo de vendidos
+    if [ -f "$BASE/cache/cotahist.duckdb" ]; then
+      passo "Histórico da B3 (COTAHIST, ano corrente)"
+      opcional timeout 20m "$PY" coleta/cotahist_db.py "$BASE/cache/cotahist.duckdb" --de "$(date -u +%Y)"
+    fi
+
     passo "Diário de sinais e calibração anteriores"
     opcional "$PY" coleta/diario_anterior.py "$M" "$ANTERIOR" "$DIARIO"
 
@@ -158,7 +164,7 @@ fi
 
 # ---------------------------------------------------------------- 3. agente
 passo "agente.json (resumo para o agente analista)"
-opcional "$PY" coleta/agente.py "$NOVO"
+opcional "$PY" coleta/agente.py "$NOVO" "$BASE/cache/cotahist.duckdb"
 
 # Pareceres do Consultor financeiro: planilha "Consultor — pareceres" do Drive (primeira aba, como CSV) -> data/pareceres.json
 if [ -n "${RCLONE_DESTINO:-}" ] && command -v rclone >/dev/null; then
@@ -181,5 +187,11 @@ du -sh "$NOVO/data" "$NOVO/antigo/data" 2>/dev/null | sed 's/^/   /'
 if [ -n "${RCLONE_DESTINO:-}" ] && command -v rclone >/dev/null && [ -s "$NOVO/data/agente.json" ]; then
   passo "Cópia do agente.json para o Google Drive ($RCLONE_DESTINO)"
   opcional timeout 5m rclone copyto "$NOVO/data/agente.json" "$RCLONE_DESTINO/agente.json"
+  # relatório inteiro de vendidos (FINRA e B3), para o Consultor consultar qualquer papel pelo código
+  for par in "us:$NOVO/antigo/data" "br:$NOVO/antigo/data/br"; do
+    if [ -s "${par#*:}/vendidos-todos.json" ]; then
+      opcional timeout 5m rclone copyto "${par#*:}/vendidos-todos.json" "$RCLONE_DESTINO/vendidos-todos-${par%%:*}.json"
+    fi
+  done
 fi
 echo "[$(hora)] Fim. Site no ar."

@@ -100,3 +100,36 @@ def test_salto_suspeito_desconta_queda_do_indice():
     calmo = agente.situacoes(p, {}, {'principal': 'IBOV', 'series': {'IBOV': {'dates': datas, 'close': ind_calmo}}})
     assert 'saltoSuspeito' not in geral[0]               # -57% - (-15%) = -42%: não é suspeito
     assert calmo[0]['saltoSuspeito'][0][0] == datas[n - 5]
+
+
+def test_radar_vendidos_ve_o_relatorio_inteiro():
+    precos = {'AAPL': {'close': [10.0] * 20, 'volume': [1000] * 20}, 'PETR4': {'close': [30.0] * 20, 'volume': [1_000_000] * 20}}
+    us = {'fonte': 'FINRA', 'data': '2026-11-13', 'ativos': {
+        'GME': {'qtd': 9_000_000, 'diasFinra': 6.2, 'volMedio': 1_500_000, 'variacaoPct': 40.0, 'nome': 'GameStop', 'mercado': 'NYSE'},
+        'AAPL': {'qtd': 1_000_000, 'diasFinra': 1.5, 'volMedio': 50_000_000, 'variacaoPct': 1.0, 'mercado': 'NNM'},
+        'AABB': {'qtd': 9_000_000, 'diasFinra': 9.0, 'volMedio': 16_000_000, 'mercado': 'OTC'},       # balcão: fora
+        'MINI': {'qtd': 2_000, 'diasFinra': 30.0, 'volMedio': 500_000, 'mercado': 'SC'}}}              # posição minúscula: fora
+    r = agente.radar_vendidos(us, precos, 'us')
+    assert [x[0] for x in r['itens']] == ['GME', 'AAPL']
+    assert r['itens'][0] == ['GME', 6.2, 40.0, 1, 'GameStop'] and r['itens'][1][3] == 0
+    assert r['papeisNoRelatorio'] == 4 and r['arquivoCompleto'] == 'vendidos-todos-us.json'
+    br = {'fonte': 'B3', 'data': '2026-11-24', 'ativos': {
+        'PETR4': {'qtd': 5_000_000, 'valor': 150e6}, 'SMAL3': {'qtd': 3_000_000, 'valor': 30e6},
+        'NADA3': {'qtd': 1_000_000, 'valor': 6e6}, 'POUCO3': {'qtd': 10, 'valor': 100.0}}}
+    vol = {'SMAL3': (500_000, 4e6), 'NADA3': (1_000, 5_000)}                                        # NADA3 sem liquidez
+    r = agente.radar_vendidos(br, precos, 'br', vol)
+    assert r['itens'] == [['SMAL3', 6.0, 30.0, 1, None], ['PETR4', 5.0, 150.0, 0, None]]
+    assert agente.radar_vendidos(None, precos, 'br') is None
+
+
+def test_volume_cotahist_sem_banco_e_com_banco(tmp_path):
+    assert agente.volume_cotahist(None) == {} and agente.volume_cotahist(str(tmp_path / 'nao.duckdb')) == {}
+    duckdb = __import__('pytest').importorskip('duckdb')
+    banco = str(tmp_path / 'c.duckdb')
+    con = duckdb.connect(banco)
+    con.execute('CREATE TABLE pregoes (data DATE, codneg VARCHAR, quantidade BIGINT, volume DOUBLE)')
+    for k in range(25):
+        con.execute("INSERT INTO pregoes VALUES (DATE '2026-10-01' + ?::INTEGER, 'SMAL3', ?, ?)", [k, 100 if k < 5 else 200, 2000.0])
+    con.close()
+    q, v = agente.volume_cotahist(banco)['SMAL3']
+    assert q == 200 and v == 2000.0                                                                   # só os 20 últimos pregões
