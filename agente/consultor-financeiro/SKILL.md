@@ -89,8 +89,8 @@ Rode os papéis em sequência, numa resposta só:
 - **Risco e livros**: retorno sempre ao lado do índice (BOVA11 ou SPY), do CDI e da `ref13`; peso do papel na carteira;
   ETF alavancado (`alavancado`) foge dos livros para quem segura posição.
 
-Formato por papel: `TICKER · a favor | neutro | contra a tese · confiança baixa | média | alta · probabilidade de bater o
-índice em 60 pregões (%) · o que mudaria a opinião`. Nunca "compre" ou "venda".
+Formato por papel: `TICKER · a favor | neutro | contra a tese · confiança baixa | média | alta · o que mudaria a
+opinião`. Nunca "compre" ou "venda".
 
 ### Nível 5 · Ideia nova
 Se o Diego (ou você) tiver uma ideia de estratégia, diga se ela se parece com uma já reprovada e mande ao
@@ -116,14 +116,11 @@ Diego contrariar um princípio, **avise qual e proponha a versão alinhada** ant
    Nível 4 → *"Parecer não validado (placar em andamento). Não é recomendação de investimento."*
 
 ## 6. Registrar o parecer (só nível 4; protocolo em `docs/protocolo-agente.md`)
-Na planilha **"Consultor — pareceres"** (pasta Invest, já criada pela VM com o cabeçalho; **não crie outra**), acrescente
-linhas na **primeira** aba, seja qual for o nome dela (a VM lê a primeira aba), colunas: `data | papel | mercado | tese | confianca | preco_ref | indice | indice_ref |
-mudaria_opiniao | data_agente_json | probabilidade`. `probabilidade` = de 0 a 100, a chance de o papel render **mais que o
-índice** em 60 pregões; coerente com a tese (a favor > 50, contra < 50, neutro entre 40 e 60). Pense nela como uma aposta
-honesta: 70 quer dizer que, de 10 pareceres assim, uns 7 batem o índice. Uma linha por papel com tese; `preco_ref` = `papeis[TICKER].p`; `indice_ref` =
+Na planilha **"Consultor — pareceres"** (pasta Invest; crie com o conector do Google Sheets se não existir), **primeira** aba,
+chamada `pareceres` (a VM lê a primeira aba), colunas: `data | papel | mercado | tese | confianca | preco_ref | indice | indice_ref |
+mudaria_opiniao | data_agente_json`. Uma linha por papel com tese; `preco_ref` = `papeis[TICKER].p`; `indice_ref` =
 `termometro.ult` do mercado. Sem conector, mostre a tabela para o Diego colar. **Nunca altere linhas antigas**;
 mudar o método recomeça o placar.
 
 "Como está o placar?": leia a planilha e calcule o excesso de retorno sobre o índice em 20, 60 e 120 pregões com os
-preços do `agente.json`. Antes de 60 pareceres com 120 pregões, diga que ainda não dá para concluir nada. Mostre também a nota de Brier dos
-pareceres com 60 pregões (0,25 = chutar 50%; quanto menor, melhor).
+preços do `agente.json`. Antes de 60 pareceres com 120 pregões, diga que ainda não dá para concluir nada.

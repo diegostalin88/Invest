@@ -102,6 +102,110 @@ def test_salto_suspeito_desconta_queda_do_indice():
     assert calmo[0]['saltoSuspeito'][0][0] == datas[n - 5]
 
 
+# ---------------- indicadores técnicos (24/11/2026) ----------------
+def _serie(c, faixa=None):
+    s = {'close': c, 'volume': [1000] * len(c)}
+    if faixa is not None:
+        s['high'] = [x + faixa / 2 for x in c]
+        s['low'] = [x - faixa / 2 for x in c]
+    return s
+
+
+def test_ifr_serie_so_subindo_e_so_caindo():
+    sobe = agente.tecnico(_serie([10 + 0.1 * k for k in range(120)], 0.2))
+    cai = agente.tecnico(_serie([30 - 0.1 * k for k in range(120)], 0.2))
+    assert sobe['ifr14'] == 100 and sobe['ifr2'] == 100
+    assert cai['ifr14'] == 0 and cai['ifr2'] == 0
+    assert sobe['mm21'] > 0 > cai['mm21'] and sobe['macdCruz'] == 0
+
+
+def test_serie_constante_sem_divisao_por_zero():
+    t = agente.tecnico(_serie([10.0] * 100, 0))
+    assert t['ifr14'] == 50 and t['bbLarg'] == 0 and 'bbPct' not in t and 'estoc' not in t
+    assert t['atr'] == 0 and t['macd'] == 0 and t['sup'] == t['res'] == 10
+    assert agente.tecnico(_serie([10.0] * 100)) and 'atr' not in agente.tecnico(_serie([10.0] * 100))
+
+
+def test_atr_com_amplitude_fixa_e_estocastico():
+    c = [10.0] * 100
+    t = agente.tecnico(_serie(c, 0.5))
+    assert t['atr'] == 0.5 and t['atrPct'] == 0.05 and t['estoc'] == 50
+    assert agente.tecnico(_serie(c[:59], 0.5)) is None            # menos de 60 fechamentos
+
+
+def test_tec_no_agente_json_e_menor_que_200kb(tmp_path):
+    site = _site(tmp_path)
+    assert agente.main(['x', str(site)]) == 0
+    txt = (site / 'data' / 'agente.json').read_bytes()
+    assert len(txt) < 200 * 1024
+    o = json.loads(txt)
+    br = o['mercados']['br']['papeis']
+    assert any('tec' in v and 'atr' in v['tec'] and 0 <= v['tec']['ifr14'] <= 100 for v in br.values())
+    assert 'tec.ifr14/ifr2' in o['legenda'] and 'não testado' in o['legenda']['tec']
+
+
+# ---------------- dado suspeito, encerrados e alertas (25/11/2026) ----------------
+def _datas(n):
+    return [f'2026-{1 + k // 28:02d}-{1 + k % 28:02d}' for k in range(n)]
+
+
+def test_salto_de_escala_anula_campos_caso_raiz4():
+    n = 120
+    d = _datas(n)
+    c = [0.40] * (n - 10) + [10.8] * 4 + [24.4, 21.4, 20.0, 19.0, 18.0, 13.9]   # 0,30 → 10,83 (×40) → 24,4 (×100)
+    o = agente.resumo_papel({'dates': d, 'close': c, 'volume': [1000] * n})
+    assert 'm1' not in o and 'vol' not in o and 'topo52' not in o and 'tec' not in o
+    assert o['p'] == 13.9 and 'd1' in o
+    assert any('salto de escala' in x and d[n - 10] in x for x in o['alertasDado'])
+    assert sum('salto de escala' in x for x in o['alertasDado']) == 1          # não repete a cada pregão
+
+
+def test_queda_real_e_geral_nao_anula_caso_movi3():
+    n = 120
+    d = _datas(n)
+    c = [18.67] * (n - 20) + [7.75] * 20                                      # −58,5% no dia
+    ind = {d[k]: 0.0 for k in range(n)}
+    ind[d[n - 20]] = -0.139                                                   # Ibovespa −13,9% no mesmo dia
+    o = agente.resumo_papel({'dates': d, 'close': c, 'volume': [1000] * n}, ret_idx=ind)
+    assert o['m1'] == round(7.75 / 18.67 - 1, 4) and 'topo52' in o and 'tec' in o
+    assert 'alertasDado' not in o                                             # −58,5% − (−13,9%) = −44,6%: nem alerta
+    so = agente.resumo_papel({'dates': d, 'close': c, 'volume': [1000] * n})  # sem queda do índice: só alerta
+    assert so['m1'] == o['m1'] and any('queda de -58%' in x for x in so['alertasDado'])
+
+
+def test_desdobramento_registrado_nao_e_salto():
+    n = 80
+    d = _datas(n)
+    c = [10.0] * 40 + [100.0] * 40
+    assert 'alertasDado' in agente.resumo_papel({'dates': d, 'close': c, 'volume': []})
+    o = agente.resumo_papel({'dates': d, 'close': c, 'volume': []}, desd=[d[40]])
+    assert 'alertasDado' not in o and 'm1' in o
+
+
+def test_alertas_de_fundamentos():
+    al = agente.alertas_fundamentos({'roe': 1.3, 'pe': 422.7, 'netMargin': 0.671, 'operatingMargins': -3.06})
+    assert any('ROE' in x for x in al) and any('P/L' in x for x in al) and any('não operacional' in x for x in al)
+    assert agente.alertas_fundamentos({'roe': 0.2, 'pe': 15, 'netMargin': 0.1, 'operatingMargins': 0.15}) == []
+    assert any('não operacional' in x for x in agente.alertas_fundamentos({'netMargin': 0.5, 'operatingMargins': 0.2}))
+
+
+def test_vendido_completo_br_e_eua():
+    br = agente.vendido_completo({'qtd': 120, 'valor': 600.0, 'precoMedio': 5.0, 'dias': 12.9, 'mercado': 'br'},
+                                 {'sharesOutstanding': 6000, 'floatShares': 400})
+    assert br == {'qtd': 120, 'valor': 600.0, 'precoMedio': 5.0, 'dias': 12.9, 'pctAcoes': 0.02, 'pctFloat': 0.3}
+    us = agente.vendido_completo({'qtd': 50, 'diasFinra': 2.2, 'dataFinra': '2026-11-13', 'mercado': 'us'},
+                                 {'floatShares': 1000, 'shortPercentOfFloat': 0.0517, 'shortRatio': 1.9, 'dateShortInterest': '2026-10-30'})
+    assert us['pctFloat'] == 0.05 and us['shortPctFloat'] == 0.0517 and us['dataShortInterest'] == '2026-10-30'
+
+
+def test_encerrados_separados_das_falhas():
+    enc, falhas = agente.separar_encerrados(['BTOW3', 'IPA', 'VVAR3', 'NOVO9'])
+    assert falhas == ['IPA', 'NOVO9'] and [e['papel'] for e in enc] == ['BTOW3', 'VVAR3']
+    assert enc[0]['sucessor'] == 'AMER3' and enc[1]['sucessor'] == 'BHIA3' and enc[0]['ultimaData'] == '2021-07-16'
+    s = agente.saude_carteira({'geradoEm': 'x', 'falhas': ['LAME4', 'IPA']})
+    assert s['falhas'] == ['IPA'] and s['encerrados'][0]['papel'] == 'LAME4'
+
+
 def test_radar_vendidos_ve_o_relatorio_inteiro():
     precos = {'AAPL': {'close': [10.0] * 20, 'volume': [1000] * 20}, 'PETR4': {'close': [30.0] * 20, 'volume': [1_000_000] * 20}}
     us = {'fonte': 'FINRA', 'data': '2026-11-13', 'ativos': {

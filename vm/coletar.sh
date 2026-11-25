@@ -5,9 +5,10 @@
 #      e o boletim Focus do Banco Central                                          -> /data/focus.json
 #   2. mercado: os EUA mais negociados (lista em cache/universo-eua.txt) + Ibovespa,  -> /antigo/data/
 #      fundamentos, índices, balanços (semanal), vendidos, diário e relatório da estratégia congelada
-#   3. agente.json: resumo de menos de 100 KB para o agente analista                  -> /data/agente.json
+#   3. agente.json: resumo de menos de 200 KB para o agente analista (com indicadores) -> /data/agente.json
 #   4. (opcional, com RCLONE_DESTINO no config.env) pareceres do Consultor (planilha do Drive -> /data/pareceres.json)
-#      e cópia do agente.json para a pasta do Drive
+#      e cópia do agente.json para a pasta do Drive; exportação de Dados/ (preços OHLC em CSV, vendidos, relatórios…)
+#      e Biblioteca/ (estudos) em $BASE/drive e cópia ao Drive (Dados com sync; Biblioteca com copy, sem apagar)
 # Se o mercado falhar, a carteira publica do mesmo jeito e /antigo/ continua com os dados anteriores.
 #
 # Uso:
@@ -107,6 +108,9 @@ if [ "$MODO" = "completo" ] || [[ "$MODO" =~ ^[0-9]+$ ]]; then
   if [ "${MERCADO_OK:-1}" = 1 ]; then
     M="$NOVO/antigo/data"
     [[ "$MODO" =~ ^[0-9]+$ ]] || opcional "$PY" coleta/universo_liquido.py reordenar "$LISTA" "$M" --n "$N_EUA"
+    # 25/11/2026: ações e BDRs da watchlist fora do universo, pelo mesmo caminho (série ajustada, fundamentos, vendidos)
+    passo "Extras da watchlist (ações e BDRs fora do universo)"
+    opcional timeout 15m "$PY" coleta/extras.py "$M" "$NOVO/data/carteira.json"
     passo "Índices de referência (SPY e BOVA11)"
     opcional "$PY" coleta/indices.py "$M"
 
@@ -193,5 +197,11 @@ if [ -n "${RCLONE_DESTINO:-}" ] && command -v rclone >/dev/null && [ -s "$NOVO/d
       opcional timeout 5m rclone copyto "${par#*:}/vendidos-todos.json" "$RCLONE_DESTINO/vendidos-todos-${par%%:*}.json"
     fi
   done
+fi
+# 24/11/2026: dados e estudos para o Consultor (Dados/ é refeita a cada dia; Biblioteca/ só acrescenta)
+passo "Exportação para o Consultor ($BASE/drive: Dados e Biblioteca)"
+if opcional timeout 10m "$PY" coleta/exportar_drive.py "$NOVO" "$BASE/drive" && [ -n "${RCLONE_DESTINO:-}" ] && command -v rclone >/dev/null; then
+  [ -d "$BASE/drive/Dados" ] && opcional timeout 45m rclone sync "$BASE/drive/Dados" "$RCLONE_DESTINO/Dados" --transfers 8 --checkers 16 --tpslimit 8  # ~680 arquivos mudam todo dia; tpslimit evita o 403 de cota do Drive
+  [ -d "$BASE/drive/Biblioteca" ] && opcional timeout 10m rclone copy "$BASE/drive/Biblioteca" "$RCLONE_DESTINO/Biblioteca"
 fi
 echo "[$(hora)] Fim. Site no ar."

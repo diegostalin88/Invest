@@ -18,6 +18,11 @@ import os
 import sys
 from datetime import date, datetime, timedelta, timezone
 
+try:
+    from encerrados import separar
+except ImportError:  # rodando de fora da pasta coleta/
+    from coleta.encerrados import separar
+
 INICIO = '2015-01-01'
 PADRAO = [('BOVA11', 'BOVA11.SA', 'BOVA11 (ETF do Ibovespa)', 'acoes_br'),
           ('IVVB11', 'IVVB11.SA', 'IVVB11 (ETF do S&P 500 em reais)', 'acoes_eua'),
@@ -274,10 +279,12 @@ def montar(extras=(), eua=(), baixar_yahoo=yahoo, baixar_bcb=bcb, nomear=nome_ya
             a['fund'] = f
     cdi_d, cdi_v = acumular(baixar_bcb(12))
     ipca = baixar_bcb(433)
+    encerrados, falhas = separar(falhas)  # 25/11/2026: código que deixou de negociar não é falha
     return {
         'geradoEm': datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace('+00:00', 'Z'),
         'ativos': ativos,
         'falhas': falhas,
+        'encerrados': encerrados,
         'falhasApoio': falhas_apoio,
         'cdi': {'datas': cdi_d, 'acum': cdi_v},
         'ipca': {'meses': [d[:7] for d, _ in ipca], 'var': [v for _, v in ipca]},
@@ -312,7 +319,8 @@ def main(argv=None, **kw):
     print('carteira.json: ' + ', '.join(f'{k} ({len(a["datas"])} dias, último {a["datas"][-1]})' + (f' [setor {a["setor"]["nome"]}: {a["setor"].get("ref") or ", ".join(a["setor"]["pares"])}]' if a.get('setor') else '') for k, a in principais.items())
           + f' | {len(dados["ativos"]) - len(principais)} de apoio (setores)' + (f' (não vieram: {", ".join(dados["falhasApoio"])})' if dados['falhasApoio'] else '')
           + f' | CDI até {dados["cdi"]["datas"][-1]} | IPCA até {dados["ipca"]["meses"][-1] if dados["ipca"]["meses"] else "—"}'
-          + (f' | falharam: {", ".join(dados["falhas"])}' if dados['falhas'] else ''))
+          + (f' | falharam: {", ".join(dados["falhas"])}' if dados['falhas'] else '')
+          + (f' | encerrados: {", ".join(e["papel"] for e in dados["encerrados"])}' if dados.get('encerrados') else ''))
     return 0 if not dados['falhas'] else 2
 
 

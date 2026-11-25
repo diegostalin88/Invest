@@ -653,6 +653,13 @@ def fetch_from_yfinance(ticker):
             'price': info.get('currentPrice') or info.get('regularMarketPrice'),
             'shortPercentOfFloat': info.get('shortPercentOfFloat'),
             'shortRatio': info.get('shortRatio'),
+            # 25/11/2026: para % do float vendido/alugado e o alerta de lucro não operacional
+            'sharesShort': info.get('sharesShort'),
+            'dateShortInterest': (datetime.fromtimestamp(info['dateShortInterest'], tz=timezone.utc).date().isoformat()
+                                  if isinstance(info.get('dateShortInterest'), (int, float)) else None),
+            'sharesOutstanding': info.get('sharesOutstanding'),
+            'floatShares': info.get('floatShares'),
+            'operatingMargins': info.get('operatingMargins'),
             'targetMeanPrice': info.get('targetMeanPrice'),
             'recommendationKey': info.get('recommendationKey'),
             'fiftyTwoWeekHigh': info.get('fiftyTwoWeekHigh'),

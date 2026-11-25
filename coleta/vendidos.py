@@ -334,6 +334,8 @@ def main(argv=None, hoje=None, sessao=requests):
     for nome, pasta, func in (('EUA', args.saida, lambda u: baixar_finra(u, sessao, hoje)),
                               ('Brasil', os.path.join(args.saida, 'br'), brasil)):
         universo = tickers_com_preco(pasta)
+        if universo and os.path.isdir(os.path.join(pasta, 'extras')):  # 25/11/2026: ações extras da watchlist
+            universo = set(universo) | set(tickers_com_preco(os.path.join(pasta, 'extras')) or ())
         if not universo:
             resumo.append(f'- {nome}: sem preços nesta publicação; pulado.')
             continue
